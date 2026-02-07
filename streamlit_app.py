@@ -3,67 +3,110 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="KneeTech Dashboard", layout="wide")
+# Configuração da Página
+st.set_page_config(page_title="KneeTech Dashboard", layout="wide", page_icon="🏥")
 
-# Conexão com o Google Sheets
-# No Streamlit Cloud, você colará o link da planilha nas 'Secrets'
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Estilo para deixar os cards e botões com cara de app profissional
+st.markdown("""
+    <style>
+    .stButton>button { width: 100%; border-radius: 8px; background-color: #007bff; color: white; height: 3em; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.title("🏥 KneeTech: Evolução Clínica")
+# Tenta estabelecer a conexão com o Google Sheets
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+except Exception as e:
+    st.error("Erro na conexão com o Banco de Dados. Verifique as 'Secrets' no painel do Streamlit.")
+    st.stop()
 
-menu = st.sidebar.selectbox("Menu", ["Check-in Paciente", "Painel do Fisioterapeuta"])
+st.title("🏥 KneeTech: Inteligência em Fisioterapia")
 
+# Navegação lateral
+menu = st.sidebar.selectbox("Navegação", ["Check-in Paciente", "Painel do Fisioterapeuta"])
+
+# --- MÓDULO 1: CHECK-IN DO PACIENTE ---
 if menu == "Check-in Paciente":
-    st.header("Bom dia! Como você está hoje?")
+    st.header("Bom dia! Vamos registrar sua evolução?")
     
-    with st.form(key="checkin_form"):
-        paciente = st.text_input("Nome do Paciente")
+    with st.form(key="checkin_form", clear_on_submit=True):
+        paciente = st.text_input("Nome do paciente")
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            dor = st.select_slider("Nível de Dor (0-10)", options=list(range(11)))
-            sono = st.radio("Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
-            postura = st.radio("Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
+            st.subheader("Estado Geral")
+            dor = st.select_slider("Nível de dor no joelho (0-10)", options=list(range(11)))
+            sono = st.radio("Qualidade do sono hoje", ["Ruim", "Regular", "Bom"], horizontal=True)
+            postura = st.radio("Postura predominante no dia", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
 
         with col2:
+            st.subheader("Testes Funcionais")
             agachar = st.selectbox("Agachamento", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
-            step_up = st.selectbox("Step Up", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
-            step_down = st.selectbox("Step Down", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
+            step_up = st.selectbox("Step Up (Subir degrau)", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
+            step_down = st.selectbox("Step Down (Descer degrau)", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
 
-        submit_button = st.form_submit_button(label="Enviar Check-in")
+        submit_button = st.form_submit_button(label="Enviar Dados")
 
         if submit_button:
             if paciente:
-                # Cria a linha de dados
-                novo_dado = pd.DataFrame([{
-                    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "Paciente": paciente,
-                    "Dor": dor,
-                    "Sono": sono,
-                    "Postura": postura,
-                    "Agachamento": agachar,
-                    "Step_Up": step_up,
-                    "Step_Down": step_down
-                }])
-                
-                # Lê os dados existentes e adiciona o novo
-                dados_atuais = conn.read()
-                dados_atualizados = pd.concat([dados_atuais, novo_dado], ignore_index=True)
-                
-                # Salva na planilha
-                conn.update(data=dados_atualizados)
-                st.success(f"Check-in de {paciente} salvo com sucesso!")
+                try:
+                    # Coleta os dados em um DataFrame
+                    nova_entrada = pd.DataFrame([{
+                        "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        "Paciente": paciente,
+                        "Dor": int(dor),
+                        "Sono": sono,
+                        "Postura": postura,
+                        "Agachamento": agachar,
+                        "Step_Up": step_up,
+                        "Step_Down": step_down
+                    }])
+                    
+                    # Lê os dados atuais para não sobrescrever o histórico
+                    df_historico = conn.read()
+                    df_final = pd.concat([df_historico, nova_entrada], ignore_index=True)
+                    
+                    # Atualiza a planilha
+                    conn.update(data=df_final)
+                    
+                    st.success(f"Excelente, {paciente}! Dados salvos com sucesso.")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Erro ao salvar: {e}")
             else:
-                st.warning("Por favor, digite o nome do paciente.")
+                st.warning("Por favor, preencha o nome do paciente.")
 
+# --- MÓDULO 2: PAINEL DO FISIOTERAPEUTA ---
 else:
-    st.header("Painel de Controle Clínico")
+    st.header("🔍 Central de Evolução Clínica")
+    
     try:
         df = conn.read()
-        st.dataframe(df) # Mostra a tabela de todos os atendimentos
         
-        if not df.empty:
-            st.subheader("Tendência de Dor por Paciente")
-            st.line_chart(df, x="Data", y="Dor")
-    except:
-        st.info("Ainda não há dados registrados na planilha.")
+        if df.empty:
+            st.info("Ainda não há dados registrados.")
+        else:
+            paciente_sel = st.selectbox("Selecione o paciente", df['Paciente'].unique())
+            df_p = df[df['Paciente'] == paciente_sel].copy()
+            
+            # Formatação de métricas e alertas baseados em evidência
+            st.subheader(f"Status Atual: {paciente_sel}")
+            ultima = df_p.iloc[-1]
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Dor", f"{ultima['Dor']}/10")
+            m2.metric("Sono", ultima['Sono'])
+            m3.metric("Postura", ultima['Postura'])
+            
+            st.divider()
+            # Lógica clínica automática
+            if int(ultima['Dor']) >= 7 and ultima['Sono'] == "Ruim":
+                st.error("🚨 **Alerta de Sensibilização:** Dor alta e sono ruim. Reduzir carga e focar em analgesia hoje.")
+            
+            st.subheader("Gráfico de Dor")
+            st.line_chart(df_p.set_index('Data')['Dor'])
+            
+    except Exception as e:
+        st.error(f"Erro ao carregar o painel: {e}")
