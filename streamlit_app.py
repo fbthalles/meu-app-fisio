@@ -122,3 +122,31 @@ nova_linha = pd.DataFrame([{
     "Step_Up": step_up,
     "Step_Down": step_down  # Verifique se no formulário a variável é 'step_down'
 }])
+
+
+if submit_button:
+            if paciente:
+                try:
+                    # 1. LER OS DADOS MAIS RECENTES (ttl=0 evita o cache)
+                    df_historico = conn.read(ttl=0)
+                    
+                    # 2. PREPARAR A NOVA LINHA (Nomes de colunas idênticos aos da planilha)
+                    nova_entrada = pd.DataFrame([{
+                        "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        "Paciente": paciente,
+                        "Dor": int(dor),
+                        "Sono": sono,
+                        "Postura": postura,
+                        "Agachamento": agachar,
+                        "Step_Up": step_up,
+                        "Step_Down": step_down # Sem o ponto final aqui!
+                    }])
+                    
+                    # 3. JUNTAR E ATUALIZAR
+                    df_final = pd.concat([df_historico, nova_entrada], ignore_index=True)
+                    conn.update(data=df_final)
+                    
+                    st.success(f"Excelente, {paciente}! Dados salvos.")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Erro ao salvar: {e}")
