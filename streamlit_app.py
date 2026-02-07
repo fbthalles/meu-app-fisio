@@ -3,15 +3,15 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 from PIL import Image
+import altair as alt
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="GENUA - Intelligence", layout="wide", page_icon="🦵")
+# --- 1. CONFIGURAÇÃO E TEMA ---
+st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="🦵")
 
-# --- 2. CSS "GENUA PREMIUM" (Blindado contra fundo branco) ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF !important; color: #1f1f1f !important; }
-    h1, h2, h3, h4, p, label, .stMarkdown { color: #008091 !important; }
+    h1, h2, h3, h4, p, label { color: #008091 !important; }
     .stButton>button {
         width: 100%; border-radius: 12px; background-color: #008091 !important;
         color: white !important; font-weight: bold; height: 3.5em; border: none;
@@ -23,14 +23,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. CONEXÃO ---
+# --- 2. CONEXÃO ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except:
     st.error("Erro de conexão.")
     st.stop()
 
-# --- 4. BARRA LATERAL (LOGO) ---
+# --- 3. LOGO E NAVEGAÇÃO ---
 with st.sidebar:
     try:
         logo = Image.open("Ativo-1.png")
@@ -38,18 +38,18 @@ with st.sidebar:
     except:
         st.subheader("GENUA Instituto")
     st.write("---")
-    menu = st.radio("MENU", ["Check-in Paciente 📝", "Painel do Fisioterapeuta 📊"])
+    menu = st.radio("MENU", ["Check-in Paciente 📝", "Painel Analítico 📊"])
 
-# --- MÓDULO 1: CHECK-IN (IGUAL AO ANTERIOR) ---
+# --- MÓDULO 1: CHECK-IN ---
 if "Check-in" in menu:
     st.header("Avaliação Diária de Evolução")
     with st.form(key="checkin_form", clear_on_submit=True):
-        paciente = st.text_input("Nome Completo do Paciente", placeholder="Ex: Jonas Hugo")
+        paciente = st.text_input("Nome do Paciente", placeholder="Ex: José Silva")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 🌡️ Estado Geral")
-            dor = st.select_slider("Nível de dor agora (0-10)", options=list(range(11)))
-            sono = st.radio("Qualidade do sono", ["Ruim", "Regular", "Bom"], horizontal=True)
+            dor = st.select_slider("Dor agora (0-10)", options=list(range(11)))
+            sono = st.radio("Sono de hoje", ["Ruim", "Regular", "Bom"], horizontal=True)
             postura = st.radio("Postura de hoje", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
         with col2:
             st.markdown("#### 🏋️ Testes Funcionais")
@@ -57,72 +57,80 @@ if "Check-in" in menu:
             step_up = st.selectbox("Step Up", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             step_down = st.selectbox("Step Down", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
 
-        if st.form_submit_button("ENVIAR PARA A PLANILHA"):
+        if st.form_submit_button("REGISTRAR NO TABLET"):
             if paciente:
                 df_h = conn.read(ttl=0).dropna(how="all")
                 nova_linha = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente, "Dor": int(dor), "Sono": sono, "Postura": postura, "Agachamento": agachar, "Step_Up": step_up, "Step_Down": step_down}])
                 df_f = pd.concat([df_h, nova_linha], ignore_index=True)
                 conn.update(data=df_f)
-                st.success(f"Check-in de {paciente} concluído!")
+                st.success(f"Check-in de {paciente} salvo!")
                 st.balloons()
 
-# --- MÓDULO 2: PAINEL DO FISIOTERAPEUTA (NOVA INTELIGÊNCIA) ---
+# --- MÓDULO 2: PAINEL ANALÍTICO (CORRELAÇÕES) ---
 else:
-    st.header("📊 Painel de Controle e Evolução")
+    st.header("📊 Inteligência de Dados GENUA")
     df = conn.read(ttl=0).dropna(how="all")
     
     if not df.empty:
-        p_sel = st.selectbox("Selecione o Paciente para Análise", df['Paciente'].unique())
+        pacientes = df['Paciente'].unique()
+        p_sel = st.selectbox("Selecione o Paciente para Correlação", pacientes)
         df_p = df[df['Paciente'] == p_sel].copy()
         
-        # --- LÓGICA DE CORRELAÇÃO DOR X FUNÇÃO ---
-        # Mapeamento para transformar texto em número (0 a 10)
-        mapa = {"Sem Dor": 10, "Dor Leve": 7, "Dor Moderada": 4, "Incapaz": 0}
+        # --- PROCESSAMENTO DE DADOS ---
+        mapa_funcao = {"Sem Dor": 10, "Dor Leve": 7, "Dor Moderada": 4, "Incapaz": 0}
+        df_p['Score_Funcao'] = (df_p['Agachamento'].map(mapa_funcao) + df_p['Step_Up'].map(mapa_funcao) + df_p['Step_Down'].map(mapa_funcao)) / 3
         
-        # Criando o Índice Funcional Genua (Média dos 3 testes)
-        df_p['Score_Funcao'] = (
-            df_p['Agachamento'].map(mapa) + 
-            df_p['Step_Up'].map(mapa) + 
-            df_p['Step_Down'].map(mapa)
-        ) / 3
+        # --- DASHBOARD VISUAL ---
+        tab_evolucao, tab_correlacao = st.tabs(["📈 Evolução Temporal", "🧬 Correlações Clínicas"])
         
-        # Invertendo a dor para o gráfico de correlação (para visualização de "melhora")
-        # Mas vamos plotar a dor real para você ver o cruzamento
-        
-        st.subheader(f"Análise Biomecânica: {p_sel}")
-        
-        # Métricas de Capacidade
-        c1, c2, c3 = st.columns(3)
-        ultima_dor = df_p.iloc[-1]['Dor']
-        ultima_funcao = df_p.iloc[-1]['Score_Funcao']
-        
-        c1.metric("Dor Atual", f"{ultima_dor}/10", delta=int(ultima_dor - df_p.iloc[-2]['Dor']) if len(df_p)>1 else 0, delta_color="inverse")
-        c2.metric("Capacidade Funcional", f"{ultima_funcao:.1f}/10")
-        
-        # Cálculo de Eficiência (O quanto a dor está limitando a função)
-        eficiencia = (ultima_funcao * 10) # Transforma em %
-        c3.metric("Eficiência de Carga", f"{eficiencia:.0f}%")
+        with tab_evolucao:
+            st.subheader(f"Evolução de {p_sel}")
+            st.line_chart(df_p.set_index('Data')[['Dor', 'Score_Funcao']], color=["#FF4B4B", "#008091"])
+            st.caption("Linha Vermelha: Dor | Linha Azul: Função")
 
-        st.write("---")
-        st.markdown("### 📉 Correlação: Dor (Vermelho) vs Função (Verde)")
-        st.caption("O objetivo clínico é ver a linha verde subir e a vermelha descer.")
-        
-        # Preparando dados para o gráfico comparativo
-        chart_data = df_p[['Data', 'Dor', 'Score_Funcao']].copy()
-        chart_data = chart_data.set_index('Data')
-        
-        # Gráfico de Linhas Comparativo
-        st.line_chart(chart_data, color=["#FF4B4B", "#008091"]) # Vermelho para Dor, Azul Genua para Função
+        with tab_correlacao:
+            st.subheader("Análise Multi-Fatorial")
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                st.markdown("##### 😴 Impacto do Sono na Dor")
+                # Gráfico de barras: Sono vs Média de Dor
+                sono_pain = df_p.groupby('Sono')['Dor'].mean().reset_index()
+                chart_sono = alt.Chart(sono_pain).mark_bar(color='#008091').encode(
+                    x=alt.X('Sono', sort=['Ruim', 'Regular', 'Bom']),
+                    y='Dor',
+                    tooltip=['Sono', 'Dor']
+                ).properties(height=300)
+                st.altair_chart(chart_sono, use_container_width=True)
+                st.caption("Média de dor para cada qualidade de sono.")
 
-        # --- INSIGHTS AUTOMÁTICOS ---
-        st.write("---")
-        st.subheader("💡 Conclusão Clínica")
-        if ultima_dor > 5 and ultima_funcao < 5:
-            st.error(f"**Quadro de Alta Irritabilidade:** A dor de {p_sel} está limitando severamente a função. Focar em estratégias de alívio e evitar testes de carga hoje.")
-        elif ultima_dor <= 3 and ultima_funcao > 7:
-            st.success(f"**Janela de Oportunidade:** Baixa dor e alta função. Ótimo momento para progredir carga e exercícios desafiadores.")
-        else:
-            st.warning(f"**Quadro Intermediário:** Monitorar a resposta aos exercícios. A função está estável, mas a dor ainda presente.")
+            with col_b:
+                st.markdown("##### 🪑 Postura vs Função")
+                # Gráfico de barras: Postura vs Score Funcional
+                postura_func = df_p.groupby('Postura')['Score_Funcao'].mean().reset_index()
+                chart_postura = alt.Chart(postura_func).mark_bar(color='#008091').encode(
+                    x=alt.X('Postura', sort=['Sentado', 'Equilibrado', 'Em pé']),
+                    y='Score_Funcao',
+                    tooltip=['Postura', 'Score_Funcao']
+                ).properties(height=300)
+                st.altair_chart(chart_postura, use_container_width=True)
+                st.caption("Quanto a postura afeta a capacidade de agachar/subir degraus.")
+
+            st.write("---")
+            st.markdown("#### 💡 Insights de Cruzamento de Dados")
+            
+            # Lógica de correlação automática
+            worst_sleep_pain = df_p[df_p['Sono'] == 'Ruim']['Dor'].mean()
+            best_sleep_pain = df_p[df_p['Sono'] == 'Bom']['Dor'].mean()
+            
+            if worst_sleep_pain > best_sleep_pain + 2:
+                st.warning(f"🔎 **Fator Biopsicossocial Detectado:** {p_sel} apresenta dor significativamente maior após noites de sono ruim. Priorizar higiene do sono.")
+            
+            sitting_function = df_p[df_p['Postura'] == 'Sentado']['Score_Funcao'].mean()
+            standing_function = df_p[df_p['Postura'] == 'Em pé']['Score_Funcao'].mean()
+            
+            if sitting_function < standing_function - 2:
+                st.info(f"🔎 **Fator Mecânico Detectado:** A função cai quando o paciente passa o dia sentado. Orientar pausas ativas a cada 50 minutos.")
 
     else:
-        st.info("Aguardando dados para gerar o Dashboard.")
+        st.info("Aguardando preenchimento para gerar correlações.")
