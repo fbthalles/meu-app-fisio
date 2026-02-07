@@ -110,3 +110,15 @@ else:
             
     except Exception as e:
         st.error(f"Erro ao carregar o painel: {e}")
+
+# No momento de criar o DataFrame, garanta que os nomes sejam estes:
+nova_linha = pd.DataFrame([{
+    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    "Paciente": paciente,
+    "Dor": int(dor),
+    "Sono": sono,
+    "Postura": postura,
+    "Agachamento": agachar,
+    "Step_Up": step_up,
+    "Step_Down": step_down  # Verifique se no formulário a variável é 'step_down'
+}])
