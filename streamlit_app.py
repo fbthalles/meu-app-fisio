@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 from PIL import Image
 import altair as alt
+import numpy as np
 
 # --- 1. CONFIGURAÇÃO DE INTERFACE ---
 st.set_page_config(page_title="GENUA Clinical Intelligence", layout="wide", page_icon="🏥")
