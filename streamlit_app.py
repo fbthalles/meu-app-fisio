@@ -5,9 +5,10 @@ from datetime import datetime
 from PIL import Image
 import altair as alt
 
-# --- 1. CONFIGURAÇÃO E TEMA ---
+# --- 1. CONFIGURAÇÃO ---
 st.set_page_config(page_title="GENUA Clinical Support", layout="wide", page_icon="🏥")
 
+# CSS GENUA Premium
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF !important; color: #1f1f1f !important; }
@@ -40,11 +41,11 @@ with st.sidebar:
     st.write("---")
     menu = st.radio("NAVEGAÇÃO", ["Check-in Paciente 📝", "Painel Analítico 📊"])
 
-# --- MÓDULO 1: CHECK-IN DIÁRIO ---
+# --- MÓDULO 1: CHECK-IN ---
 if "Check-in" in menu:
     st.header("Entrada de Dados Clínicos")
     with st.form(key="checkin_form", clear_on_submit=True):
-        paciente = st.text_input("Nome do Paciente", placeholder="Ex: Jonas Hugo")
+        paciente = st.text_input("Nome do Paciente", placeholder="Ex: Gabriel Medeiros")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 🌡️ Estado Geral")
@@ -59,33 +60,29 @@ if "Check-in" in menu:
 
         if st.form_submit_button("REGISTRAR NO SISTEMA"):
             if paciente:
-                try:
-                    df_h = conn.read(ttl=0).dropna(how="all")
-                    nova_linha = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), "Dor": int(dor), "Sono": sono, "Postura": postura, "Agachamento": agachar, "Step_Up": step_up, "Step_Down": step_down}])
-                    conn.update(data=pd.concat([df_h, nova_linha], ignore_index=True))
-                    st.success(f"Check-in de {paciente} salvo!")
-                    st.balloons()
-                except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
+                df_h = conn.read(ttl=0).dropna(how="all")
+                nova_linha = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), "Dor": int(dor), "Sono": sono, "Postura": postura, "Agachamento": agachar, "Step_Up": step_up, "Step_Down": step_down}])
+                conn.update(data=pd.concat([df_h, nova_linha], ignore_index=True))
+                st.success("Dados registrados com sucesso!")
+                st.balloons()
 
-# --- MÓDULO 2: PAINEL ANALÍTICO (DINÂMICO) ---
+# --- MÓDULO 2: PAINEL ANALÍTICO (RACIOCÍNIO CLÍNICO EXPANDIDO) ---
 else:
-    st.header("📊 Inteligência Clínica GENUA")
+    st.header("📊 Painel de Decisão Baseada em Evidências")
     df = conn.read(ttl=0).dropna(how="all")
     
     if not df.empty:
         df['Paciente'] = df['Paciente'].str.strip()
         p_sel = st.selectbox("Selecione o Paciente", df['Paciente'].unique())
 
-        # --- NOVA LÓGICA: BUSCA HISTÓRIA NA PLANILHA ---
+        # Busca História na aba Cadastro
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
             df_cad['Nome'] = df_cad['Nome'].str.strip()
-            # Busca o texto da história para o nome selecionado
             historia_txt = df_cad[df_cad['Nome'] == p_sel]['Historia'].values[0]
             st.info(f"📝 **História Clínica:** {historia_txt}")
         except:
-            st.warning("⚠️ História não encontrada na aba 'Cadastro' para este paciente.")
+            st.warning("⚠️ História não encontrada na aba 'Cadastro'.")
 
         df_p = df[df['Paciente'] == p_sel].copy()
         mapa = {"Sem Dor": 10, "Dor Leve": 7, "Dor Moderada": 4, "Incapaz": 0}
@@ -98,15 +95,48 @@ else:
         c3.metric("Eficiência de Carga", f"{(ultima['Score_Funcao']*10):.0f}%")
 
         st.write("---")
-        st.subheader("🧬 Correlação: Dor (Vermelho) vs Função (Verde)")
+        st.subheader("🧬 Evolução: Dor vs Função")
         st.line_chart(df_p.set_index('Data')[['Dor', 'Score_Funcao']], color=["#FF4B4B", "#008091"])
 
-        # --- INSIGHTS AUTOMÁTICOS ---
-        st.subheader("💡 Raciocínio Clínico")
-        if ultima['Sono'] == "Ruim" and ultima['Dor'] >= 6:
-            st.error("🚨 **Alerta de Sensibilização:** Sono ruim correlacionado a dor alta. Modular carga hoje.")
-        elif ultima['Score_Funcao'] > 8:
-            st.success("✅ **Critério de Progressão:** Alta funcionalidade detectada. Apto para novos desafios.")
+        # --- SEÇÃO DE RACIOCÍNIO CLÍNICO EXPANDIDA ---
+        st.write("---")
+        st.subheader("💡 Suporte à Decisão Clínica (PBE)")
+        
+        col_mecanico, col_bio = st.columns(2)
+        
+        with col_mecanico:
+            st.markdown("##### 📏 Análise de Guidelines (JOSPT/AAOS)")
+            
+            # Caso 1: Déficit Excêntrico (Step Down)
+            if "Dor" in ultima['Step_Down'] or "Incapaz" in ultima['Step_Down']:
+                st.warning("**Foco: Controle Motor Excêntrico.** Dor no Step Down indica necessidade de fortalecimento proximal (quadril) e controle de valgo dinâmico.")
+            
+            # Caso 2: Alta Funcionalidade (LCA/Retorno)
+            if ultima['Score_Funcao'] >= 9 and ultima['Dor'] <= 1:
+                st.success("**Critério de Retorno ao Esporte:** Paciente atinge níveis de simetria funcional sugeridos para retorno seguro. Iniciar testes de LSI (Limb Symmetry Index).")
+            
+            # Caso 3: Osteoartrite Estável
+            if "Neusa" in p_sel or (ultima['Dor'] >= 4 and ultima['Dor'] <= 6):
+                st.info("**Manejo de OA:** Quadro estável. Priorizar exercícios aeróbicos de baixo impacto e fortalecimento progressivo de quadríceps.")
+
+        with col_bio:
+            st.markdown("##### 🧠 Fatores Biopsicossociais (OARSI)")
+            
+            # Caso 4: Sensibilização por Sono
+            if ultima['Sono'] == "Ruim" and ultima['Dor'] >= 6:
+                st.error("**Alerta de Sensibilização Central:** Sono ruim correlacionado a dor alta. Priorizar educação em dor e evitar excesso de carga mecânica hoje.")
+            
+            # Caso 5: Impacto Postural (Sinal do Cinema)
+            if ultima['Postura'] == "Sentado" and ultima['Dor'] > 5:
+                st.warning("**Fator Postural Detectado:** Piora da dor correlacionada à postura sentada prolongada. Prescrever pausas ativas e exercícios de extensão.")
+                
+            # Caso 6: Janela de Oportunidade
+            if ultima['Sono'] == "Bom" and ultima['Dor'] <= 3:
+                st.success("**Janela de Carga:** Baixa irritabilidade e sono restaurador. Momento ideal para progressão de carga e exercícios desafiadores.")
+
+        st.write("---")
+        resumo_zen = f"Evolução {p_sel}: Dor {ultima['Dor']}/10, Função {ultima['Score_Funcao']:.1f}/10. Predomínio de postura {ultima['Postura']} e sono {ultima['Sono']}."
+        st.text_area("Copie para o ZenFisio:", value=resumo_zen)
 
     else:
-        st.info("Aguardando dados para gerar o painel.")
+        st.info("Aguardando dados.")
