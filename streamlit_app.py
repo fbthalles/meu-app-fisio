@@ -34,9 +34,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-def create_pdf(p_name, hist, dor_atual, func_atual, ikdc_atual, previsao_alta):
-    pdf = FPDF()
-    pdf.add_page()
+# Aplique a função no nome e na história clínica
+pdf.cell(0, 10, f"RELATORIO CLINICO: {limpar_texto_pdf(p_name).upper()}", ln=True)
+pdf.multi_cell(0, 8, f"Historia: {limpar_texto_pdf(hist)}")
     
     # Cabeçalho Profissional
     try:
