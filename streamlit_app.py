@@ -187,9 +187,34 @@ else: # PAINEL ANALÍTICO (O CÉREBRO)
         
         # 7. Geração do Laudo PDF
         st.write("---")
-        st.subheader("📄 Relatório para Médico")
-        ikdc_pdf_txt = f"{u_score:.0f}/100" if u_score != "N/A" else "N/A"
-        pdf_bytes = create_pdf(p_sel, historia, ultima['Dor'], ultima['Score_Funcao'], ikdc_pdf_txt, prev_txt)
-        st.download_button("📥 BAIXAR RELATÓRIO PDF", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf", mime="application/pdf")
+        texto_zen = f"Evolução {p_sel}: Dor {ultima['Dor']}/10, Score Funcional {ultima['Score_Funcao']:.1f}/10. Sono {ultima['Sono']} e Postura {ultima['Postura']}."
+        st.text_area("Copie para o ZenFisio:", value=texto_zen)
+
+        # --- EXPORTAÇÃO DE LAUDO PDF (DENTRO DA IDENTAÇÃO) ---
+        st.write("---")
+        st.subheader("📄 Relatório para Médico/Convênio")
+        
+        try:
+            prev_txt = data_previsao.strftime("%d/%m/%Y")
+        except:
+            prev_txt = "Em análise"
+            
+        try:
+            ikdc_txt = f"{ultimo_score:.1f}/100"
+        except:
+            ikdc_txt = "N/A"
+        
+        # Gera os bytes do PDF
+        pdf_bytes = create_pdf(p_sel, historia, ultima['Dor'], ultima['Score_Funcao'], ikdc_txt, prev_txt)
+        
+        # O botão de download deve estar aqui, indentado!
+        st.download_button(
+            label="📥 BAIXAR RELATÓRIO PDF",
+            data=pdf_bytes,
+            file_name=f"Relatorio_GENUA_{p_sel}.pdf",
+            mime="application/pdf"
+        )
     else:
         st.info("Aguardando dados para análise.")
+
+# FIM DO ARQUIVO - NÃO COLOQUE MAIS NADA ABAIXO DESTA LINHA!
