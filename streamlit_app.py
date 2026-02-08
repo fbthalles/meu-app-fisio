@@ -8,6 +8,8 @@ import numpy as np
 from fpdf import FPDF
 import base64
 
+    
+# ESTA FUNÇÃO FICA NA COLUNA ZERO (SEM ESPAÇOS ANTES)
 def limpar_texto_pdf(txt):
     if not isinstance(txt, str): 
         return str(txt)
