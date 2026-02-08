@@ -32,41 +32,49 @@ def create_pdf(p_name, hist, dor_atual, func_atual, ikdc_atual, previsao_alta):
     pdf = FPDF()
     pdf.add_page()
     
-    # Cabeçalho com Logo (se existir o arquivo)
+    # Cabeçalho Profissional
     try:
-        pdf.image("Ativo-1.png", x=10, y=8, w=33)
+        pdf.image("Ativo-1.png", x=10, y=8, w=35)
     except:
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
+        pdf.set_font("helvetica", 'B', 16)
+        pdf.cell(0, 10, "GENUA INSTITUTO DO JOELHO", ln=True, align='C')
     
     pdf.ln(20)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, f"RELATÓRIO DE EVOLUÇÃO CLÍNICA - {p_name.upper()}", ln=True, align='C')
+    pdf.set_font("helvetica", 'B', 14)
+    pdf.cell(0, 10, f"RELATORIO DE EVOLUCAO CLINICA", ln=True, align='C')
+    pdf.set_font("helvetica", '', 12)
+    pdf.cell(0, 10, f"Paciente: {p_name.upper()}", ln=True, align='C')
     pdf.ln(10)
     
-    # História Pregressa
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "História Clínica:", ln=True)
-    pdf.set_font("Arial", '', 11)
+    # Seção: História e Contexto
+    pdf.set_fill_color(240, 249, 250)
+    pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 10, " 1. Historia Pregressa e Diagnostico", ln=True, fill=True)
+    pdf.set_font("helvetica", '', 11)
     pdf.multi_cell(0, 8, hist)
     pdf.ln(5)
     
-    # Métricas Atuais
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "Métricas de Desempenho (PBE):", ln=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(0, 8, f"- Dor Atual (EVA): {dor_atual}/10", ln=True)
-    pdf.cell(0, 8, f"- Capacidade Funcional: {func_atual:.1f}/10", ln=True)
-    pdf.cell(0, 8, f"- Score IKDC: {ikdc_atual if ikdc_atual != 'N/A' else 'Pendente'}", ln=True)
-    pdf.cell(0, 8, f"- Previsão Estimada de Alta: {previsao_alta}", ln=True)
-    pdf.ln(10)
+    # Seção: Métricas Funcionais
+    pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 10, " 2. Metricas de Desempenho (Baseado em Evidencias)", ln=True, fill=True)
+    pdf.set_font("helvetica", '', 11)
+    pdf.cell(0, 8, f"- Nivel de Dor Atual (EVA): {dor_atual}/10", ln=True)
+    pdf.cell(0, 8, f"- Capacidade Funcional Estimada: {func_atual:.1f}/10", ln=True)
+    pdf.cell(0, 8, f"- Score Funcional IKDC: {ikdc_atual}", ln=True)
+    pdf.ln(5)
+
+    # Seção: Prognóstico
+    pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 10, " 3. Prognostico e Previsao de Alta", ln=True, fill=True)
+    pdf.set_font("helvetica", '', 11)
+    pdf.cell(0, 8, f"- Data Estimada para atingir 90% de funcao: {previsao_alta}", ln=True)
     
-    # Nota Técnica
-    pdf.set_font("Arial", 'I', 10)
-    resumo = "Este relatório utiliza diretrizes da JOSPT e OARSI para análise de progressão de carga e função."
-    pdf.multi_cell(0, 8, resumo)
+    pdf.ln(20)
+    pdf.set_font("helvetica", 'I', 8)
+    pdf.multi_cell(0, 5, "Este documento e um suporte a decisao clinica baseado nos guidelines JOSPT e OARSI. Dados gerados via GENUA Intelligence System.")
     
     return pdf.output()
+    
 
 # --- 2. CONEXÃO COM GOOGLE SHEETS ---
 try:
@@ -278,6 +286,32 @@ else:
         st.write("---")
         texto_zen = f"Evolução {p_sel}: Dor {ultima['Dor']}/10, Score Funcional {ultima['Score_Funcao']:.1f}/10. Sono {ultima['Sono']} e Postura {ultima['Postura']}."
         st.text_area("Copie para o ZenFisio:", value=texto_zen)
+
+    # --- EXPORTAÇÃO DE LAUDO PDF ---
+        st.write("---")
+        st.subheader("📄 Relatório para Médico/Convênio")
+        
+        # Define os valores para o PDF
+        # Se as variáveis de previsão não existirem (erro na regressão), define como padrão
+        try:
+            prev_txt = data_previsao.strftime("%d/%m/%Y")
+        except:
+            prev_txt = "Em analise"
+            
+        try:
+            ikdc_txt = f"{ultimo_score:.1f}/100"
+        except:
+            ikdc_txt = "N/A"
+        
+        # Gera o PDF apenas quando o botão é clicado
+        pdf_output = create_pdf(p_sel, historia, ultima['Dor'], ultima['Score_Funcao'], ikdc_txt, prev_txt)
+        
+        st.download_button(
+            label="📥 BAIXAR RELATÓRIO PDF",
+            data=pdf_output,
+            file_name=f"Relatorio_GENUA_{p_sel}.pdf",
+            mime="application/pdf"
+        )
 
     else:
         st.info("Aguardando dados para análise.")
