@@ -127,6 +127,40 @@ else:
         df_p['Score_Funcao'] = (df_p['Agachamento'].map(mapa_f) + df_p['Step_Up'].map(mapa_f) + df_p['Step_Down'].map(mapa_f)) / 3
         ultima = df_p.iloc[-1]
 
+        # --- NOVO: MOTOR DE PREVISÃO DE ALTA (IA/ESTATÍSTICA) ---
+        st.write("---")
+        st.subheader("🔮 Previsão de Alta (Forecasting GENUA)")
+        
+        try:
+            # Prepara dados para regressão (Dias x Função)
+            df_p['Dias'] = (pd.to_datetime(df_p['Data'], dayfirst=True) - pd.to_datetime(df_p['Data'], dayfirst=True).min()).dt.days
+            X = df_p['Dias'].values
+            y = df_p['Score_Funcao'].values
+
+            # Calcula a linha de tendência (y = ax + b)
+            z = np.polyfit(X, y, 1)
+            p = np.poly1d(z)
+            
+            # Projeta quando o Score_Funcao atingirá 9.0 (90%)
+            # 9.0 = z[0] * dia_alvo + z[1]  => dia_alvo = (9.0 - z[1]) / z[0]
+            if z[0] > 0:  # Só calcula se houver melhora
+                dia_alvo = (9.0 - z[1]) / z[0]
+                data_previsao = pd.to_datetime(df_p['Data'], dayfirst=True).min() + pd.to_timedelta(dia_alvo, unit='d')
+                semanas_restantes = max(0, (data_previsao - datetime.now()).days // 7)
+                
+                col_ia1, col_ia2 = st.columns(2)
+                with col_ia1:
+                    st.metric("Previsão de Alta", data_previsao.strftime("%d/%m/%Y"))
+                with col_ia2:
+                    st.metric("Semanas Estimadas", f"{semanas_restantes} sem")
+                
+                st.info(f"💡 **Análise Predictiva:** Mantendo o ritmo atual de evolução, o paciente atingirá 90% de capacidade funcional em aproximadamente {semanas_restantes} semanas.")
+            else:
+                st.warning("⚠️ **Alerta de Platô:** A velocidade de melhora atual é nula ou negativa. Ajuste a carga ou investigue fatores biopsicossociais.")
+        
+        except Exception as e:
+            st.write("Dados insuficientes para gerar previsão de alta.")
+
         # 3. Métricas Principais
         m1, m2, m3 = st.columns(3)
         m1.metric("Dor Atual", f"{ultima['Dor']}/10")
