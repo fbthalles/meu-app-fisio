@@ -5,6 +5,8 @@ from datetime import datetime
 from PIL import Image
 import altair as alt
 import numpy as np
+from fpdf import FPDF
+import base64
 
 # --- 1. CONFIGURAÇÃO DE INTERFACE ---
 st.set_page_config(page_title="GENUA Clinical Intelligence", layout="wide", page_icon="🏥")
@@ -25,6 +27,46 @@ st.markdown("""
     .stTextInput>div>div>input { color: #000000 !important; }
     </style>
     """, unsafe_allow_html=True)
+
+def create_pdf(p_name, hist, dor_atual, func_atual, ikdc_atual, previsao_alta):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Cabeçalho com Logo (se existir o arquivo)
+    try:
+        pdf.image("Ativo-1.png", x=10, y=8, w=33)
+    except:
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
+    
+    pdf.ln(20)
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(0, 10, f"RELATÓRIO DE EVOLUÇÃO CLÍNICA - {p_name.upper()}", ln=True, align='C')
+    pdf.ln(10)
+    
+    # História Pregressa
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "História Clínica:", ln=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.multi_cell(0, 8, hist)
+    pdf.ln(5)
+    
+    # Métricas Atuais
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "Métricas de Desempenho (PBE):", ln=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(0, 8, f"- Dor Atual (EVA): {dor_atual}/10", ln=True)
+    pdf.cell(0, 8, f"- Capacidade Funcional: {func_atual:.1f}/10", ln=True)
+    pdf.cell(0, 8, f"- Score IKDC: {ikdc_atual if ikdc_atual != 'N/A' else 'Pendente'}", ln=True)
+    pdf.cell(0, 8, f"- Previsão Estimada de Alta: {previsao_alta}", ln=True)
+    pdf.ln(10)
+    
+    # Nota Técnica
+    pdf.set_font("Arial", 'I', 10)
+    resumo = "Este relatório utiliza diretrizes da JOSPT e OARSI para análise de progressão de carga e função."
+    pdf.multi_cell(0, 8, resumo)
+    
+    return pdf.output()
 
 # --- 2. CONEXÃO COM GOOGLE SHEETS ---
 try:
@@ -239,3 +281,20 @@ else:
 
     else:
         st.info("Aguardando dados para análise.")
+
+# --- NOVO: BOTÃO DE EXPORTAÇÃO DE LAUDO ---
+        st.write("---")
+        st.subheader("📄 Relatório para Médico/Convênio")
+        
+        # Preparar dados para o PDF
+        previsao_txt = data_previsao.strftime("%d/%m/%Y") if 'data_previsao' in locals() else "Em análise"
+        ikdc_val = f"{ultimo_score:.1f}/100" if 'ultimo_score' in locals() else "N/A"
+        
+        pdf_bytes = create_pdf(p_sel, historia, ultima['Dor'], ultima['Score_Funcao'], ikdc_val, previsao_txt)
+        
+        st.download_button(
+            label="📥 BAIXAR RELATÓRIO PDF",
+            data=pdf_bytes,
+            file_name=f"Relatorio_GENUA_{p_sel}.pdf",
+            mime="application/pdf",
+        )
