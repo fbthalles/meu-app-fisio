@@ -41,9 +41,9 @@ pdf.cell(0, 10, f"RELATORIO CLINICO: {limpar_texto_pdf(p_name).upper()}", ln=Tru
 pdf.multi_cell(0, 8, f"Historia: {limpar_texto_pdf(hist)}")
     
     # Cabeçalho Profissional
-    try:
+try:
         pdf.image("Ativo-1.png", x=10, y=8, w=35)
-    except:
+except:
         pdf.set_font("helvetica", 'B', 16)
         pdf.cell(0, 10, "GENUA INSTITUTO DO JOELHO", ln=True, align='C')
     
