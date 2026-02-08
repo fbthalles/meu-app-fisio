@@ -1,3 +1,7 @@
 streamlit
+streamlit-gsheets
 pandas
-st-gsheets-connection
+Pillow
+altair
+numpy
+fpdf2
