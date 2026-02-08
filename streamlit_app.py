@@ -5,130 +5,182 @@ from datetime import datetime
 from PIL import Image
 import altair as alt
 
-# --- 1. CONFIGURAÇÃO ---
+# --- 1. CONFIGURAÇÃO DE INTERFACE ---
 st.set_page_config(page_title="GENUA Clinical Intelligence", layout="wide", page_icon="🏥")
 
+# CSS Customizado para identidade visual e contraste no tablet
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF !important; color: #1f1f1f !important; }
     h1, h2, h3, h4, p, label { color: #008091 !important; }
-    .stButton>button { width: 100%; border-radius: 12px; background-color: #008091 !important; color: white !important; font-weight: bold; height: 3.5em; border: none; }
-    [data-testid="stMetric"] { background-color: #f8fcfd !important; border: 1px solid #008091; border-radius: 15px; padding: 15px; }
+    .stButton>button { 
+        width: 100%; border-radius: 12px; background-color: #008091 !important; 
+        color: white !important; font-weight: bold; height: 3.5em; border: none; 
+    }
+    [data-testid="stMetric"] { 
+        background-color: #f8fcfd !important; border: 1px solid #008091; 
+        border-radius: 15px; padding: 15px; 
+    }
+    .stTextInput>div>div>input { color: #000000 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. CONEXÃO ---
+# --- 2. CONEXÃO COM GOOGLE SHEETS ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
     st.error(f"Erro de conexão: {e}")
     st.stop()
 
-# --- 3. BARRA LATERAL ---
+# --- 3. BARRA LATERAL (LOGO E NAVEGAÇÃO) ---
 with st.sidebar:
     try:
         logo = Image.open("Ativo-1.png")
         st.image(logo, use_container_width=True)
     except:
         st.subheader("GENUA Instituto")
+    
     st.write("---")
-    menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação Mensal (IKDC) 📋", "Painel Analítico 📊"])
+    menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC (Mensal) 📋", "Painel Analítico 📊"])
+    st.write("---")
+    st.caption("Fisioterapia Baseada em Evidências")
 
 # --- MÓDULO 1: CHECK-IN DIÁRIO ---
 if "Check-in" in menu:
-    st.header("Check-in de Evolução Diária")
+    st.header("Entrada de Dados Diários")
     with st.form(key="checkin_form", clear_on_submit=True):
-        paciente = st.text_input("Nome do Paciente", placeholder="Ex: Gabriel Medeiros")
+        paciente = st.text_input("Nome do Paciente", placeholder="Ex: Jonas Hugo")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 🌡️ Estado Geral")
-            dor = st.select_slider("Dor agora (0-10)", options=list(range(11)))
+            dor = st.select_slider("Dor agora (EVA 0-10)", options=list(range(11)))
             sono = st.radio("Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
-            postura = st.radio("Postura Predominante", ["Sentado", "Em pé"], horizontal=True)
+            postura = st.radio("Postura Predominante hoje", ["Sentado", "Em pé"], horizontal=True)
         with col2:
             st.markdown("#### 🏋️ Testes Funcionais")
             agachar = st.selectbox("Agachamento", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             step_up = st.selectbox("Step Up", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             step_down = st.selectbox("Step Down", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
 
-        if st.form_submit_button("REGISTRAR CHECK-IN"):
+        if st.form_submit_button("REGISTRAR NO SISTEMA"):
             if paciente:
                 df_h = conn.read(ttl=0).dropna(how="all")
                 nova_linha = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), "Dor": int(dor), "Sono": sono, "Postura": postura, "Agachamento": agachar, "Step_Up": step_up, "Step_Down": step_down}])
                 conn.update(data=pd.concat([df_h, nova_linha], ignore_index=True))
-                st.success("Dados de check-in salvos!")
+                st.success(f"Check-in de {paciente} salvo!")
                 st.balloons()
 
-# --- MÓDULO 2: QUESTIONÁRIO IKDC SIMPLIFICADO ---
-elif "Avaliação Mensal" in menu:
-    st.header("📋 Questionário Funcional IKDC (Simplificado)")
-    st.info("Esta avaliação deve ser feita mensalmente para medir o ganho de função global.")
-    
+# --- MÓDULO 2: AVALIAÇÃO IKDC (CIENTÍFICA) ---
+elif "Avaliação IKDC" in menu:
+    st.header("📋 Questionário IKDC (Score Funcional)")
     with st.form(key="ikdc_form", clear_on_submit=True):
-        paciente_ikdc = st.text_input("Nome do Paciente para IKDC")
+        paciente_ikdc = st.text_input("Nome do Paciente")
         
-        st.markdown("##### 1. Qual o nível mais alto de atividade que você consegue realizar sem dor?")
-        p1 = st.selectbox("Atividade", ["Incapaz", "Atividade Leve (Caminhar)", "Atividade Moderada (Trabalho)", "Atividade Intensa (Esporte)"])
+        st.markdown("##### 1. Nível mais alto de atividade sem dor?")
+        p1 = st.selectbox("Atividade", ["Incapaz", "Atividade Leve", "Atividade Moderada", "Atividade Intensa"])
         
-        st.markdown("##### 2. Nos últimos 7 dias, quão difícil foi subir ou descer escadas?")
-        p2 = st.select_slider("Dificuldade Escadas", options=["Extrema", "Muita", "Moderada", "Leve", "Nenhuma"])
+        st.markdown("##### 2. Dificuldade para subir/descer escadas?")
+        p2 = st.select_slider("Escadas", options=["Extrema", "Muita", "Moderada", "Leve", "Nenhuma"])
         
-        st.markdown("##### 3. Nos últimos 7 dias, quão difícil foi agachar?")
-        p3 = st.select_slider("Dificuldade Agachar", options=["Extrema", "Muita", "Moderada", "Leve", "Nenhuma"])
+        st.markdown("##### 3. Dificuldade para agachar?")
+        p3 = st.select_slider("Agachar", options=["Extrema", "Muita", "Moderada", "Leve", "Nenhuma"])
         
-        st.markdown("##### 4. Como você avalia a função do seu joelho hoje? (0 é incapaz, 100 é perfeito)")
-        p4 = st.slider("Nota de 0 a 100", 0, 100, 50)
+        st.markdown("##### 4. Nota global da função do joelho (0-100)?")
+        p4 = st.slider("Nota", 0, 100, 50)
 
-        if st.form_submit_button("SALVAR AVALIAÇÃO CIENTÍFICA"):
-            # Lógica simples de Score IKDC (0-100)
-            mapa_ikdc = {"Incapaz": 0, "Atividade Leve": 33, "Atividade Moderada": 66, "Atividade Intensa": 100,
-                         "Extrema": 0, "Muita": 25, "Moderada": 50, "Leve": 75, "Nenhuma": 100}
-            
-            score_final = (mapa_ikdc.get(p1, 50) + mapa_ikdc.get(p2, 50) + mapa_ikdc.get(p3, 50) + p4) / 4
-            
-            # Salvar em uma aba separada chamada 'IKDC'
-            try:
-                df_ikdc = conn.read(worksheet="IKDC", ttl=0).dropna(how="all")
-                novo_ikdc = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": paciente_ikdc.strip(), "Score_IKDC": score_final}])
-                conn.update(worksheet="IKDC", data=pd.concat([df_ikdc, novo_ikdc], ignore_index=True))
-                st.success(f"Score IKDC de {score_final:.1f} registrado para {paciente_ikdc}!")
-            except:
-                st.error("Crie uma aba chamada 'IKDC' na sua planilha do Google com os títulos: Data, Paciente, Score_IKDC")
+        if st.form_submit_button("SALVAR SCORE CIENTÍFICO"):
+            if paciente_ikdc:
+                mapa_ikdc = {"Incapaz": 0, "Atividade Leve": 33, "Atividade Moderada": 66, "Atividade Intensa": 100,
+                             "Extrema": 0, "Muita": 25, "Moderada": 50, "Leve": 75, "Nenhuma": 100}
+                score = (mapa_ikdc.get(p1, 0) + mapa_ikdc.get(p2, 0) + mapa_ikdc.get(p3, 0) + p4) / 4
+                
+                try:
+                    df_ikdc = conn.read(worksheet="IKDC", ttl=0).dropna(how="all")
+                    novo_reg = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": paciente_ikdc.strip(), "Score_IKDC": score}])
+                    conn.update(worksheet="IKDC", data=pd.concat([df_ikdc, novo_reg], ignore_index=True))
+                    st.success(f"Score de {score:.1f} registrado!")
+                except:
+                    st.error("Erro: Crie a aba 'IKDC' no Sheets (Data, Paciente, Score_IKDC).")
 
-# --- MÓDULO 3: PAINEL ANALÍTICO ---
+# --- MÓDULO 3: PAINEL ANALÍTICO (O "CÉREBRO" DO APP) ---
 else:
-    st.header("📊 Inteligência Clínica")
+    st.header("📊 Painel de Decisão Clínica")
     df = conn.read(ttl=0).dropna(how="all")
     
     if not df.empty:
         df['Paciente'] = df['Paciente'].str.strip()
-        p_sel = st.selectbox("Selecione o Paciente", df['Paciente'].unique())
+        p_sel = st.selectbox("Selecione o Paciente para Análise", df['Paciente'].unique())
 
-        # História Clínica (da aba Cadastro)
+        # 1. História Clínica (Aba Cadastro)
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
-            historia_txt = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
-            st.info(f"📝 **História:** {historia_txt}")
+            df_cad['Nome'] = df_cad['Nome'].str.strip()
+            historia = df_cad[df_cad['Nome'] == p_sel]['Historia'].values[0]
+            st.info(f"📝 **História Clínica:** {historia}")
         except:
-            st.warning("⚠️ História não cadastrada.")
+            st.warning("História não cadastrada na aba 'Cadastro'.")
 
-        # Dashboards de Evolução
+        # 2. Processamento de Dados
         df_p = df[df['Paciente'] == p_sel].copy()
+        mapa_f = {"Sem Dor": 10, "Dor Leve": 7, "Dor Moderada": 4, "Incapaz": 0}
+        df_p['Score_Funcao'] = (df_p['Agachamento'].map(mapa_f) + df_p['Step_Up'].map(mapa_f) + df_p['Step_Down'].map(mapa_f)) / 3
         ultima = df_p.iloc[-1]
+
+        # 3. Métricas Principais
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Dor Atual", f"{ultima['Dor']}/10")
         
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Dor Diária", f"{ultima['Dor']}/10")
-        
-        # Busca último IKDC se existir
         try:
             df_ikdc_all = conn.read(worksheet="IKDC", ttl=0)
-            ultimo_ikdc = df_ikdc_all[df_ikdc_all['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
-            c2.metric("Score IKDC (Mês)", f"{ultimo_ikdc:.1f}/100")
+            ultimo_score = df_ikdc_all[df_ikdc_all['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
+            m2.metric("Score IKDC", f"{ultimo_score:.1f}/100")
         except:
-            c2.metric("Score IKDC", "N/A")
+            m2.metric("Score IKDC", "N/A")
             
-        c3.metric("Postura", ultima['Postura'])
+        m3.metric("Eficiência de Carga", f"{(ultima['Score_Funcao']*10):.0f}%")
 
+        # 4. Gráficos de Evolução e Correlação
         st.write("---")
-        st.subheader("🧬 Gráfico de Evolução Dor vs Função Diária")
-        st.line_chart(df_p.set_index('Data')[['Dor']])
+        t1, t2 = st.tabs(["📈 Evolução Temporal", "🧬 Correlações (Sono/Postura)"])
+        
+        with t1:
+            st.subheader("Evolução: Dor (Vermelho) vs Função (Azul)")
+            chart_data = df_p.set_index('Data')[['Dor', 'Score_Funcao']]
+            st.line_chart(chart_data, color=["#FF4B4B", "#008091"])
+
+        with t2:
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown("##### 😴 Sono vs Dor")
+                sono_pain = df_p.groupby('Sono')['Dor'].mean().reset_index()
+                st.altair_chart(alt.Chart(sono_pain).mark_bar(color='#008091').encode(x=alt.X('Sono', sort=['Ruim', 'Regular', 'Bom']), y='Dor'), use_container_width=True)
+            with col_b:
+                st.markdown("##### 🪑 Postura vs Função")
+                post_func = df_p.groupby('Postura')['Score_Funcao'].mean().reset_index()
+                st.altair_chart(alt.Chart(post_func).mark_bar(color='#008091').encode(x='Postura', y='Score_Funcao'), use_container_width=True)
+
+        # 5. Raciocínio Clínico (Guidelines)
+        
+        st.write("---")
+        st.subheader("💡 Suporte à Decisão Baseada em Evidências")
+        c_m, c_b = st.columns(2)
+        with c_m:
+            st.markdown("**Análise Mecânica (JOSPT)**")
+            if "Dor" in ultima['Step_Down'] or "Incapaz" in ultima['Step_Down']:
+                st.warning("⚠️ **Déficit Excêntrico:** Dor no Step Down sugere necessidade de foco em controle de glúteo médio e quadril.")
+            if ultima['Postura'] == "Sentado" and ultima['Dor'] > 4:
+                st.info("ℹ️ **Sinal do Cinema:** Correlação entre postura sentada e dor sugere irritabilidade patelofemoral.")
+        with c_b:
+            st.markdown("**Análise Biopsicossocial (OARSI)**")
+            if ultima['Sono'] == "Ruim":
+                st.error("🚨 **Alerta de Sensibilização:** Sono ruim detectado. Reduzir carga e focar em educação em dor nesta sessão.")
+            elif ultima['Score_Funcao'] > 8:
+                st.success("✅ **Janela de Alta:** Alta funcionalidade detectada. Iniciar protocolos de retorno ao esporte.")
+
+        # 6. Resumo ZenFisio
+        st.write("---")
+        texto_zen = f"Evolução {p_sel}: Dor {ultima['Dor']}/10, Score Funcional {ultima['Score_Funcao']:.1f}/10. Sono {ultima['Sono']} e Postura {ultima['Postura']}."
+        st.text_area("Copie para o ZenFisio:", value=texto_zen)
+
+    else:
+        st.info("Aguardando dados para análise.")
