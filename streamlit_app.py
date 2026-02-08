@@ -7,20 +7,20 @@ import altair as alt
 import numpy as np
 from fpdf import FPDF
 
-# --- 1. FUNÇÕES AUXILIARES (COLUNA ZERO) ---
+# --- 1. FUNÇÕES DE SUPORTE (PDF E LIMPEZA) ---
 
 def limpar_texto_pdf(txt):
-    """Remove emojis e caracteres que travam a biblioteca PDF padrão."""
+    """Remove emojis e caracteres que travam o PDF (padrão Latin-1)."""
     if not isinstance(txt, str): 
         return str(txt)
     return txt.encode('latin-1', 'ignore').decode('latin-1')
 
 def create_pdf(p_name, hist, dor_at, func_at, ikdc_at, prev_alta):
-    """Gera o laudo médico em formato PDF."""
+    """Gera o laudo médico formatado."""
     pdf = FPDF()
     pdf.add_page()
     
-    # Cabeçalho
+    # Cabeçalho com Logo
     try:
         pdf.image("Ativo-1.png", x=10, y=8, w=35)
     except:
@@ -34,35 +34,42 @@ def create_pdf(p_name, hist, dor_at, func_at, ikdc_at, prev_alta):
     pdf.cell(0, 10, f"Paciente: {limpar_texto_pdf(p_name).upper()}", ln=True, align='C')
     pdf.ln(10)
     
-    # História e Métricas
+    # Seção 1: História
     pdf.set_fill_color(240, 249, 250)
     pdf.set_font("helvetica", 'B', 12)
-    pdf.cell(0, 10, " 1. Historia e Diagnostico", ln=True, fill=True)
+    pdf.cell(0, 10, " 1. Historia Pregressa e Diagnostico", ln=True, fill=True)
     pdf.set_font("helvetica", '', 11)
     pdf.multi_cell(0, 8, limpar_texto_pdf(hist))
     pdf.ln(5)
     
+    # Seção 2: Métricas
     pdf.set_font("helvetica", 'B', 12)
     pdf.cell(0, 10, " 2. Metricas de Desempenho (PBE)", ln=True, fill=True)
     pdf.set_font("helvetica", '', 11)
-    pdf.cell(0, 8, f"- Dor Atual (EVA): {dor_at}/10", ln=True)
-    pdf.cell(0, 8, f"- Capacidade Funcional: {func_at:.1f}/10", ln=True)
-    pdf.cell(0, 8, f"- Score IKDC: {ikdc_at}", ln=True)
-    pdf.cell(0, 8, f"- Previsao de Alta (90%): {prev_alta}", ln=True)
+    pdf.cell(0, 8, f"- Nivel de Dor Atual (EVA): {dor_at}/10", ln=True)
+    pdf.cell(0, 8, f"- Capacidade Funcional Estimada: {func_at:.1f}/10", ln=True)
+    pdf.cell(0, 8, f"- Score Funcional IKDC: {ikdc_at}", ln=True)
+    pdf.ln(5)
+
+    # Seção 3: Prognóstico
+    pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 10, " 3. Prognostico e Previsao de Alta", ln=True, fill=True)
+    pdf.set_font("helvetica", '', 11)
+    pdf.cell(0, 8, f"- Data Estimada para atingir 90% de funcao: {prev_alta}", ln=True)
     
-    pdf.ln(15)
+    pdf.ln(20)
     pdf.set_font("helvetica", 'I', 8)
-    pdf.multi_cell(0, 5, "Este documento e um suporte a decisao clinica baseado nos guidelines JOSPT e OARSI.")
+    pdf.multi_cell(0, 5, "Este documento e um suporte a decisao clinica baseado nos guidelines JOSPT e OARSI. Dados gerados via GENUA Intelligence System.")
     
     return pdf.output()
 
-# --- 2. CONFIGURAÇÃO DA INTERFACE ---
+# --- 2. CONFIGURAÇÃO DE INTERFACE ---
 
 st.set_page_config(page_title="GENUA Clinical Intelligence", layout="wide", page_icon="🏥")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #FFFFFF !important; }
+    .stApp { background-color: #FFFFFF !important; color: #1f1f1f !important; }
     h1, h2, h3, h4, p, label { color: #008091 !important; }
     .stButton>button { width: 100%; border-radius: 12px; background-color: #008091 !important; color: white !important; font-weight: bold; }
     [data-testid="stMetric"] { background-color: #f8fcfd !important; border: 1px solid #008091; border-radius: 15px; padding: 15px; }
@@ -85,89 +92,104 @@ with st.sidebar:
         st.image(logo, width=250)
     except:
         st.subheader("GENUA Instituto")
+    st.write("---")
     menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC (Mensal) 📋", "Painel Analítico 📊"])
 
-# --- 5. MÓDULOS ---
+# --- 5. MÓDULOS DO SISTEMA ---
 
 if menu == "Check-in Diário 📝":
-    st.header("Check-in de Evolução")
-    with st.form("checkin", clear_on_submit=True):
+    st.header("Entrada de Dados Diários")
+    with st.form(key="checkin_form", clear_on_submit=True):
         paciente = st.text_input("Nome do Paciente")
         col1, col2 = st.columns(2)
         with col1:
-            dor = st.select_slider("Dor (0-10)", options=list(range(11)))
+            dor = st.select_slider("Dor agora (0-10)", options=list(range(11)))
             sono = st.radio("Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
-            postura = st.radio("Postura", ["Sentado", "Em pé"], horizontal=True)
+            postura = st.radio("Postura hoje", ["Sentado", "Em pé"], horizontal=True)
         with col2:
             agac = st.selectbox("Agachamento", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             sup = st.selectbox("Step Up", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             sdn = st.selectbox("Step Down", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
-        if st.form_submit_button("REGISTRAR"):
+        if st.form_submit_button("REGISTRAR NO SISTEMA"):
             df_h = conn.read(ttl=0).dropna(how="all")
             nova_l = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), "Dor": int(dor), "Sono": sono, "Postura": postura, "Agachamento": agac, "Step_Up": sup, "Step_Down": sdn}])
             conn.update(data=pd.concat([df_h, nova_l], ignore_index=True))
-            st.success("Salvo!")
+            st.success("Check-in salvo!")
 
 elif menu == "Avaliação IKDC (Mensal) 📋":
-    st.header("Score Funcional IKDC")
-    with st.form("ikdc"):
-        p_ikdc = st.text_input("Nome do Paciente")
-        nota = st.slider("Nota Global (0-100)", 0, 100, 50)
-        if st.form_submit_button("SALVAR SCORE"):
+    st.header("Questionário IKDC (Score Funcional)")
+    with st.form(key="ikdc_form"):
+        p_ikdc = st.text_input("Paciente")
+        nota = st.slider("Função Global (0-100)", 0, 100, 50)
+        if st.form_submit_button("SALVAR SCORE CIENTÍFICO"):
             df_i = conn.read(worksheet="IKDC", ttl=0).dropna(how="all")
             conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
             st.success("IKDC Registrado!")
 
-else: # PAINEL ANALÍTICO
+else: # PAINEL ANALÍTICO (O CÉREBRO)
     st.header("📊 Painel de Decisão Clínica")
     df = conn.read(ttl=0).dropna(how="all")
     if not df.empty:
-        df['Paciente'] = df['Paciente'].str.strip()
         p_sel = st.selectbox("Selecione o Paciente", df['Paciente'].unique())
         
-        # História Clínica
+        # 1. Busca História
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
-            historia = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
+            historia = df_cad[df_cad['Nome'].str.strip() == p_sel.strip()]['Historia'].values[0]
             st.info(f"📝 **História:** {historia}")
         except:
             historia = "Não cadastrada."
-
-        # Cálculos
+        
+        # 2. Cálculos de Função
         df_p = df[df['Paciente'] == p_sel].copy()
         mapa = {"Sem Dor": 10, "Dor Leve": 7, "Dor Moderada": 4, "Incapaz": 0}
         df_p['Score_Funcao'] = (df_p['Agachamento'].map(mapa) + df_p['Step_Up'].map(mapa) + df_p['Step_Down'].map(mapa)) / 3
         ultima = df_p.iloc[-1]
 
-        # Previsão de Alta
+        # 3. Previsão de Alta (IA)
         try:
             df_p['Dias'] = (pd.to_datetime(df_p['Data'], dayfirst=True) - pd.to_datetime(df_p['Data'], dayfirst=True).min()).dt.days
             z = np.polyfit(df_p['Dias'].values, df_p['Score_Funcao'].values, 1)
             dia_alvo = (9.0 - z[1]) / z[0] if z[0] > 0 else 0
             data_prev = pd.to_datetime(df_p['Data'], dayfirst=True).min() + pd.to_timedelta(dia_alvo, unit='d')
             prev_txt = data_prev.strftime("%d/%m/%Y")
+            st.success(f"🔮 **Previsão de Alta (90% de Função):** {prev_txt}")
         except:
             prev_txt = "Em análise"
 
-        # Métricas
+        # 4. Métricas e IKDC
         c1, c2, c3 = st.columns(3)
         c1.metric("Dor Atual", f"{ultima['Dor']}/10")
         try:
             df_ikdc_all = conn.read(worksheet="IKDC", ttl=0)
             u_score = df_ikdc_all[df_ikdc_all['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
-            c2.metric("Score IKDC", f"{u_score:.0f}/100")
+            status = "🔴 Severo" if u_score < 40 else "🟡 Regular" if u_score < 65 else "🟢 Bom" if u_score < 85 else "🏆 Excelente"
+            c2.metric("Score IKDC", f"{u_score:.0f}/100", delta=status)
         except:
             u_score = "N/A"
             c2.metric("Score IKDC", "N/A")
         c3.metric("Função Diária", f"{(ultima['Score_Funcao']*10):.0f}%")
 
+        # 5. Gráficos
+        st.write("---")
+        st.subheader("Evolução: Dor (Vermelho) vs Função (Azul)")
         st.line_chart(df_p.set_index('Data')[['Dor', 'Score_Funcao']], color=["#FF4B4B", "#008091"])
 
-        # BOTÃO DE PDF (DENTRO DA LÓGICA DO PACIENTE)
+        # 6. Raciocínio Clínico
+        st.write("---")
+        st.subheader("💡 Raciocínio Baseado em Evidências")
+        col_m, col_b = st.columns(2)
+        with col_m:
+            if "Dor" in ultima['Step_Down']: st.warning("⚠️ **Foco Excêntrico:** Dor no Step Down indica déficit de controle motor e força proximal.")
+            if ultima['Postura'] == "Sentado" and ultima['Dor'] > 4: st.info("ℹ️ **Sinal do Cinema:** Postura sentada agravando a dor sugere irritabilidade patelofemoral.")
+        with col_b:
+            if ultima['Sono'] == "Ruim": st.error("🚨 **Sensibilização:** Sono ruim detectado. Reduzir intensidade hoje para evitar picos de dor.")
+        
+        # 7. Geração do Laudo PDF
         st.write("---")
         st.subheader("📄 Relatório para Médico")
-        ikdc_txt = f"{u_score:.1f}/100" if isinstance(u_score, (int, float)) else "N/A"
-        pdf_bytes = create_pdf(p_sel, historia, ultima['Dor'], ultima['Score_Funcao'], ikdc_txt, prev_txt)
+        ikdc_pdf_txt = f"{u_score:.0f}/100" if u_score != "N/A" else "N/A"
+        pdf_bytes = create_pdf(p_sel, historia, ultima['Dor'], ultima['Score_Funcao'], ikdc_pdf_txt, prev_txt)
         st.download_button("📥 BAIXAR RELATÓRIO PDF", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf", mime="application/pdf")
     else:
-        st.info("Aguardando dados.")
+        st.info("Aguardando dados para análise.")
