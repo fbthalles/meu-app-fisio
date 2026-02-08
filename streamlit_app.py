@@ -8,6 +8,12 @@ import numpy as np
 from fpdf import FPDF
 import base64
 
+def limpar_texto_pdf(txt):
+    if not isinstance(txt, str): 
+        return str(txt)
+    # Remove emojis e caracteres que o PDF não entende (padrão Latin-1)
+    return txt.encode('latin-1', 'ignore').decode('latin-1')
+
 # --- 1. CONFIGURAÇÃO DE INTERFACE ---
 st.set_page_config(page_title="GENUA Clinical Intelligence", layout="wide", page_icon="🏥")
 
