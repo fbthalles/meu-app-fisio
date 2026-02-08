@@ -132,12 +132,32 @@ else:
         
         try:
             df_ikdc_all = conn.read(worksheet="IKDC", ttl=0)
-            ultimo_score = df_ikdc_all[df_ikdc_all['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
-            m2.metric("Score IKDC", f"{ultimo_score:.1f}/100")
+            historico_ikdc = df_ikdc_all[df_ikdc_all['Paciente'].str.strip() == p_sel]
+            ultimo_score = historico_ikdc['Score_IKDC'].values[-1]
+            
+            # --- NOVO: LÓGICA DE PARECER CLÍNICO IKDC ---
+            if ultimo_score < 40:
+                parecer_ikdc = "🔴 Severo: Foco em modulação de dor."
+            elif ultimo_score < 65:
+                parecer_ikdc = "🟡 Regular: Evolução de carga funcional."
+            elif ultimo_score < 85:
+                parecer_ikdc = "🟢 Bom: Iniciar pliometria/agilidade."
+            else:
+                parecer_ikdc = "🏆 Excelente: Critério de Alta/Esporte."
+            
+            m2.metric("Score IKDC", f"{ultimo_score:.1f}/100", help=parecer_ikdc)
+            st.write(f"**Parecer Funcional:** {parecer_ikdc}")
+
+            # Lógica de Comparação (MCID)
+            if len(historico_ikdc) > 1:
+                evolucao = ultimo_score - historico_ikdc['Score_IKDC'].values[-2]
+                if evolucao >= 11.5:
+                    st.success(f"📈 Melhora significativa! (+{evolucao:.1f} pts)")
+                elif evolucao < 0:
+                    st.error(f"📉 Alerta: Queda de função. ({evolucao:.1f} pts)")
+
         except:
             m2.metric("Score IKDC", "N/A")
-            
-        m3.metric("Eficiência de Carga", f"{(ultima['Score_Funcao']*10):.0f}%")
 
         # 4. Gráficos de Evolução e Correlação
         st.write("---")
