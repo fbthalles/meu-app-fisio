@@ -20,11 +20,9 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf = FPDF()
     pdf.add_page()
     
-    # Cabeçalho Institucional
+    # Cabeçalho
     try: pdf.image("Ativo-1.png", x=10, y=8, w=35)
-    except: 
-        pdf.set_font("helvetica", 'B', 16)
-        pdf.cell(0, 10, "GENUA - INSTITUTO DO JOELHO", ln=True, align='C')
+    except: pdf.set_font("helvetica", 'B', 16); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
     pdf.ln(18)
     pdf.set_font("helvetica", 'B', 14)
@@ -36,36 +34,35 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf(f" PACIENTE: {p_name.upper()}"), ln=True, fill=True)
     pdf.set_font("helvetica", '', 10); pdf.multi_cell(0, 7, limpar_texto_pdf(f"História Clínica: {hist}")); pdf.ln(3)
 
-    # 2. SCORE IKDC - CENTRALIZAÇÃO E DESTAQUE MÁXIMO
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("AVALIAÇÃO CIENTÍFICA IKDC (PADRÃO OURO)"), ln=True, fill=True, align='C')
+    # 2. SCORE IKDC - CENTRALIZAÇÃO E DESTAQUE
+    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("AVALIAÇÃO CIENTÍFICA IKDC"), ln=True, fill=True, align='C')
     pdf.set_font("helvetica", 'I', 9)
-    txt_ikdc = "Interpretacao do Score IKDC: <45 (Severo), 45-70 (Regular), >70 (Bom)."
-    pdf.multi_cell(0, 5, limpar_texto_pdf(txt_ikdc), align='C')
+    pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro internacional. <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
     
     pdf.ln(2)
     pdf.set_fill_color(0, 128, 145) # Azul GENUA
-    pdf.set_text_color(255, 255, 255) # Texto Branco
+    pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", 'B', 14)
-    # Cálculo para centralizar a moldura de 70mm
-    pdf.set_x((pdf.w - 70) / 2)
-    pdf.cell(70, 12, limpar_texto_pdf(f"SCORE ATUAL: {metrics['ikdc']}/100 {metrics['ikdc_emoji']}"), ln=True, fill=True, align='C')
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(8)
+    
+    # Cálculo para centralizar a moldura de destaque do Score
+    largura_moldura = 70
+    pdf.set_x((pdf.w - largura_moldura) / 2)
+    pdf.cell(largura_moldura, 12, limpar_texto_pdf(f"SCORE ATUAL: {metrics['ikdc']}/100 {metrics['ikdc_emoji']}"), ln=True, fill=True, align='C')
+    
+    pdf.set_text_color(0, 0, 0) # Retorna ao preto
+    pdf.ln(5)
 
-    # 3. Gráficos - Página 1
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("ANÁLISE DE EVOLUÇÃO: CAPACIDADE VS DOR"), ln=True, fill=True, align='C')
-    pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 2, w=175); pdf.set_y(pdf.get_y() + 85)
+    # 3. Gráficos (Evolução e Inchaço)
+    pdf.image(imgs['ev'], x=15, y=pdf.get_y(), w=175); pdf.set_y(pdf.get_y() + 85)
+    pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("LINHA DO TEMPO: ESTADO DO INCHAÇO"), ln=True, fill=True, align='C')
-    pdf.image(imgs['inchaco'], x=15, y=pdf.get_y() + 2, w=175)
-    
-    # Página 2 - Capacidade e Biopsicossocial
+    # Página 2 - Perfil e Biopsicossocial
     pdf.add_page()
     pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
-    pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 5, w=145)
+    pdf.image(imgs['radar'], x=30, y=pdf.get_y() + 5, w=145)
     
     pdf.set_y(pdf.get_y() + 105)
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("CORRELAÇÃO BIOPSICOSSOCIAL: SONO VS DOR"), ln=True, fill=True, align='C')
+    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("ANÁLISE BIOPSICOSSOCIAL: SONO VS DOR"), ln=True, fill=True, align='C')
     pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 5, w=175)
 
     return bytes(pdf.output())
