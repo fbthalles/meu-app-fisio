@@ -7,10 +7,10 @@ import altair as alt
 import numpy as np
 from fpdf import FPDF
 
-# --- 1. FUNÇÕES DE SUPORTE (COLUNA ZERO) ---
+# --- 1. FUNÇÕES DE SUPORTE (PDF E LIMPEZA) ---
 
 def limpar_texto_pdf(txt):
-    """Remove emojis e caracteres que travam o PDF (padrão Latin-1)."""
+    """Remove caracteres especiais (emojis) que quebram o PDF."""
     if not isinstance(txt, str): return str(txt)
     return txt.encode('latin-1', 'ignore').decode('latin-1')
 
@@ -44,7 +44,7 @@ def create_pdf(p_name, hist, dor_at, func_at, ikdc_at, prev_alta, inchaco_at):
     pdf.cell(0, 10, " 2. Metricas de Desempenho (PBE)", ln=True, fill=True)
     pdf.set_font("helvetica", '', 11)
     pdf.cell(0, 8, f"- Dor Atual (EVA): {dor_at}/10", ln=True)
-    pdf.cell(0, 8, f"- Inchaco (Stroke Test): {inchaco_at}", ln=True)
+    pdf.cell(0, 8, f"- Inchaco (Grau Stroke): {inchaco_at}", ln=True)
     pdf.cell(0, 8, f"- Capacidade Funcional: {func_at:.1f}/10", ln=True)
     pdf.cell(0, 8, f"- Score IKDC: {ikdc_at}", ln=True)
     pdf.ln(5)
@@ -109,16 +109,27 @@ if menu == "Check-in Diário 📝":
             sup = st.selectbox("Step Up", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             sdn = st.selectbox("Step Down", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             
-            # --- NOVO: CAMPO INCHAÇO ---
-            st.markdown("#### 🌊 Efusão Articular")
-            inchaco = st.select_slider("Inchaço (Stroke Test)", options=["0", "1", "2", "3"], help="Grau 0 a 3")
+            # --- SEÇÃO INCHAÇO (LINGUAGEM ACESSÍVEL) ---
+            st.markdown("#### 🌊 Inchaço do Joelho")
+            inchaco = st.select_slider(
+                "Nível de Inchaço (Stroke Test)", 
+                options=["0", "1", "2", "3"], 
+                help="Grau 0: Sem inchaço | Grau 3: Inchaço severo"
+            )
 
         if st.form_submit_button("REGISTRAR NO SISTEMA"):
             df_h = conn.read(ttl=0).dropna(how="all")
-            nova_l = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), 
-                                    "Paciente": paciente.strip(), "Dor": int(dor), 
-                                    "Inchaco": inchaco, "Sono": sono, "Postura": postura, 
-                                    "Agachamento": agachar, "Step_Up": sup, "Step_Down": sdn}])
+            nova_l = pd.DataFrame([{
+                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"), 
+                "Paciente": paciente.strip(), 
+                "Dor": int(dor), 
+                "Inchaco": inchaco, 
+                "Sono": sono, 
+                "Postura": postura, 
+                "Agachamento": agachar, 
+                "Step_Up": sup, 
+                "Step_Down": sdn
+            }])
             conn.update(data=pd.concat([df_h, nova_l], ignore_index=True))
             st.success(f"Check-in de {paciente} salvo!")
 
@@ -164,10 +175,10 @@ else: # PAINEL ANALÍTICO
         except:
             prev_txt = "Em análise"
 
-        # 4. Métricas Principais (INCLUINDO INCHAÇO)
+        # 4. Métricas Principais
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual", f"{ultima['Dor']}/10")
-        m2.metric("Stroke Test", f"Grau {ultima.get('Inchaco', 'N/A')}")
+        m2.metric("Inchaço (Grau)", f"{ultima.get('Inchaco', '0')}")
         try:
             df_ikdc_all = conn.read(worksheet="IKDC", ttl=0)
             u_score = df_ikdc_all[df_ikdc_all['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
@@ -177,7 +188,7 @@ else: # PAINEL ANALÍTICO
             m3.metric("Score IKDC", "N/A")
         m4.metric("Eficiência", f"{(ultima['Score_Funcao']*10):.0f}%")
 
-        # 5. Gráficos e Correlações
+        # 5. Gráficos e Tabs
         t1, t2 = st.tabs(["📈 Evolução", "🧬 Biopsicossocial"])
         with t1:
             st.line_chart(df_p.set_index('Data')[['Dor', 'Score_Funcao']], color=["#FF4B4B", "#008091"])
@@ -190,20 +201,20 @@ else: # PAINEL ANALÍTICO
                 st.write("🪑 Postura vs Função")
                 st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(x='Postura', y='mean(Score_Funcao)'), use_container_width=True)
 
-        # 6. Raciocínio Clínico e ZenFisio
+        # 6. Alertas e ZenFisio
         st.write("---")
         if "2" in str(ultima.get('Inchaco', '')) or "3" in str(ultima.get('Inchaco', '')):
-            st.error("🚨 **Alerta de Irritabilidade:** Efusão significativa. Reduzir carga hoje.")
+            st.error("🚨 **Alerta de Irritabilidade:** Inchaço significativo detectado. Reduzir carga hoje.")
         
-        texto_zen = f"Evolução {p_sel}: Dor {ultima['Dor']}/10, Stroke Test {ultima.get('Inchaco', '0')}, Score Funcional {ultima['Score_Funcao']:.1f}/10."
+        texto_zen = f"Evolução {p_sel}: Dor {ultima['Dor']}/10, Inchaço {ultima.get('Inchaco', '0')}/3, Score Funcional {ultima['Score_Funcao']:.1f}/10."
         st.text_area("Copie para o ZenFisio:", value=texto_zen)
         
-        # 7. PDF (DENTRO DA LÓGICA DO PACIENTE)
+        # 7. Laudo PDF
         st.subheader("📄 Relatório para Médico")
         ikdc_pdf = f"{u_score:.0f}/100" if u_score != "N/A" else "N/A"
         inchaco_pdf = f"Grau {ultima.get('Inchaco', '0')}"
         
         pdf_bytes = create_pdf(p_sel, historia, ultima['Dor'], ultima['Score_Funcao'], ikdc_pdf, prev_txt, inchaco_pdf)
-        st.download_button("📥 BAIXAR RELATÓRIO PDF", data=pdf_bytes, file_name=f"Laudo_{p_sel}.pdf", mime="application/pdf")
+        st.download_button("📥 BAIXAR RELATÓRIO PDF", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf", mime="application/pdf")
     else:
-        st.info("Aguardando dados.")
+        st.info("Aguardando dados para análise.")
