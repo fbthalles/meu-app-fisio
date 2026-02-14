@@ -36,25 +36,24 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf(f" PACIENTE: {p_name.upper()}"), ln=True, fill=True)
     pdf.set_font("helvetica", '', 10); pdf.multi_cell(0, 7, limpar_texto_pdf(f"História Clínica: {hist}")); pdf.ln(3)
 
-    # 2. SEÇÃO IKDC - CENTRALIZAÇÃO COM DESTAQUE (MOLDURA)
+    # 2. SCORE IKDC - DESTAQUE CENTRALIZADO
     pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     pdf.set_font("helvetica", 'I', 9)
-    txt_ikdc = "O IKDC é o padrão ouro internacional para avaliação funcional. <45 (Severo), 45-70 (Regular), >70 (Bom)."
-    pdf.multi_cell(0, 5, limpar_texto_pdf(txt_ikdc), align='C')
+    pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro internacional para avaliação funcional. <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
     
     pdf.ln(2)
     pdf.set_fill_color(0, 128, 145) # Azul GENUA
     pdf.set_text_color(255, 255, 255) # Texto Branco
     pdf.set_font("helvetica", 'B', 14)
     
-    # Cálculo para centralizar a moldura de 75mm no meio da página
+    # Centralização precisa da moldura (75mm de largura)
     pdf.set_x((pdf.w - 75) / 2)
     pdf.cell(75, 12, limpar_texto_pdf(f"RESULTADO: {metrics['ikdc']}/100 {metrics['ikdc_emoji']}"), ln=True, fill=True, align='C')
     
-    pdf.set_text_color(0, 0, 0) # Retorna ao preto padrão
+    pdf.set_text_color(0, 0, 0)
     pdf.ln(5)
 
-    # 3. Gráficos (Evolução e Inchaço)
+    # 3. Gráficos - Página 1
     pdf.image(imgs['ev'], x=15, y=pdf.get_y(), w=175); pdf.set_y(pdf.get_y() + 85)
     pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
@@ -109,15 +108,15 @@ elif menu == "Avaliação IKDC 📋":
             conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
             st.success("Score IKDC registrado!")
 
-# --- 4. PAINEL ANALÍTICO (O CÉREBRO CLÍNICO) ---
-else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
+# PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
+    else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
     st.header("📊 Painel Analítico & Clinical Intelligence")
     df = conn.read(ttl=0).dropna(how="all")
     if not df.empty:
         p_sel = st.selectbox("Selecione o Paciente para Análise", df['Paciente'].unique())
         df_p = df[df['Paciente'] == p_sel].copy()
         
-        # Numeração de Sessões e Mapeamento
+        # Numeração de Sessões e Mapeamentos
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
         mapa = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
         df_p['Score_Função'] = (df_p['Agachamento'].map(mapa) + df_p['Step_Up'].map(mapa) + df_p['Step_Down'].map(mapa)) / 3
@@ -134,25 +133,25 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
             dia_alvo = (9.0 - z[1]) / z[0] if z[0] > 0 else 0
             data_prev = pd.to_datetime(df_p['Data'], dayfirst=True).min() + pd.to_timedelta(dia_alvo, unit='d')
             prev_txt = data_prev.strftime("%d/%m/%Y")
-        except: prev_txt = "Em análise estatística"
+        except: prev_txt = "Em análise"
 
-        # Métricas IKDC com Emojis
+        # Métricas IKDC
         try:
             df_ikdc = conn.read(worksheet="IKDC", ttl=0)
             u_ikdc = df_ikdc[df_ikdc['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
             emoji_ikdc = "🏆" if u_ikdc >= 85 else "🟢" if u_ikdc >= 70 else "🟡" if u_ikdc >= 45 else "🔴"
         except: u_ikdc = 0; emoji_ikdc = "⚪"
 
-        # --- GERAÇÃO DE GRÁFICOS (AJUSTES DE LEGENDA E ESPAÇAMENTO) ---
+        # --- GERAÇÃO DE GRÁFICOS (REVISÃO DE ESPAÇAMENTO E LEGENDAS) ---
         
-        # 1. Evolução Clínica: Capacidade vs. Dor
+        # 1. Evolução: Capacidade vs. Dor
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
         ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
         ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
         ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold', pad=15)
         ax_ev.set_ylim(-0.5, 11)
         ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
-        indices = np.arange(0, len(df_p), 10) # 10 em 10 sessões
+        indices = np.arange(0, len(df_p), 10) # SESSÕES DE 10 EM 10
         ax_ev.set_xticks(indices); ax_ev.set_xticklabels([df_p['Sessão_Num'].iloc[i] for i in indices])
         ax_ev.grid(True, alpha=0.1); plt.subplots_adjust(bottom=0.25)
         buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
@@ -161,16 +160,16 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         ax_inc.bar(df_p['Sessão_Num'].tail(20), df_p['Inchaco_N'].tail(20), color='#008091', alpha=0.8)
         ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
-        ax_inc.set_ylim(0, 3.5); ax_inc.grid(axis='y', alpha=0.1)
+        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)"); ax_inc.grid(axis='y', alpha=0.1)
         buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
 
-        # 3. Capacidade por Teste (Barras)
+        # 3. Perfil de Capacidade Funcional (Barras)
         fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
         testes = ['Agachamento', 'Step Up', 'Step Down']
         valores = [mapa[ultima['Agachamento']], mapa[ultima['Step_Up']], mapa[ultima['Step_Down']]]
         ax_cap.bar(testes, valores, color='#008091')
         ax_cap.set_title("Capacidade Funcional por Teste (Sessão Atual)", fontweight='bold', pad=10)
-        ax_cap.set_ylim(0, 10.5)
+        ax_cap.set_ylim(0, 10.5); ax_cap.set_ylabel("Nota (0-10)")
         buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight'); plt.close(fig_cap)
 
         # 4. Impacto do Sono na Dor
@@ -184,7 +183,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
         plt.subplots_adjust(bottom=0.3)
         buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
 
-        # --- EXIBIÇÃO NO DASHBOARD ---
+        # --- EXIBIÇÃO DAS MÉTRICAS NO TOPO ---
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual", f"{ultima['Dor']}/10")
         m2.metric("Inchaço", f"Grau {ultima[col_inc]}")
@@ -192,6 +191,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
         m4.metric("Prognóstico Alta", prev_txt)
 
         st.write("---")
+        # --- DESENHO DAS ABAS E GRÁFICOS (TRAZENDO DE VOLTA O QUE SUMIU) ---
         t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌙 Sono & Inchaço", "🎯 Capacidade & Postura"])
         with t1:
             st.pyplot(fig_ev)
@@ -208,7 +208,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
                 tooltip=['Postura', 'mean(Dor)']
             ), use_container_width=True)
 
-        # --- DOWNLOAD E ZENFISIO ---
+        # --- BOTÃO DE DOWNLOAD E ZENFISIO ---
         st.write("---")
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
