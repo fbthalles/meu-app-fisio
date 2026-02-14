@@ -17,32 +17,43 @@ def limpar_texto_pdf(txt):
 def create_pdf(p_name, hist, metrics, imgs):
     pdf = FPDF()
     pdf.add_page()
+    
+    # Cabeçalho
     try: pdf.image("Ativo-1.png", x=10, y=8, w=35)
     except: pdf.set_font("helvetica", 'B', 16); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
-    pdf.ln(20)
+    pdf.ln(18)
     pdf.set_font("helvetica", 'B', 14)
-    pdf.cell(0, 10, "RELATÓRIO DE INTELIGÊNCIA CLÍNICA AVANÇADA", ln=True, align='C')
+    pdf.cell(0, 10, "RELATÓRIO DE INTELIGÊNCIA CLÍNICA E PBE", ln=True, align='C')
     pdf.ln(5)
 
-    # Dados e História
+    # 1. Identificação e História
     pdf.set_fill_color(240, 249, 250)
     pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, f" PACIENTE: {p_name.upper()}", ln=True, fill=True)
-    pdf.set_font("helvetica", '', 10); pdf.multi_cell(0, 7, f"Anamnese: {hist}"); pdf.ln(5)
+    pdf.set_font("helvetica", '', 10); pdf.multi_cell(0, 7, f"Anamnese: {limpar_texto_pdf(hist)}"); pdf.ln(5)
 
-    # Tabela de Métricas
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, " MÉTRICAS CIENTÍFICAS E PBE", ln=True, fill=True)
-    pdf.set_font("helvetica", '', 10)
-    pdf.cell(95, 7, f"- Dor (EVA): {metrics['dor']}/10", ln=0); pdf.cell(95, 7, f"- Inchaço (Stroke): {metrics['inchaco']}", ln=1)
-    pdf.cell(95, 7, f"- IKDC Score: {metrics['ikdc']}", ln=0); pdf.cell(95, 7, f"- Previsão de Alta: {metrics['alta']}", ln=1)
-    pdf.ln(5)
+    # 2. Score IKDC Explicado
+    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, " QUESTIONÁRIO IKDC (SUBJETIVO)", ln=True, fill=True)
+    pdf.set_font("helvetica", 'I', 9)
+    txt_ikdc = "O International Knee Documentation Committee (IKDC) e um score de 0-100. Valores proximos a 100 indicam ausencia de limitacoes funcionais. Interpretacao: <45 (Severo), 45-70 (Regular), >70 (Bom)."
+    pdf.multi_cell(0, 5, limpar_texto_pdf(txt_ikdc))
+    pdf.set_font("helvetica", 'B', 10); pdf.cell(0, 7, f"Score Atual: {metrics['ikdc']}/100", ln=True); pdf.ln(5)
 
-    # Gráficos
-    pdf.image(imgs['ev'], x=15, y=pdf.get_y(), w=175); pdf.set_y(pdf.get_y() + 85)
-    pdf.image(imgs['sono'], x=15, y=pdf.get_y(), w=175)
+    # 3. Gráficos de Evolução
+    pdf.image(imgs['ev'], x=15, y=pdf.get_y(), w=175); pdf.set_y(pdf.get_y() + 82)
+    pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
+    # Segunda Página
     pdf.add_page()
-    pdf.image(imgs['radar'], x=45, y=20, w=120)
+    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, " PERFIL FUNCIONAL (RADAR)", ln=True, fill=True)
+    pdf.set_font("helvetica", '', 9)
+    pdf.multi_cell(0, 5, "O grafico abaixo ilustra o equilibrio entre os testes de agachamento, step up e step down. Desequilibrios na teia indicam deficits especificos em controle motor ou forca excentrica.")
+    pdf.image(imgs['radar'], x=45, y=pdf.get_y() + 10, w=120)
+    
+    pdf.set_y(pdf.get_y() + 115)
+    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, " FATORES BIOPSICOSSOCIAIS (SONO vs DOR)", ln=True, fill=True)
+    pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 5, w=175)
+
     return bytes(pdf.output())
 
 # --- 2. INTERFACE ---
@@ -54,7 +65,7 @@ with st.sidebar:
     except: st.header("GENUA")
     menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "IKDC (Mensal) 📋", "Painel Analítico 📊"])
 
-# --- 3. MÓDULOS DE ENTRADA (RESTAURADOS) ---
+# --- 3. MÓDULOS DE ENTRADA ---
 if menu == "Check-in Diário 📝":
     st.header("Entrada de Dados Diários")
     with st.form("checkin", clear_on_submit=True):
@@ -85,7 +96,7 @@ elif menu == "IKDC (Mensal) 📋":
             conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
             st.success("IKDC Atualizado!")
 
-# --- 4. PAINEL ANALÍTICO (O CÉREBRO) ---
+# --- 4. PAINEL ANALÍTICO ---
 else:
     st.header("📊 Inteligência Clínica & BI")
     df = conn.read(ttl=0).dropna(how="all")
@@ -93,14 +104,14 @@ else:
         p_sel = st.selectbox("Selecione o Paciente", df['Paciente'].unique())
         df_p = df[df['Paciente'] == p_sel].copy()
         
-        # Cruzamento de Dados e Cálculos
         mapa = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
         mapa_sono = {"Ruim": 1, "Regular": 5, "Bom": 10}
         df_p['Score_Funcao'] = (df_p['Agachamento'].map(mapa) + df_p['Step_Up'].map(mapa) + df_p['Step_Down'].map(mapa)) / 3
         df_p['Sono_N'] = df_p['Sono'].map(mapa_sono)
+        df_p['Inchaco_N'] = pd.to_numeric(df_p['Inchaco'], errors='coerce').fillna(0)
         ultima = df_p.iloc[-1]
 
-        # IA: Previsão de Alta (Regressão Linear)
+        # IA: Previsão de Alta
         try:
             df_p['Dias'] = (pd.to_datetime(df_p['Data'], dayfirst=True) - pd.to_datetime(df_p['Data'], dayfirst=True).min()).dt.days
             z = np.polyfit(df_p['Dias'].values, df_p['Score_Funcao'].values, 1)
@@ -109,73 +120,59 @@ else:
             prev_txt = data_prev.strftime("%d/%m/%Y")
         except: prev_txt = "Em análise"
 
-        # Métricas no Topo
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual", f"{ultima['Dor']}/10")
         m2.metric("Inchaço", f"Grau {ultima.get('Inchaco', '0')}")
         try:
             df_ikdc = conn.read(worksheet="IKDC", ttl=0)
-            u_ikdc = df_ikdc[df_ikdc['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
-            status = "🔴 Severo" if u_ikdc < 45 else "🟡 Regular" if u_ikdc < 70 else "🟢 Bom"
-            m3.metric("IKDC Científico", f"{u_ikdc:.0f}/100", delta=status)
-        except: u_ikdc = "N/A"; m3.metric("IKDC", "Pendente")
+            u_ikdc_val = df_ikdc[df_ikdc['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1]
+            m3.metric("IKDC", f"{u_ikdc_val:.0f}/100")
+        except: u_ikdc_val = "N/A"; m3.metric("IKDC", "Pendente")
         m4.metric("Eficiência de Carga", f"{(ultima['Score_Funcao']*10):.0f}%")
 
-        # --- GERAÇÃO DE GRÁFICOS (MATPLOTLIB PARA PDF) ---
+        # --- GERAÇÃO DE GRÁFICOS ---
         # A) Evolução Geral
         fig_ev, ax_ev = plt.subplots(figsize=(10, 4))
         ax_ev.plot(df_p['Data'], df_p['Dor'], color='#FF4B4B', label='Dor (EVA)', marker='o')
-        ax_ev.plot(df_p['Data'], df_p['Score_Funcao'], color='#008091', label='Função (Score)', linewidth=3)
-        ax_ev.set_title("Evolução: Dor vs Capacidade Funcional"); ax_ev.legend(); plt.xticks(rotation=45, fontsize=8)
+        ax_ev.plot(df_p['Data'], df_p['Score_Funcao'], color='#008091', label='Função', linewidth=3)
+        ax_ev.set_title("Evolução Clínica Geral"); ax_ev.legend(); plt.xticks(rotation=45, fontsize=8)
         buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
 
-        # B) Biopsicossocial: Sono vs Dor
-        fig_sono, ax_sono = plt.subplots(figsize=(10, 3))
-        ax_sono.fill_between(df_p['Data'], df_p['Sono_N'], color='#008091', alpha=0.3, label='Qualidade do Sono')
-        ax_sono.step(df_p['Data'], df_p['Dor'], color='#FF4B4B', where='post', label='Picos de Dor')
-        ax_sono.set_title("Análise Biopsicossocial: Sono vs Dor"); ax_sono.legend(); plt.xticks(rotation=45, fontsize=8)
-        buf_sono = io.BytesIO(); plt.savefig(buf_sono, format='png', bbox_inches='tight'); plt.close(fig_sono)
+        # B) Linha do Tempo de Inchaço (NOVO)
+        fig_inc, ax_inc = plt.subplots(figsize=(10, 3))
+        cores_inc = ['#FF4B4B' if x > 1 else '#008091' for x in df_p['Inchaco_N'].tail(15)]
+        ax_inc.bar(df_p['Data'].tail(15), df_p['Inchaco_N'].tail(15), color=cores_inc)
+        ax_inc.set_title("Linha do Tempo de Inchaço (Últimas 15 sessões)"); ax_inc.set_ylim(0,3)
+        plt.xticks(rotation=45, fontsize=8)
+        buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
 
-        # C) Radar Funcional
-        lbls = ['Agacho', 'Step Up', 'Step Down']; stats = [ultima['Agachamento'], ultima['Step_Up'], ultima['Step_Down']]
-        stats_n = [mapa[s] for s in stats]; angles = np.linspace(0, 2*np.pi, len(lbls), endpoint=False).tolist()
-        stats_n += stats_n[:1]; angles += angles[:1]
-        fig_r, ax_r = plt.subplots(figsize=(5, 4), subplot_kw=dict(polar=True))
-        ax_r.fill(angles, stats_n, color='#008091', alpha=0.25); ax_r.set_xticklabels(lbls)
+        # C) Radar Funcional (MODIFICADO)
+        lbls = ['Agachamento', 'Step Up', 'Step Down']; stats = [mapa[ultima['Agachamento']], mapa[ultima['Step_Up']], mapa[ultima['Step_Down']]]
+        angles = np.linspace(0, 2*np.pi, len(lbls), endpoint=False).tolist(); stats += stats[:1]; angles += angles[:1]
+        fig_r, ax_r = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+        ax_r.fill(angles, stats, color='#008091', alpha=0.3); ax_r.plot(angles, stats, color='#008091', linewidth=2)
+        ax_r.set_xticks(angles[:-1]); ax_r.set_xticklabels(lbls); ax_r.set_ylim(0, 10)
         buf_radar = io.BytesIO(); plt.savefig(buf_radar, format='png', bbox_inches='tight'); plt.close(fig_r)
 
-        # Exibição das Abas
-        st.write("---")
-        t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌙 Biopsicossocial", "🎯 Perfil de Capacidade"])
-        with t1:
-            st.pyplot(fig_ev)
-            st.success(f"🔮 **Prognóstico de Alta:** De acordo com a regressão linear, o paciente atingirá 90% de função em **{prev_txt}**.")
-        with t2:
-            st.pyplot(fig_sono)
-            st.write("**Análise de Postura vs Dor:**")
-            st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(x='Postura', y='mean(Dor)'), use_container_width=True)
-        with t3:
-            c_l, c_r = st.columns(2)
-            with c_l: st.pyplot(fig_r)
-            with c_r:
-                st.markdown("#### 💡 Insights Clínicos (PBE)")
-                if "Incapaz" in str(ultima['Step_Down']) or "Moderada" in str(ultima['Step_Down']):
-                    st.warning("⚠️ **Déficit Excêntrico:** Baixo controle no Step Down indica necessidade de focar em freio motor.")
-                if int(ultima.get('Inchaco', '0')) >= 2:
-                    st.error("🔥 **Joelho Irritado:** Inchaço Grau 2+. Priorizar controle de efusão e reduzir pliometria.")
-                if ultima['Sono'] == "Ruim":
-                    st.info("🚨 **Sensibilização:** Sono ruim detectado. Possível aumento da percepção de dor sem dano tecidual novo.")
+        # D) Sono vs Dor
+        fig_s, ax_s = plt.subplots(figsize=(10, 3))
+        ax_s.fill_between(df_p['Data'], df_p['Sono_N'], color='#008091', alpha=0.3, label='Sono')
+        ax_s.plot(df_p['Data'], df_p['Dor'], color='#FF4B4B', label='Dor'); ax_s.legend(); plt.xticks(rotation=45, fontsize=8)
+        buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
 
-        # ZenFisio e PDF
+        # Tabs Interface
+        t1, t2, t3 = st.tabs(["📊 Evolução", "🧬 Inchaço & Sono", "🎯 Radar Funcional"])
+        with t1: st.pyplot(fig_ev)
+        with t2: st.pyplot(fig_inc); st.pyplot(fig_s)
+        with t3: st.pyplot(fig_r)
+
+        # PDF e ZenFisio
         st.write("---")
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
             hist = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
         except: hist = "Não cadastrada."
         
-        txt_zen = f"Evolução {p_sel}: Dor {ultima['Dor']}/10, Inchaço {ultima.get('Inchaco', '0')}, Score Funcional {ultima['Score_Funcao']:.1f}/10. Previsão de Alta: {prev_txt}."
-        st.text_area("Copie para o ZenFisio:", value=txt_zen)
-        
-        pdf_bytes = create_pdf(p_sel, hist, {'dor': ultima['Dor'], 'inchaco': ultima.get('Inchaco', '0'), 'ikdc': u_ikdc, 'alta': prev_txt}, {'ev': buf_ev, 'sono': buf_sono, 'radar': buf_radar})
-        st.download_button("📥 EXPORTAR PARECER COMPLETO (PDF)", data=pdf_bytes, file_name=f"GENUA_Report_{p_sel}.pdf")
+        pdf_bytes = create_pdf(p_sel, hist, {'dor': ultima['Dor'], 'inchaco': ultima.get('Inchaco', '0'), 'ikdc': u_ikdc_val, 'alta': prev_txt}, {'ev': buf_ev, 'sono': buf_s, 'radar': buf_radar, 'inchaco': buf_inc})
+        st.download_button("📥 EXPORTAR RELATÓRIO PREMIUM (PDF)", data=pdf_bytes, file_name=f"GENUA_Full_Report_{p_sel}.pdf")
     else: st.info("Sem dados disponíveis.")
