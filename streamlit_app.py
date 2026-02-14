@@ -103,7 +103,7 @@ with st.sidebar:
     except: st.header("GENUA")
     menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
 
-# --- 3. MÓDULOS DE NAVEGAÇÃO (SUBSTITUA A PARTIR DAQUI) ---
+# --- 3. MÓDULOS DE NAVEGAÇÃO
 
 if menu == "Check-in Diário 📝":
     st.header("Check-in Diário de Evolução")
@@ -169,74 +169,52 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
         except: u_ikdc = 0; emoji_ikdc = "⚪"
 
         # --- GERAÇÃO DE GRÁFICOS 
+
+        # --- GERAÇÃO DE GRÁFICOS (FIX FIG_CAP E EIXO X) ---
         
-        # Índices fixos para o Eixo X (S1, S11, S21, S31...)
+        # Índices fixos para o Eixo X (10 em 10 sessões)
         indices_10 = np.arange(0, len(df_p), 10)
         labels_10 = [df_p['Sessão_Num'].iloc[i] for i in indices_10]
 
-        # 1. Gráfico de Evolução
+        # 1. Evolução Clínica
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Dor (EVA)', marker='o', linewidth=2)
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade', marker='s', linewidth=3)
         ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold', pad=15)
         ax_ev.set_ylim(-0.5, 11)
+        ax_ev.set_xticks(indices_10); ax_ev.set_xticklabels(labels_10)
         ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
-        
-        # Aplicação Rígida do Eixo X
-        ax_ev.set_xticks(indices_10)
-        ax_ev.set_xticklabels(labels_10)
-        ax_ev.grid(True, alpha=0.1); plt.subplots_adjust(bottom=0.25)
-        buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
+        plt.subplots_adjust(bottom=0.25); buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
 
-        # 2. Histórico de Inchaço
+        # 2. Linha do Tempo de Inchaço
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color='#008091', alpha=0.8)
         ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
-        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)")
-        
-        # Aplicação do Eixo X no Inchaço também
-        ax_inc.set_xticks(indices_10)
-        ax_inc.set_xticklabels(labels_10)
-        ax_inc.grid(axis='y', alpha=0.1)
+        ax_inc.set_ylim(0, 3.5); ax_inc.set_xticks(indices_10); ax_inc.set_xticklabels(labels_10)
         buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
+
+        # 3. Capacidade Funcional (AQUI DEFINE O FIG_CAP)
+        fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
+        testes = ['Agachamento', 'Step Up', 'Step Down']
+        valores = [mapa[ultima['Agachamento']], mapa[ultima['Step_Up']], mapa[ultima['Step_Down']]]
+        ax_cap.bar(testes, valores, color='#008091')
+        ax_cap.set_title("Capacidade Funcional por Teste", fontweight='bold')
+        ax_cap.set_ylim(0, 10.5)
+        buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight'); plt.close(fig_cap)
 
         # 4. Sono vs. Dor
         fig_s, ax_s = plt.subplots(figsize=(10, 4))
-        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
-        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
-        ax_s.set_title("Impacto Biopsicossocial: Qualidade do Sono vs. Dor", fontweight='bold', pad=15)
-        ax_s.set_ylim(-0.5, 11)
+        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Sono')
+        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Dor')
+        ax_s.set_ylim(-0.5, 11); ax_s.set_xticks(indices_10); ax_s.set_xticklabels(labels_10)
         ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
-        
-        # Eixo X limpo
-        ax_s.set_xticks(indices_10)
-        ax_s.set_xticklabels(labels_10)
-        plt.subplots_adjust(bottom=0.3)
-        buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
+        plt.subplots_adjust(bottom=0.3); buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
 
-        # --- EXIBIÇÃO NO TABLET ---
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Dor Atual", f"{ultima['Dor']}/10")
-        m2.metric("Inchaço", f"Grau {ultima[col_inc]}")
-        m3.metric("IKDC", f"{u_ikdc:.0f}/100", emoji_ikdc)
-        m4.metric("Prognóstico Alta", prev_txt)
-
-        st.write("---")
-        t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌙 Sono & Inchaço", "🎯 Capacidade & Postura"])
-        with t1:
-            st.pyplot(fig_ev)
-            st.success(f"🔮 **Previsão de Alta:** O paciente atingirá 90% de função em {prev_txt}.")
-        with t2:
-            st.pyplot(fig_inc)
-            st.pyplot(fig_s)
-        with t3: 
-            st.pyplot(fig_cap)
-            st.write("**Análise: Postura vs Nível Médio de Dor**")
-            st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
-                x=alt.X('Postura', title='Postura Predominante'),
-                y=alt.Y('mean(Dor)', title='Média de Dor (0-10)'),
-                tooltip=['Postura', 'mean(Dor)']
-            ), use_container_width=True)
+        # --- EXIBIÇÃO NAS ABAS (DASHBOARD) ---
+        t1, t2, t3 = st.tabs(["📈 Evolução", "🌙 Biopsicossocial", "🎯 Capacidade"])
+        with t1: st.pyplot(fig_ev)
+        with t2: st.pyplot(fig_inc); st.pyplot(fig_s)
+        with t3: st.pyplot(fig_cap) # AGORA FIG_CAP ESTÁ DEFINIDO
 
         # --- DOWNLOAD E ZENFISIO ---
         st.write("---")
