@@ -1,7 +1,7 @@
 streamlit
 st-gsheets-connection
 pandas
-Pillow
-altair
 numpy
 fpdf2
+matplotlib
+Pillow
