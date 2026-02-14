@@ -31,39 +31,65 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
     pdf.ln(5)
 
-    # 1. Identificação e Anamnese
-    pdf.set_fill_color(240, 249, 250)
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf(f" PACIENTE: {p_name.upper()}"), ln=True, fill=True)
-    pdf.set_font("helvetica", '', 10); pdf.multi_cell(0, 7, limpar_texto_pdf(f"História Clínica: {hist}")); pdf.ln(3)
+    # Configuração de Cores Institucionais
+    azul_genua = (0, 128, 145)
 
-    # 2. SCORE IKDC - DESTAQUE CENTRALIZADO
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
-    pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro internacional para avaliação funcional. <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
-    
-    pdf.ln(2)
-    pdf.set_fill_color(0, 128, 145) # Azul GENUA
+    # 1. Identificação e Anamnese (Padronizado)
+    pdf.set_fill_color(*azul_genua)
     pdf.set_text_color(255, 255, 255) # Texto Branco
-    pdf.set_font("helvetica", 'B', 14)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
     
-    # Centralização precisa da moldura (75mm de largura)
-    pdf.set_x((pdf.w - 75) / 2)
-    pdf.cell(75, 12, limpar_texto_pdf(f"RESULTADO: {metrics['ikdc']}/100 {metrics['ikdc_emoji']}"), ln=True, fill=True, align='C')
+    pdf.set_text_color(0, 0, 0) # Volta para preto
+    pdf.set_font("helvetica", '', 10)
+    pdf.ln(2)
+    pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}"))
+    pdf.ln(3)
+
+    # 2. SEÇÃO IKDC - CENTRALIZADA E SEM DECIMAIS
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", 'I', 9)
+    pdf.ln(1)
+    pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro internacional para avaliação funcional do joelho."), align='C')
+    
+    # Moldura do Score Centralizado (Score como Inteiro)
+    pdf.ln(2)
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 14)
+    pdf.set_x((pdf.w - 70) / 2)
+    # Conversão para inteiro para remover o .0
+    score_inteiro = int(float(metrics['ikdc']))
+    pdf.cell(70, 12, limpar_texto_pdf(f"RESULTADO: {score_inteiro}/100 {metrics['ikdc_emoji']}"), ln=True, fill=True, align='C')
     
     pdf.set_text_color(0, 0, 0)
     pdf.ln(5)
 
     # 3. Gráficos - Página 1
-    pdf.image(imgs['ev'], x=15, y=pdf.get_y(), w=175); pdf.set_y(pdf.get_y() + 85)
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, limpar_texto_pdf(" 3. ANÁLISE DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
+    pdf.set_text_color(0, 0, 0)
+    
+    pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 2, w=175); pdf.set_y(pdf.get_y() + 85)
     pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
-    # Página 2 - Perfil de Capacidade e Biopsicossocial
+    # Página 2 - Perfil e Biopsicossocial
     pdf.add_page()
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("PERFIL DE CAPACIDADE POR TESTE FUNCIONAL"), ln=True, fill=True, align='C')
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL"), ln=True, fill=True, align='C')
     pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 5, w=145)
     
     pdf.set_y(pdf.get_y() + 105)
-    pdf.set_font("helvetica", 'B', 11); pdf.cell(0, 8, limpar_texto_pdf("ANÁLISE BIOPSICOSSOCIAL: SONO VS. DOR"), ln=True, fill=True, align='C')
+    pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 5, w=175)
 
     return bytes(pdf.output())
@@ -77,7 +103,6 @@ with st.sidebar:
     except: st.header("GENUA")
     menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
 
-# --- 3. MÓDULOS DE ENTRADA ---
 # --- 3. MÓDULOS DE NAVEGAÇÃO (SUBSTITUA A PARTIR DAQUI) ---
 
 if menu == "Check-in Diário 📝":
@@ -143,44 +168,49 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
             emoji_ikdc = "🏆" if u_ikdc >= 85 else "🟢" if u_ikdc >= 70 else "🟡" if u_ikdc >= 45 else "🔴"
         except: u_ikdc = 0; emoji_ikdc = "⚪"
 
-        # --- GERAÇÃO DE GRÁFICOS (REVISÃO DE ESPAÇAMENTO E LEGENDAS) ---
+        # --- GERAÇÃO DE GRÁFICOS 
         
-        # 1. Evolução Clínica: Capacidade vs. Dor
+        # Índices fixos para o Eixo X (S1, S11, S21, S31...)
+        indices_10 = np.arange(0, len(df_p), 10)
+        labels_10 = [df_p['Sessão_Num'].iloc[i] for i in indices_10]
+
+        # 1. Gráfico de Evolução
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
         ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
         ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
         ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold', pad=15)
-        ax_ev.set_ylim(-0.5, 11.5) # Margem de segurança
+        ax_ev.set_ylim(-0.5, 11)
         ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
-        indices = np.arange(0, len(df_p), 10) # SESSÕES DE 10 EM 10
-        ax_ev.set_xticks(indices); ax_ev.set_xticklabels([df_p['Sessão_Num'].iloc[i] for i in indices])
+        
+        # Aplicação Rígida do Eixo X
+        ax_ev.set_xticks(indices_10)
+        ax_ev.set_xticklabels(labels_10)
         ax_ev.grid(True, alpha=0.1); plt.subplots_adjust(bottom=0.25)
         buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
 
-        # 2. Histórico de Inchaço (Stroke Test)
+        # 2. Histórico de Inchaço
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
-        ax_inc.bar(df_p['Sessão_Num'].tail(20), df_p['Inchaco_N'].tail(20), color='#008091', alpha=0.8)
+        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color='#008091', alpha=0.8)
         ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
-        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)"); ax_inc.grid(axis='y', alpha=0.1)
+        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)")
+        
+        # Aplicação do Eixo X no Inchaço também
+        ax_inc.set_xticks(indices_10)
+        ax_inc.set_xticklabels(labels_10)
+        ax_inc.grid(axis='y', alpha=0.1)
         buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
-
-        # 3. Capacidade Funcional (Barras)
-        fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
-        testes = ['Agachamento', 'Step Up', 'Step Down']
-        valores = [mapa[ultima['Agachamento']], mapa[ultima['Step_Up']], mapa[ultima['Step_Down']]]
-        ax_cap.bar(testes, valores, color='#008091')
-        ax_cap.set_title("Capacidade Funcional por Teste (Sessão Atual)", fontweight='bold', pad=10)
-        ax_cap.set_ylim(0, 10.5)
-        buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight'); plt.close(fig_cap)
 
         # 4. Sono vs. Dor
         fig_s, ax_s = plt.subplots(figsize=(10, 4))
         ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
         ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
         ax_s.set_title("Impacto Biopsicossocial: Qualidade do Sono vs. Dor", fontweight='bold', pad=15)
-        ax_s.set_ylim(-0.5, 11.5)
+        ax_s.set_ylim(-0.5, 11)
         ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
-        ax_s.set_xticks(indices); ax_s.set_xticklabels([df_p['Sessão_Num'].iloc[i] for i in indices])
+        
+        # Eixo X limpo
+        ax_s.set_xticks(indices_10)
+        ax_s.set_xticklabels(labels_10)
         plt.subplots_adjust(bottom=0.3)
         buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
 
