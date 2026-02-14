@@ -148,61 +148,62 @@ else:
 
         # --- GERAÇÃO DE GRÁFICOS (MATPLOTLIB) ---
         
-        # A) Capacidade vs Dor (0-10)
+        # --- GERAÇÃO DE GRÁFICOS (REVISÃO DE ESPAÇAMENTO E LEGENDAS EXTERNAS) ---
+        
+        # 1. Gráfico de Evolução: Capacidade vs. Dor
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
         ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
         ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
-        ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs Dor", fontweight='bold')
-        ax_ev.set_ylim(-0.5, 10.5); ax_ev.set_ylabel("Escala (0-10)"); ax_ev.legend(); ax_ev.grid(True, alpha=0.1)
-        # S10 em 10
+        
+        ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold', pad=15)
+        ax_ev.set_ylim(-0.5, 11) # Margem para evitar que a linha toque na borda superior
+        ax_ev.set_ylabel("Escala (0-10)")
+        
+        # AJUSTE DA LEGENDA: Fora do gráfico (abaixo) para não obstruir dados
+        ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
+        
+        # ESPAÇAMENTO DO EIXO X: Mostra sessões de 10 em 10 (S1, S11, S21...)
         indices = np.arange(0, len(df_p), 10)
-        ax_ev.set_xticks(indices); ax_ev.set_xticklabels([df_p['Sessão_Num'].iloc[i] for i in indices])
+        ax_ev.set_xticks(indices)
+        ax_ev.set_xticklabels([df_p['Sessão_Num'].iloc[i] for i in indices], rotation=0)
+        ax_ev.grid(True, alpha=0.1)
+        
+        plt.subplots_adjust(bottom=0.25) # Espaço extra para a legenda e rótulos
         buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
 
-        # B) Histórico de Inchaço (0-3)
+        # 2. Histórico de Inchaço (Stroke Test)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
-        cores_inc = ['#FF4B4B' if x >= 2 else '#008091' for x in df_p['Inchaco_N'].tail(20)]
-        ax_inc.bar(df_p['Sessão_Num'].tail(20), df_p['Inchaco_N'].tail(20), color=cores_inc, alpha=0.8, label='Inchaço')
-        ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold')
-        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)"); ax_inc.legend(); ax_inc.grid(axis='y', alpha=0.1)
+        ax_inc.bar(df_p['Sessão_Num'].tail(20), df_p['Inchaco_N'].tail(20), color='#008091', alpha=0.8)
+        ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
+        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)")
+        ax_inc.grid(axis='y', alpha=0.1)
         buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
 
-        # C) Perfil por Teste (Barras)
+        # 3. Perfil de Capacidade Funcional (Barras)
         fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
         testes = ['Agachamento', 'Step Up', 'Step Down']
         valores = [mapa[ultima['Agachamento']], mapa[ultima['Step_Up']], mapa[ultima['Step_Down']]]
-        ax_cap.bar(testes, valores, color=['#008091', '#00A1B1', '#00C3D3'], label='Capacidade (0-10)')
-        ax_cap.set_title("Perfil de Capacidade por Teste Funcional", fontweight='bold')
-        ax_cap.set_ylim(0, 10.5); ax_cap.legend(); ax_cap.grid(axis='y', alpha=0.1)
+        ax_cap.bar(testes, valores, color='#008091')
+        ax_cap.set_title("Capacidade Funcional por Teste (Sessão Atual)", fontweight='bold', pad=10)
+        ax_cap.set_ylim(0, 10.5); ax_cap.set_ylabel("Nota (0-10)")
         buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight'); plt.close(fig_cap)
 
-        # D) Sono vs Dor
-        fig_s, ax_s = plt.subplots(figsize=(10, 3))
+        # 4. Análise do Sono vs. Dor (Área)
+        fig_s, ax_s = plt.subplots(figsize=(10, 4))
         ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
-        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Dor')
-        ax_s.set_title("Impacto Biopsicossocial: Qualidade do Sono vs Dor", fontweight='bold'); ax_s.legend(); ax_s.set_ylim(0, 10.5)
+        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
+        
+        ax_s.set_title("Impacto Biopsicossocial: Qualidade do Sono vs. Dor", fontweight='bold', pad=15)
+        ax_s.set_ylim(-0.5, 11)
+        
+        # AJUSTE DA LEGENDA: Abaixo do gráfico para não cobrir as crises de dor
+        ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
+        
+        ax_s.set_xticks(indices)
+        ax_s.set_xticklabels([df_p['Sessão_Num'].iloc[i] for i in indices])
+        
+        plt.subplots_adjust(bottom=0.3)
         buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
-
-        # Dashboard Streamlit
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Dor Atual", f"{ultima['Dor']}/10")
-        m2.metric("Inchaço", f"Grau {ultima[col_inc]}")
-        m3.metric("IKDC", f"{u_ikdc:.0f}/100", emoji_ikdc)
-        m4.metric("Prognóstico Alta", prev_txt)
-
-        st.write("---")
-        t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌙 Sono & Inchaço", "🎯 Capacidade & Postura"])
-        with t1: st.pyplot(fig_ev); st.success(f"🔮 **Previsão de Alta:** O paciente atingirá 90% de função em {prev_txt}.")
-        with t2: st.pyplot(fig_inc); st.pyplot(fig_s)
-        with t3: 
-            st.pyplot(fig_cap)
-            st.write("**Análise: Postura vs Nível Médio de Dor**")
-            # FIX DO ERRO ALT AQUI:
-            st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
-                x=alt.X('Postura', title='Postura Predominante'),
-                y=alt.Y('mean(Dor)', title='Média de Dor (0-10)'),
-                tooltip=['Postura', 'mean(Dor)']
-            ), use_container_width=True)
 
         # Download PDF Master
         st.write("---")
