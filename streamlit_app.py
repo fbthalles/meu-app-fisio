@@ -144,43 +144,45 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
 
         # --- GERAÇÃO DE GRÁFICOS 
         
-        # Intervalo de 5 em 5 sessões para maior detalhamento
+        # Intervalo de 5 sessões para o Eixo X
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
-        # 1. Gráfico de Evolução (Capacidade vs Dor)
+        # 1. Gráfico de Evolução
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
         ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Dor (EVA)', marker='o', linewidth=2)
         ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade', marker='s', linewidth=3)
         ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold', pad=15)
-        ax_ev.set_ylim(-0.5, 11)
-        ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
+        ax_ev.set_ylim(-0.5, 11); ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
         ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
         plt.subplots_adjust(bottom=0.25); buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
 
-        # 2. Histórico de Inchaço (CORES CONDICIONAIS E DESIGN REFINADO)
+        # 2. Histórico de Inchaço (Design com Cores de Alerta)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
-        # Verde para Grau 0-1, Amarelo para 2, Vermelho para 3
-        cores_mapa = {0.0: '#008091', 1.0: '#4DB6AC', 2.0: '#FFB300', 3.0: '#D32F2F'}
-        cores_barras = [cores_mapa.get(x, '#008091') for x in df_p['Inchaco_N']]
-        
-        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_barras, alpha=0.8, width=0.7)
+        # Verde (0-1), Amarelo (2), Vermelho (3)
+        cores_inc = ['#008091' if x <= 1 else '#FFB300' if x == 2 else '#D32F2F' for x in df_p['Inchaco_N']]
+        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8)
         ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
-        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)")
-        ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
-        ax_inc.grid(axis='y', alpha=0.1)
+        ax_inc.set_ylim(0, 3.5); ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
         buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
 
-        # 3. Capacidade Funcional (Barras com Labels)
+        # 3. Capacidade por Teste (DEFINIÇÃO DO BUF_CAP)
         fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
         testes = ['Agachamento', 'Step Up', 'Step Down']
         valores = [mapa[ultima['Agachamento']], mapa[ultima['Step_Up']], mapa[ultima['Step_Down']]]
         barras = ax_cap.bar(testes, valores, color='#008091', width=0.6)
-        # Adiciona o número em cima da barra para facilitar a leitura
         ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold')
-        ax_cap.set_title("Perfil de Capacidade por Teste Funcional", fontweight='bold')
-        ax_cap.set_ylim(0, 11); ax_cap.grid(axis='y', alpha=0.1)
+        ax_cap.set_title("Capacidade Funcional por Teste", fontweight='bold')
+        ax_cap.set_ylim(0, 11)
         buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight'); plt.close(fig_cap)
+
+        # 4. Sono vs. Dor
+        fig_s, ax_s = plt.subplots(figsize=(10, 4))
+        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Sono')
+        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Dor')
+        ax_s.set_ylim(-0.5, 11); ax_s.set_xticks(indices_5); ax_s.set_xticklabels(labels_5)
+        ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
+        plt.subplots_adjust(bottom=0.3); buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
 
         # --- DOWNLOAD E ZENFISIO ---
         st.write("---")
