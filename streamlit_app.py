@@ -36,19 +36,18 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
     pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. Avaliação IKDC (Com Classificação e Status)
+    # 2. Avaliação IKDC (Com Status)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'I', 9); pdf.ln(1)
     pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro para avaliação funcional do joelho."), align='C')
     
-    # Moldura do Resultado com Classificação
+    # Moldura do Resultado com Classificação (ex: BOM, REGULAR)
     pdf.ln(2); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
-    pdf.set_x((pdf.w - 110) / 2) # Caixa um pouco maior para caber o texto
-    score_limpo = int(float(metrics['ikdc']))
-    # O texto agora inclui o score e o status (ex: 89/100 - BOM)
-    status_texto = f"RESULTADO: {score_limpo}/100 - {metrics['ikdc_status'].upper()}"
-    pdf.cell(110, 12, limpar_texto_pdf(status_texto), ln=True, fill=True, align='C')
+    pdf.set_x((pdf.w - 115) / 2) 
+    score_val = int(float(metrics['ikdc']))
+    status_msg = f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"
+    pdf.cell(115, 12, limpar_texto_pdf(status_msg), ln=True, fill=True, align='C')
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
@@ -61,7 +60,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     # --- PÁGINA 2 ---
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE POR TESTE FUNCIONAL"), ln=True, fill=True, align='C')
+    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL"), ln=True, fill=True, align='C')
     pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145); pdf.set_y(pdf.get_y() + 110)
     
     pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
