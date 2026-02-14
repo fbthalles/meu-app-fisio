@@ -104,11 +104,50 @@ if menu == "Check-in Diário 📝":
             agachar = st.selectbox("Agachamento", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             step_up = st.selectbox("Step Up", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
             step_down = st.selectbox("Step Down", ["Sem Dor", "Dor Leve", "Dor Moderada", "Incapaz"])
+
+        # Adicione este bloco logo abaixo do campo do Step Down
+st.markdown("#### 🌊 Efusão Articular")
+inchaco = st.select_slider(
+    "Inchaço (Stroke Test)", 
+    options=["0 (Nenhum)", "1 (Leve)", "2 (Moderado)", "3 (Tenso)"],
+    help="Grau 0: Sem onda | Grau 1: Pequena onda medial | Grau 2: Líquido retorna sozinho | Grau 3: Joelho túrgido"
+)
         if st.form_submit_button("REGISTRAR NO SISTEMA"):
             df_h = conn.read(ttl=0).dropna(how="all")
             nova_linha = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), "Dor": int(dor), "Sono": sono, "Postura": postura, "Agachamento": agachar, "Step_Up": step_up, "Step_Down": step_down}])
             conn.update(data=pd.concat([df_h, nova_linha], ignore_index=True))
             st.success("Check-in salvo!")
+
+# Adicione "Inchaco": inchaco dentro do dicionário da nova_linha
+if st.form_submit_button("REGISTRAR NO SISTEMA"):
+    if paciente:
+        df_h = conn.read(ttl=0).dropna(how="all")
+        nova_linha = pd.DataFrame([{
+            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Paciente": paciente.strip(),
+            "Dor": int(dor),
+            "Inchaco": inchaco, # <--- ADICIONE ESTA LINHA AQUI
+            "Sono": sono,
+            "Postura": postura,
+            "Agachamento": agachar,
+            "Step_Up": step_up,
+            "Step_Down": step_down
+        }])
+        conn.update(data=pd.concat([df_h, nova_linha], ignore_index=True))
+        st.success(f"Dados de {paciente} salvos!")
+
+# 1. Adicione a métrica visual (ajuste as colunas se necessário)
+col_m1, col_m2, col_m3 = st.columns(3)
+col_m1.metric("Dor Atual", f"{ultima['Dor']}/10")
+col_m2.metric("Inchaço (Stroke)", ultima['Inchaco']) # <--- EXIBE O GRAU SALVO
+col_m3.metric("Eficiência de Carga", f"{(ultima['Score_Funcao']*10):.0f}%")
+
+# 2. Raciocínio Clínico Automático
+if "2" in ultima['Inchaco'] or "3" in ultima['Inchaco']:
+    st.error("🚨 **ALERTA DE IRRITABILIDADE:** Efusão significativa detectada. Recomenda-se reduzir volume de carga e evitar pliometria hoje.")
+
+
+
 
 # --- MÓDULO 2: IKDC (RESTAURADO COMPLETO) ---
 elif menu == "Avaliação IKDC (Mensal) 📋":
