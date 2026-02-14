@@ -6,16 +6,21 @@ import altair as alt
 import numpy as np
 from fpdf import FPDF
 from PIL import Image
+import matplotlib.pyplot as plt
+import io
 
-# --- 1. FUNÇÕES DE SUPORTE (PDF E LIMPEZA) ---
+# --- 1. FUNÇÕES DE SUPORTE (PDF E GRÁFICOS) ---
+
 def limpar_texto_pdf(txt):
     """Garante que o PDF não trave com emojis ou acentos."""
     if not isinstance(txt, str): return str(txt)
     return txt.encode('latin-1', 'ignore').decode('latin-1')
 
-def create_pdf(p_name, hist, dor_at, func_at, ikdc_at, prev_alta, inchaco_at, hist_inchaco):
+def create_pdf(p_name, hist, dor_at, func_at, ikdc_at, prev_alta, inchaco_at, img_evolucao, img_inchaco):
     pdf = FPDF()
     pdf.add_page()
+    
+    # Cabeçalho com Logo
     try:
         pdf.image("Ativo-1.png", x=10, y=8, w=35)
     except:
@@ -27,24 +32,36 @@ def create_pdf(p_name, hist, dor_at, func_at, ikdc_at, prev_alta, inchaco_at, hi
     pdf.cell(0, 10, "RELATORIO DE EVOLUCAO CLINICA", ln=True, align='C')
     pdf.set_font("helvetica", '', 12)
     pdf.cell(0, 10, f"Paciente: {limpar_texto_pdf(p_name).upper()}", ln=True, align='C')
-    pdf.ln(10)
-    
-    # Seções do Laudo
-    pdf.set_fill_color(240, 249, 250)
-    pdf.set_font("helvetica", 'B', 12)
-    pdf.cell(0, 10, " 1. Historia e Contexto Clinico", ln=True, fill=True)
-    pdf.set_font("helvetica", '', 11)
-    pdf.multi_cell(0, 8, limpar_texto_pdf(hist))
     pdf.ln(5)
     
-    pdf.cell(0, 10, " 2. Metricas e Sinais Clinicos", ln=True, fill=True)
-    pdf.cell(0, 8, f"- Dor (EVA): {dor_at}/10 | Inchaco (Stroke): {inchaco_at}", ln=True)
-    pdf.cell(0, 8, f"- Tendencia Recente de Inchaco: {hist_inchaco}", ln=True)
-    pdf.cell(0, 8, f"- Score Funcional Estimado: {func_at:.1f}/10 | IKDC: {ikdc_at}", ln=True)
+    # 1. História Clínica
+    pdf.set_fill_color(240, 249, 250)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, " 1. HISTORIA E CONTEXTO", ln=True, fill=True)
+    pdf.set_font("helvetica", '', 10)
+    pdf.multi_cell(0, 7, limpar_texto_pdf(hist))
+    pdf.ln(5)
+    
+    # 2. Métricas Atuais
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, " 2. METRICAS DE DESEMPENHO ATUAIS", ln=True, fill=True)
+    pdf.set_font("helvetica", '', 10)
+    pdf.cell(95, 7, f"- Dor (EVA): {dor_at}/10", ln=0)
+    pdf.cell(95, 7, f"- Inchaco (Stroke): {inchaco_at}", ln=1)
+    pdf.cell(95, 7, f"- IKDC: {ikdc_at}", ln=0)
+    pdf.cell(95, 7, f"- Alta Estimada: {prev_alta}", ln=1)
     pdf.ln(5)
 
-    pdf.cell(0, 10, " 3. Prognostico e Previsao de Alta", ln=True, fill=True)
-    pdf.cell(0, 8, f"- Data Estimada para atingir 90% de funcao: {prev_alta}", ln=True)
+    # 3. Gráficos de Evolução
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, " 3. ANALISE GRAFICA DE EVOLUCAO", ln=True, fill=True)
+    
+    # Imagem 1: Curva de Dor vs Função
+    pdf.image(img_evolucao, x=15, y=pdf.get_y() + 5, w=170)
+    pdf.set_y(pdf.get_y() + 90) # Pula o espaço do gráfico
+    
+    # Imagem 2: Histórico de Inchaço
+    pdf.image(img_inchaco, x=15, y=pdf.get_y(), w=170)
     
     return bytes(pdf.output())
 
@@ -111,7 +128,6 @@ else: # PAINEL ANALÍTICO
         df['Paciente'] = df['Paciente'].str.strip()
         p_sel = st.selectbox("Selecione o Paciente", df['Paciente'].unique())
 
-        # 1. Cadastro/História
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
             hist = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
@@ -119,13 +135,12 @@ else: # PAINEL ANALÍTICO
         except:
             hist = "Não cadastrada."
 
-        # 2. Processamento (Score Funcional GENUA)
         df_p = df[df['Paciente'] == p_sel].copy()
         mapa = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
         df_p['Score_Funcao'] = (df_p['Agachamento'].map(mapa) + df_p['Step_Up'].map(mapa) + df_p['Step_Down'].map(mapa)) / 3
         ultima = df_p.iloc[-1]
 
-        # 3. Métricas
+        # Métricas na Tela
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor", f"{ultima['Dor']}/10")
         m2.metric("Inchaço", f"Grau {ultima.get('Inchaco', '0')}")
@@ -139,7 +154,7 @@ else: # PAINEL ANALÍTICO
             
         m4.metric("Eficiência", f"{(ultima['Score_Funcao']*10):.0f}%")
 
-        # 4. Gráficos
+        # Gráficos na Tela (Altair)
         t1, t2 = st.tabs(["📈 Evolução", "🌊 Inchaço"])
         with t1:
             st.line_chart(df_p.set_index('Data')[['Dor', 'Score_Funcao']], color=["#FF4B4B", "#008091"])
@@ -151,7 +166,7 @@ else: # PAINEL ANALÍTICO
             ).properties(height=300)
             st.altair_chart(c_inchaco, use_container_width=True)
 
-        # 5. IA: Previsão de Alta
+        # Previsão de Alta
         try:
             df_p['Dias'] = (pd.to_datetime(df_p['Data'], dayfirst=True) - pd.to_datetime(df_p['Data'], dayfirst=True).min()).dt.days
             z = np.polyfit(df_p['Dias'].values, df_p['Score_Funcao'].values, 1)
@@ -162,10 +177,36 @@ else: # PAINEL ANALÍTICO
         except:
             prev_txt = "Em análise"
 
-        # 6. Laudo Médico
+        # --- GERAÇÃO DE IMAGENS PARA O PDF (Matplotlib) ---
+        
+        # 1. Gráfico de Evolução
+        fig_ev, ax_ev = plt.subplots(figsize=(8, 4))
+        ax_ev.plot(df_p['Data'], df_p['Dor'], color='#FF4B4B', label='Dor (EVA)', marker='o', linewidth=2)
+        ax_ev.plot(df_p['Data'], df_p['Score_Funcao'], color='#008091', label='Funcao (Score)', marker='s', linewidth=2)
+        ax_ev.set_title("Evolucao: Dor vs Funcao", fontsize=12, fontweight='bold')
+        ax_ev.legend()
+        plt.xticks(rotation=45, fontsize=8)
+        buf_ev = io.BytesIO()
+        plt.savefig(buf_ev, format='png', bbox_inches='tight')
+        plt.close(fig_ev)
+
+        # 2. Gráfico de Inchaço
+        fig_in, ax_in = plt.subplots(figsize=(8, 3))
+        cores = ['#FF4B4B' if int(x) > 1 else '#008091' for x in df_p['Inchaco'].tail(10)]
+        ax_in.bar(df_p['Data'].tail(10), pd.to_numeric(df_p['Inchaco'].tail(10)), color=cores)
+        ax_in.set_title("Historico de Inchaco (Stroke Test)", fontsize=12, fontweight='bold')
+        ax_in.set_ylim(0, 3)
+        plt.xticks(rotation=45, fontsize=8)
+        buf_in = io.BytesIO()
+        plt.savefig(buf_in, format='png', bbox_inches='tight')
+        plt.close(fig_in)
+
+        # Botão de Download
         st.write("---")
-        tendencia = " -> ".join([str(int(x)) for x in df_p['Inchaco_N'].tail(3).tolist()])
-        pdf_bytes = create_pdf(p_sel, hist, ultima['Dor'], ultima['Score_Funcao'], u_ikdc, prev_txt, ultima.get('Inchaco', '0'), tendencia)
-        st.download_button("📥 BAIXAR RELATÓRIO PDF", data=pdf_bytes, file_name=f"Laudo_{p_sel}.pdf", mime="application/pdf")
+        pdf_bytes = create_pdf(
+            p_sel, hist, ultima['Dor'], ultima['Score_Funcao'], 
+            u_ikdc, prev_txt, ultima.get('Inchaco', '0'), buf_ev, buf_in
+        )
+        st.download_button("📥 BAIXAR RELATÓRIO COMPLETO (PDF)", data=pdf_bytes, file_name=f"Laudo_GENUA_{p_sel}.pdf", mime="application/pdf")
     else:
         st.info("Aguardando dados.")
