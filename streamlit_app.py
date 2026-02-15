@@ -108,7 +108,7 @@ elif menu == "Avaliação IKDC 📋":
             conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
             st.success("Score IKDC registrado!")
 
-else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
+else: # PAINEL ANALÍTICO (V18.12 - FIX DEFINITIVO DE VARIÁVEIS)
     st.header("📊 Painel Analítico & Clinical Intelligence")
     df = conn.read(ttl=0).dropna(how="all")
     
@@ -116,7 +116,7 @@ else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
         p_sel = st.selectbox("Selecione o Paciente para Análise", df['Paciente'].unique())
         df_p = df[df['Paciente'] == p_sel].copy()
         
-        # 1. Processamento e Previsão de Alta
+        # 1. PROCESSAMENTO DE DADOS (ESSENCIAL PARA O EIXO X)
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
         mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
         df_p['Score_Função'] = (df_p['Agachamento'].map(mapa_func) + df_p['Step_Up'].map(mapa_func) + df_p['Step_Down'].map(mapa_func)) / 3
@@ -125,15 +125,20 @@ else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
         df_p['Inchaco_N'] = pd.to_numeric(df_p[col_inc], errors='coerce').fillna(0)
         ultima = df_p.iloc[-1]
 
+        # DEFINIÇÃO DO EIXO X (Aqui resolve o erro do indices_5)
+        indices_5 = np.arange(0, len(df_p), 5)
+        labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
+
+        # TENDÊNCIA E ALTA
         try:
             df_p['Data_DT'] = pd.to_datetime(df_p['Data'], dayfirst=True)
             df_p['Dias'] = (df_p['Data_DT'] - df_p['Data_DT'].min()).dt.days
             z = np.polyfit(df_p['Dias'].values, df_p['Score_Função'].values, 1)
             trend_line = z[0] * df_p['Dias'].values + z[1]
-            prev_txt = (df_p['Data_DT'].min() + pd.to_timedelta((9.0 - z[1]) / z[0], unit='d')).strftime("%d/%m/%Y") if z[0] > 0 else "Estável"
-        except: trend_line = []; prev_txt = "Calculando..."
+            prev_txt = (df_p['Data_DT'].min() + pd.to_timedelta((9.0 - z[1]) / z[0], unit='d')).strftime("%d/%m/%Y") if z[0] > 0 else "Estabilizado"
+        except: trend_line = []; prev_txt = "Em análise"
 
-        # 2. Score IKDC
+        # SCORE IKDC
         try:
             df_ikdc = conn.read(worksheet="IKDC", ttl=0)
             u_ikdc = float(df_ikdc[df_ikdc['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1])
@@ -141,45 +146,14 @@ else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
             emoji_ikdc = "🏆" if status_clinico == "Bom" else "🟢" if status_clinico == "Regular" else "🔴"
         except: u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-       # --- B) INCHAÇO (CORES DE ALERTA + FIX DE LEGENDA PARA PDF) ---
-        fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
+        # 3. GERAÇÃO DE GRÁFICOS (BLINDAGEM DE LEGENDA E CORES)
         
-        # Lógica de Cores: Verde (0-1), Amarelo (2), Vermelho (3)
-        cores_inc = [
-            '#008091' if x <= 1 else 
-            '#FFB300' if x == 2 else 
-            '#D32F2F' for x in df_p['Inchaco_N']
-        ]
-        
-        # Criamos a barra com o rótulo para a legenda
-        ax_inc.bar(
-            df_p['Sessão_Num'], 
-            df_p['Inchaco_N'], 
-            color=cores_inc, 
-            alpha=0.8, 
-            width=0.7, 
-            label='Grau de Inchaço (Stroke Test)'
-        )
-        
-        ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
-        ax_inc.set_ylim(0, 3.5)
-        ax_inc.set_ylabel("Grau (0-3)")
-        
-        # Eixo X de 5 em 5 sessões
-        ax_inc.set_xticks(indices_5)
-        ax_inc.set_xticklabels(labels_5)
-        
-        # Criamos a legenda e guardamos na variável lgd_inc
-        lgd_inc = ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False, fontsize=10)
-        
-        # Salvamento blindado para o PDF
-        buf_inc = io.BytesIO()
-        fig_inc.savefig(
-            buf_inc, 
-            format='png', 
-            bbox_inches='tight', 
-            bbox_extra_artists=(lgd_inc,), 
-            dpi=150
-        )
-        buf_inc.seek(0) # Garante que apareça no tablet
-        plt.close(fig_inc)
+        # A) Evolução + Tendência
+        fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o')
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s')
+        if len(trend_line) > 0:
+            ax_ev.plot(df_p['Sessão_Num'], trend_line, '--', color='#5D6D7E', alpha=0.5, label='Tendência de Alta')
+        ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold')
+        ax_ev.set_ylim(-0.5, 11); ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
+        lgd_ev = ax
