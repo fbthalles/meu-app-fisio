@@ -139,27 +139,6 @@ else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
             emoji_ikdc = "🏆" if status_clinico == "Bom" else "🟢" if status_clinico == "Regular" else "🔴"
         except: u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-       # --- 3. GRÁFICOS (FIX DEFINITIVO DE LEGENDA E VISIBILIDADE) ---
-        indices_5 = np.arange(0, len(df_p), 5)
-        labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
-
-        # A) Evolução + Tendência (Captura a legenda!)
-        fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o')
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s')
-        if len(trend_line) > 0:
-            ax_ev.plot(df_p['Sessão_Num'], trend_line, '--', color='#5D6D7E', alpha=0.5, label='Tendência de Alta')
-        ax_ev.set_ylim(-0.5, 11); ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
-        
-        # Guardamos a legenda em uma variável 'lgd'
-        lgd_ev = ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
-        
-        buf_ev = io.BytesIO()
-        # O SEGREDO: bbox_extra_artists garante que a legenda lgd_ev saia na foto!
-        fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_ev,), dpi=150)
-        buf_ev.seek(0) 
-        plt.close(fig_ev)
-
        # --- B) INCHAÇO (CORES DE ALERTA + FIX DE LEGENDA PARA PDF) ---
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         
@@ -202,42 +181,3 @@ else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
         )
         buf_inc.seek(0) # Garante que apareça no tablet
         plt.close(fig_inc)
-
-        # C) Perfil e D) Sono (Seguindo o mesmo padrão de segurança)
-        fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
-        testes = ['Agachamento', 'Step Up', 'Step Down']
-        valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step_Down']]]
-        barras = ax_cap.bar(testes, valores, color='#008091')
-        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold')
-        buf_cap = io.BytesIO(); fig_cap.savefig(buf_cap, format='png', bbox_inches='tight', dpi=150); buf_cap.seek(0); plt.close(fig_cap)
-
-        fig_s, ax_s = plt.subplots(figsize=(10, 4))
-        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
-        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
-        lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
-        buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
-
-        # 4. EXIBIÇÃO DASHBOARD (RESTAURADA)
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Dor Atual", f"{ultima['Dor']}/10")
-        m2.metric("Inchaço", f"Grau {ultima[col_inc]}")
-        m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
-        m4.metric("Previsão Alta", prev_txt)
-
-        st.write("---")
-        t1, t2, t3 = st.tabs(["📈 Evolução", "🌊 Inchaço", "🎯 Capacidade"])
-        with t1: st.image(buf_ev, use_container_width=True)
-        with t2: st.image(buf_inc, use_container_width=True)
-        with t3: st.image(buf_cap, use_container_width=True); st.image(buf_s, use_container_width=True)
-
-        # 5. DOWNLOAD PDF (MÉTRICAS COMPLETAS)
-        try:
-            df_cad = conn.read(worksheet="Cadastro", ttl=0)
-            hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
-        except: hist_clinica = "Anamnese não cadastrada."
-
-        pdf_metrics = {'ikdc': u_ikdc, 'ikdc_status': status_clinico, 'dor': ultima['Dor'], 'inchaco': ultima[col_inc], 'alta': prev_txt}
-        pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {'ev': buf_ev, 'sono': buf_s, 'cap': buf_cap, 'inchaco': buf_inc})
-        st.download_button("📥 BAIXAR RELATÓRIO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_{p_sel}.pdf")
-        st.info(f"📝 ZenFisio: {p_sel} - Dor {ultima['Dor']}, IKDC {int(u_ikdc)}, Alta est. {prev_txt}.")
-    else: st.info("Aguardando entrada de dados na planilha.")
