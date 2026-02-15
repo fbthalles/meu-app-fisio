@@ -573,6 +573,22 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             insight_dor = f"A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
             cor_dor = "error"
 
+        # 1. Cálculo de LSI Estimado (Limb Symmetry Index) baseado na função atual
+        lsi_estimado = (df_p['Score_Função'].iloc[-1] / 10) * 100 
+        
+        # 2. Rastreio de Nociplasticidade (Dor vs. Inchaço/Função)
+        descompasso_nociplastico = False
+        if ultima['Dor'] > 5 and ultima['Inchaco_N'] <= 1 and df_p['Score_Função'].iloc[-1] >= 7:
+            descompasso_nociplastico = True
+            
+        # 3. Alerta de Inibição Muscular Artrogênica (AMI)
+        alerta_ami = False
+        if ultima['Inchaco_N'] >= 2:
+            alerta_ami = True
+        # ----------------------------------------------------------------------------
+
+        # 4. DASHBOARD TELA (O código continua aqui...)
+
         # 4. DASHBOARD TELA
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
@@ -584,8 +600,46 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Fatores Externos"])
         
         with t1: 
+            # 1. Alerta de Platô (Mantendo sua funcionalidade anterior)
+            if plato_detectado:
+                st.error("🚨 **ALERTA DE PLATÔ TERAPÊUTICO DETECTADO**")
+                st.markdown(f"""
+                    <div style='background-color: #f8d7da; padding: 10px; border-left: 5px solid #dc3545; border-radius: 5px;'>
+                        <p style='color: #721c24; margin: 0;'><b>Parecer da Inteligência:</b> O paciente não apresenta progressão há 3 sessões. 
+                        A curva de adaptação estabilizou. Imperativo introduzir novos estímulos mecânicos ou reavaliar volume de carga.</p>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # 2. NOVO: QUADRO DE DECISÃO CLÍNICA (Evidências 2025/2026)
+            st.markdown(f"### 🧠 Inteligência Clínica GENUA")
+            col_ia1, col_ia2, col_ia3 = st.columns(3)
+            
+            with col_ia1:
+                st.metric("Prontidão para Alta (LSI)", f"{lsi_estimado:.0f}%", help="Alvo para alta esportiva: >90%")
+                st.progress(min(lsi_estimado/100, 1.0))
+                st.caption("Baseado em simetria funcional estimada.")
+            
+            with col_ia2:
+                if descompasso_nociplastico:
+                    st.warning("⚠️ Perfil Nociplástico")
+                    st.caption("Dor desproporcional à mecânica. Priorizar educação e dessensibilização.")
+                else:
+                    st.success("✅ Perfil Mecânico")
+                    st.caption("Quadro álgico condizente com a carga e função atual.")
+            
+            with col_ia3:
+                if alerta_ami:
+                    st.error("🚨 Inibição (AMI)")
+                    st.caption("Derrame articular (Inchaço >= 2) limitando ativação. Foco em controle de efusão.")
+                else:
+                    st.success("💪 Ativação Ativa")
+                    st.caption("Ausência de inibição artrogênica impeditiva.")
+
+            st.write("---")
+            
+            # 3. Gráfico de Evolução (Mantendo sua regra de exibição)
             st.image(buf_ev, use_container_width=True)
-            st.success(f"🔮 **Inteligência GENUA:** Alta estimada para **{prev_txt}**.")
+            st.success(f"🔮 **Previsão de Alta:** Estimada para **{prev_txt}**.")
             st.info(f"💡 **Insight Evolutivo:** {insight_evolucao}")
             
         with t2:
