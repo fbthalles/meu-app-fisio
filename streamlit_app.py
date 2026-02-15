@@ -103,8 +103,24 @@ def create_pdf(p_name, hist, metrics, imgs):
 
     # --- PÁGINA 1 ---
     pdf.add_page()
-    try: pdf.image("NOVO_LOGO_GENUA", x=10, y=8, w=30)
-    except: pdf.set_font("helvetica", 'B', 14); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
+    
+    # ENGENHARIA CIRÚRGICA: O FPDF não aceita transparência (Canal Alfa). 
+    # Isso converte o logo transparente para fundo branco apenas na hora de imprimir o PDF.
+    import io
+    from PIL import Image
+    try:
+        img_logo = Image.open(NOVO_LOGO_GENUA).convert("RGBA")
+        fundo_branco = Image.new("RGBA", img_logo.size, "WHITE")
+        fundo_branco.paste(img_logo, (0, 0), img_logo)
+        buf_logo = io.BytesIO()
+        fundo_branco.convert('RGB').save(buf_logo, format="PNG")
+        buf_logo.seek(0)
+        pdf.image(buf_logo, x=10, y=8, w=35) 
+    except Exception as e: 
+        pdf.set_font("helvetica", 'B', 14); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
+    
+    pdf.ln(12)
+    pdf.set_font("helvetica", 'B', 13)
     
     pdf.ln(15); pdf.set_font("helvetica", 'B', 12)
     pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C'); pdf.ln(3)
