@@ -20,6 +20,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf = FPDF()
     azul_genua = (0, 128, 145)
     
+    # --- PÁGINA 1 ---
     pdf.add_page()
     try: pdf.image("Ativo-1.png", x=10, y=8, w=35)
     except: pdf.set_font("helvetica", 'B', 16); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
@@ -33,11 +34,11 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
     pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. IKDC com Legenda Explicativa (Igual ao da Camila)
+    # 2. IKDC (Com a Legenda de Score que você solicitou)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'I', 9); pdf.ln(1)
-    pdf.multi_cell(0, 5, limpar_texto_pdf("Legenda Score: <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C') # [cite: 73]
+    pdf.multi_cell(0, 5, limpar_texto_pdf("Legenda Score: <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
     
     pdf.ln(2); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
     pdf.set_x((pdf.w - 115) / 2) 
@@ -45,20 +46,21 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
-    # 3. Gráficos com Margem de Segurança
+    # 3. Gráficos com Salto de Linha Protegido (Sempre 115 para não cortar a legenda)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
     
     pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 5, w=175)
-    pdf.set_y(pdf.get_y() + 115) # Aumentado para 115 para a legenda não sumir
+    pdf.set_y(pdf.get_y() + 115) # Espaço vital para a legenda de Dor/Tendência
     
     pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
-    # Página 2
+    # --- PÁGINA 2 ---
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255)
     pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
     pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145)
+    
     pdf.set_y(pdf.get_y() + 115)
     pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 10, w=175)
