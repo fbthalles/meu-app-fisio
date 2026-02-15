@@ -600,16 +600,47 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Fatores Externos"])
         
         with t1: 
-            # 1. Alerta de Platô (Mantendo sua funcionalidade anterior)
+        with t1: 
+            # 1. Alerta de Platô (Caso exista)
             if plato_detectado:
                 st.error("🚨 **ALERTA DE PLATÔ TERAPÊUTICO DETECTADO**")
                 st.markdown(f"""
                     <div style='background-color: #f8d7da; padding: 10px; border-left: 5px solid #dc3545; border-radius: 5px;'>
                         <p style='color: #721c24; margin: 0;'><b>Parecer da Inteligência:</b> O paciente não apresenta progressão há 3 sessões. 
-                        A curva de adaptação estabilizou. Imperativo introduzir novos estímulos mecânicos ou reavaliar volume de carga.</p>
+                        A curva de adaptação estabilizou.</p>
                     </div>
                 """, unsafe_allow_html=True)
 
+            # 2. O QUADRO QUE ESTÁ FALTANDO NO SEU PRINT:
+            st.markdown(f"### 🧠 Inteligência Clínica GENUA")
+            col_ia1, col_ia2, col_ia3 = st.columns(3)
+            
+            with col_ia1:
+                st.metric("Prontidão para Alta (LSI)", f"{lsi_estimado:.0f}%", help="Alvo para alta esportiva: >90%")
+                st.progress(min(lsi_estimado/100, 1.0))
+            
+            with col_ia2:
+                if descompasso_nociplastico:
+                    st.warning("⚠️ Perfil Nociplástico")
+                    st.caption("Dor desproporcional à mecânica. Priorizar educação.")
+                else:
+                    st.success("✅ Perfil Mecânico")
+                    st.caption("Quadro álgico condizente com a carga.")
+            
+            with col_ia3:
+                if alerta_ami:
+                    st.error("🚨 Inibição (AMI)")
+                    st.caption("Derrame articular limitando ativação muscular.")
+                else:
+                    st.success("💪 Ativação Preservada")
+                    st.caption("Ausência de inibição artrogênica impeditiva.")
+
+            st.write("---")
+            
+            # 3. Gráfico e Previsões (O que já aparece no seu print)
+            st.image(buf_ev, use_container_width=True)
+            st.success(f"🔮 **Inteligência GENUA:** Alta estimada para **{prev_txt}**.")
+            st.info(f"💡 **Insight Evolutivo:** {insight_evolucao}")
             # 2. NOVO: QUADRO DE DECISÃO CLÍNICA (Evidências 2025/2026)
             st.markdown(f"### 🧠 Inteligência Clínica GENUA")
             col_ia1, col_ia2, col_ia3 = st.columns(3)
