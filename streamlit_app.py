@@ -22,32 +22,77 @@ def create_pdf(p_name, hist, metrics, imgs):
     
     # --- PÁGINA 1 ---
     pdf.add_page()
-    try: pdf.image("Ativo-1.png", x=10, y=8, w=35)
-    except: pdf.set_font("helvetica", 'B', 16); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
+    try: 
+        pdf.image("Ativo-1.png", x=10, y=8, w=35)
+    except: 
+        pdf.set_font("helvetica", 'B', 16)
+        pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
     pdf.ln(18)
-    pdf.set_font("helvetica", 'B', 14); pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C'); pdf.ln(5)
+    pdf.set_font("helvetica", 'B', 14)
+    pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
+    pdf.ln(5)
 
     # 1. Identificação
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
-    pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
-    pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", '', 10)
+    pdf.ln(2)
+    pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}"))
+    pdf.ln(3)
 
     # 2. IKDC
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
-    pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'I', 9); pdf.ln(1)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", 'I', 9)
+    pdf.ln(1)
     pdf.multi_cell(0, 5, limpar_texto_pdf("Legenda Score: <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
     
-    pdf.ln(2); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
+    pdf.ln(2)
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 13)
     pdf.set_x((pdf.w - 115) / 2) 
     score_val = int(float(metrics['ikdc']))
     pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
-    pdf.set_text_color(0, 0, 0); pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(5)
 
     # 3. Gráficos - Layout Matemático para A4
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
+    
+    y_ev = pdf.get_y() + 5
+    # Largura ajustada para 170 e centralizada (x=20) para a altura escalar perfeitamente
+    pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
+    
+    y_inc = y_ev + 125 # Regra de salto exato de 125mm garantida
+    pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170) 
+    
+    # --- PÁGINA 2 ---
+    pdf.add_page()
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
+    
+    y_cap = pdf.get_y() + 5
+    pdf.image(imgs['cap'], x=30, y=y_cap, w=150)
+    
+    y_sono = y_cap + 125 # Salto de 125mm garantido na segunda página
+    pdf.set_y(y_sono - 10) # Título 5 ficará sempre ANTES do gráfico
+    pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
+    pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
+
+    return bytes(pdf.output())
 
 # --- 2. INTERFACE E CONEXÃO ---
 st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="🏥")
