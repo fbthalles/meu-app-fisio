@@ -70,6 +70,8 @@ def limpar_texto_pdf(txt):
 def create_pdf(p_name, hist, metrics, imgs):
     from fpdf import FPDF
     from datetime import datetime
+    import io
+    from PIL import Image
     
     def hex_to_rgb(hex_code):
         hex_code = hex_code.lstrip('#')
@@ -92,13 +94,13 @@ def create_pdf(p_name, hist, metrics, imgs):
     cinza_bg = (245, 245, 245) 
     cinza_txt = (80, 80, 80)
     
-    # 1. CORES DAS CAIXAS DE INSIGHT (UX VISUAL)
+    # 1. CORES DAS CAIXAS DE INSIGHT
     bg_azul_claro = (209, 236, 241); txt_azul_escuro = (12, 84, 96)
     bg_amarelo_claro = (255, 243, 205); txt_amarelo_escuro = (133, 100, 4)
     bg_vermelho_claro = (248, 215, 218); txt_vermelho_escuro = (114, 28, 36)
     bg_verde_claro = (212, 237, 218); txt_verde_escuro = (21, 87, 36)
 
-    # --- PARECERES CLÍNICOS DINÂMICOS (Base) ---
+    # --- PARECERES CLÍNICOS DINÂMICOS ---
     if metrics['ikdc_status'] == 'Bom': par_ikdc = "Parecer Clínico: Excelente evolução. O paciente apresenta alta percepção de funcionalidade."
     elif metrics['ikdc_status'] == 'Regular': par_ikdc = "Parecer Clínico: Evolução moderada. Apresenta ganhos reais, mas demanda atenção fisioterapêutica."
     else: par_ikdc = "Parecer Clínico: Baixa funcionalidade percebida. Focar intensamente na modulação de sintomas."
@@ -106,28 +108,36 @@ def create_pdf(p_name, hist, metrics, imgs):
     if metrics['alta'] not in ["Em análise", "Estabilizado"]: par_ev = f"Parecer Clínico: Cruzamento demonstra melhora. Projeção matemática de alta para {metrics['alta']}."
     else: par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância. Foco atual em afastar a curva de função da curva de dor."
 
-    dor_atual = float(metrics['dor'])
-    media_dor = float(metrics['media_dor'])
-    if dor_atual < media_dor: par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) está abaixo da média ({media_dor:.1f}), indicando dessensibilização efetiva."
-    elif dor_atual == media_dor: par_dor = f"Parecer Clínico: Quadro álgico estabilizado na média ({media_dor:.1f}). Foco em romper o platô de sintomas."
-    else: par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
-
     grau_inc = int(float(metrics['inchaco']))
     if grau_inc <= 1: par_inc = "Parecer Clínico: Articulação estável (Grau 0-1). Cenário totalmente seguro para progressão."
     elif grau_inc == 2: par_inc = "Parecer Clínico: Presença de inchaço moderado (Alerta Amarelo). Recomendável estabilizar volume de treino."
     else: par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). Imperativo regredir a sobrecarga mecânica."
 
+    # LÓGICA DO INSIGHT ÁLGICO (DOR) RECUPERADO
+    dor_atual = float(metrics['dor'])
+    media_dor = float(metrics['media_dor'])
+    
+    if dor_atual < media_dor:
+        par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) está abaixo da média ({media_dor:.1f}), indicando dessensibilização efetiva."
+        insight_dor_texto = "Quadro álgico em regressão. O paciente responde bem às estratégias analgésicas e a tolerância mecânica está aumentando."
+        cor_bg_dor = bg_verde_claro; cor_txt_dor = txt_verde_escuro
+    elif dor_atual == media_dor:
+        par_dor = f"Parecer Clínico: Quadro álgico estabilizado na média ({media_dor:.1f}). Foco em romper o platô de sintomas."
+        insight_dor_texto = "O paciente encontra-se em platô álgico. Necessário reavaliar variáveis de carga ou introduzir novos estímulos analgésicos."
+        cor_bg_dor = bg_amarelo_claro; cor_txt_dor = txt_amarelo_escuro
+    else:
+        par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
+        insight_dor_texto = "Alerta de Hiperalgesia. A dor superou a média histórica do tratamento. Priorizar modulação de sintomas imediatamente."
+        cor_bg_dor = bg_vermelho_claro; cor_txt_dor = txt_vermelho_escuro
+
     def get_img_height(img_buffer, pdf_width):
         img_buffer.seek(0)
-        from PIL import Image
         with Image.open(img_buffer) as im: return pdf_width * (im.height / im.width)
 
-    # 2. MOTOR DE CAIXAS DE DESTAQUE (Desenha os blocos coloridos)
     def desenhar_caixa_insight(titulo, texto, cor_bg, cor_txt):
         pdf.ln(3)
         pdf.set_fill_color(*cor_bg); pdf.set_text_color(*cor_txt)
         pdf.set_font("helvetica", 'B', 9)
-        # Limpa o texto das variáveis para evitar redundâncias na caixa
         texto_limpo = str(texto).replace("Parecer Biopsicossocial: ", "").replace("Evolução Ideal: ", "")
         pdf.cell(0, 6, limpar_texto_pdf(f" {titulo} "), ln=True, fill=True)
         pdf.set_font("helvetica", '', 9)
@@ -138,8 +148,6 @@ def create_pdf(p_name, hist, metrics, imgs):
     # --- PÁGINA 1: SNAPSHOT EXECUTIVO E EVOLUÇÃO ---
     # ==========================================
     pdf.add_page()
-    import io
-    from PIL import Image
     try:
         img_logo = Image.open(NOVO_LOGO_GENUA).convert("RGBA")
         fundo_branco = Image.new("RGBA", img_logo.size, "WHITE")
@@ -182,18 +190,16 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_ev = pdf.get_y() + 4
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
     
-    # 3. MARGEM Y DE SEGURANÇA MÁXIMA PARA NÃO CORTAR GRÁFICOS
     margem_y = max(125, get_img_height(imgs['ev'], 170))
     pdf.set_y(y_ev + margem_y + 2) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
     
-    # INJEÇÃO DA CAIXA DE INSIGHT 
     desenhar_caixa_insight("💡 INSIGHT EVOLUTIVO", metrics['insight_evolucao'], bg_azul_claro, txt_azul_escuro)
 
     # ==========================================
-    # --- PÁGINA 2: DOR ISOLADA E INCHAÇO ---
+    # --- PÁGINA 2: DOR ISOLADA (Página Própria) ---
     # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
@@ -206,8 +212,14 @@ def create_pdf(p_name, hist, metrics, imgs):
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_dor), align='C')
-    pdf.ln(6)
+    
+    # Injeção do Insight Álgico Faltante
+    desenhar_caixa_insight("🧠 INSIGHT ÁLGICO", insight_dor_texto, cor_bg_dor, cor_txt_dor)
 
+    # ==========================================
+    # --- PÁGINA 3: INCHAÇO (Página Própria para não vazar) ---
+    # ==========================================
+    pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
     pdf.cell(0, 7, limpar_texto_pdf(" 3. MONITORAMENTO DE INCHAÇO"), ln=True, fill=True, align='C')
     y_inc = pdf.get_y() + 4
@@ -222,7 +234,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     desenhar_caixa_insight("⚠️ INSIGHT MECÂNICO", metrics['insight_mecanico'], bg_amarelo_claro, txt_amarelo_escuro)
 
     # ==========================================
-    # --- PÁGINA 3: BIOPSICOSSOCIAL ---
+    # --- PÁGINA 4: BIOPSICOSSOCIAL E FATORES EXTERNOS ---
     # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
@@ -234,10 +246,12 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_y(y_sono + margem_y + 2) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf("Parecer Clínico: A análise destaca a correlação exata da qualidade do sono e dos gatilhos posturais com o quadro álgico do paciente."), align='C')
+    pdf.multi_cell(0, 5, limpar_texto_pdf("Parecer Clínico: O gráfico acima ilustra a interação do sono com a dor. Abaixo, os diagnósticos cruzados da Inteligência Artificial sobre fatores modificáveis."), align='C')
     
     desenhar_caixa_insight("💤 INSIGHT DO SONO", metrics['insight_ouro'], bg_verde_claro, txt_verde_escuro)
-    desenhar_caixa_insight("🔴 INSIGHT POSTURAL", metrics['insight_postura'], bg_vermelho_claro, txt_vermelho_escuro)
+    
+    # Texto de Postura agora separado e contextualizado
+    desenhar_caixa_insight("🔴 INSIGHT POSTURAL (GATILHO BIOMECÂNICO)", metrics['insight_postura'], bg_vermelho_claro, txt_vermelho_escuro)
 
     return bytes(pdf.output())
 
