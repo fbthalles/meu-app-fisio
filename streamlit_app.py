@@ -41,6 +41,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     else: par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). Imperativo regredir a sobrecarga mecânica."
 
     # INJEÇÃO DOS INSIGHTS DE OURO DE FORMA AUTOMÁTICA NOS PARECERES
+    par_ev = par_ev + f"\n\nInsight Evolutivo: {metrics['insight_evolucao']}"
     par_inc = par_inc + f"\n\nInsight Mecânico: {metrics['insight_mecanico']}"
     par_sono = metrics['insight_ouro'] + f"\n\nInsight Postural: {metrics['insight_postura']}"
 
@@ -305,6 +306,26 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         except:
             insight_postura = "Aguardando volume de dados para mapeamento de gatilho postural."
 
+        # Insight 4: Evolução Clínica (Função vs Dor)
+        try:
+            dor_ini = df_p['Dor'].iloc[0]
+            dor_atu = ultima['Dor']
+            func_ini = df_p['Score_Função'].iloc[0]
+            func_atu = ultima['Score_Função']
+            
+            if func_atu > func_ini and dor_atu < dor_ini:
+                ganho_f = ((func_atu - func_ini) / func_ini * 100) if func_ini > 0 else 100
+                queda_d = ((dor_ini - dor_atu) / dor_ini * 100) if dor_ini > 0 else 100
+                insight_evolucao = f"Evolução Ideal: O paciente aumentou sua capacidade funcional em {ganho_f:.0f}% enquanto reduziu a dor em {queda_d:.0f}%. Ganhos reais de tolerância mecânica."
+            elif func_atu > func_ini and dor_atu >= dor_ini:
+                insight_evolucao = "Atenção: Houve ganho funcional, mas com custo álgico. O paciente pode estar operando no limite ou acima da sua janela de tolerância atual."
+            elif func_atu <= func_ini and dor_atu < dor_ini:
+                insight_evolucao = "Fase Analgésica: O tratamento reduziu a dor com sucesso, porém a capacidade funcional ainda não apresenta progressão em relação ao início."
+            else:
+                insight_evolucao = "Alerta Clínico: Sem progressão funcional e sem alívio da dor comparado ao início do tratamento. Recomenda-se reavaliar o plano terapêutico."
+        except:
+            insight_evolucao = "Aguardando volume de dados para calcular o ganho percentual de função vs. dor."
+
         # 4. DASHBOARD TELA
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
@@ -318,6 +339,8 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         with t1: 
             st.image(buf_ev, use_container_width=True)
             st.success(f"🔮 **Inteligência GENUA:** Alta estimada para **{prev_txt}**.")
+            # Injetando o insight evolutivo na primeira aba
+            st.info(f"💡 **Insight Evolutivo:** {insight_evolucao}")
             
         with t2:
             st.image(buf_dor, use_container_width=True)
@@ -351,7 +374,8 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             'inchaco': ultima[col_inc], 'alta': prev_txt,
             'insight_ouro': insight_ouro,
             'insight_mecanico': insight_mecanico,
-            'insight_postura': insight_postura
+            'insight_postura': insight_postura,
+            'insight_evolucao': insight_evolucao # Enviando para o PDF
         }
         
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
