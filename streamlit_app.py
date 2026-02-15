@@ -44,7 +44,7 @@ def create_pdf(p_name, hist, metrics, imgs):
 
     par_sono = "Parecer Clínico: A análise biopsicossocial destaca a influência da qualidade do sono na hiperalgesia. Noites reparadoras correlacionam-se com menor percepção de dor articular."
 
-    # LÓGICA CIRÚRGICA DE ESPAÇAMENTO: Calcula a altura exata da imagem gerada
+    # LÓGICA DE ESPAÇAMENTO COMPACTO
     def get_img_height(img_buffer, pdf_width):
         img_buffer.seek(0)
         with Image.open(img_buffer) as im:
@@ -55,88 +55,87 @@ def create_pdf(p_name, hist, metrics, imgs):
     # ==========================================
     pdf.add_page()
     try: 
-        pdf.image("Ativo-1.png", x=10, y=8, w=35)
+        pdf.image("Ativo-1.png", x=10, y=8, w=30)
     except: 
-        pdf.set_font("helvetica", 'B', 16)
+        pdf.set_font("helvetica", 'B', 14)
         pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
-    pdf.ln(18)
-    pdf.set_font("helvetica", 'B', 14)
-    pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
-    pdf.ln(5)
+    pdf.ln(15)
+    pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
+    pdf.ln(3)
 
-    # 1. Identificação
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
-    pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
-    pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
+    # 1. Identificação (Fontes reduzidas)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
+    pdf.cell(0, 7, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
+    pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 9); pdf.ln(2)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
     # 2. IKDC
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
+    pdf.cell(0, 7, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     
-    pdf.ln(4)
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
-    pdf.set_x((pdf.w - 115) / 2) 
+    pdf.ln(3)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 12)
+    pdf.set_x((pdf.w - 100) / 2) 
     score_val = int(float(metrics['ikdc']))
-    pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
+    pdf.cell(100, 10, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
     
-    pdf.ln(12) 
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
-    pdf.multi_cell(0, 6, limpar_texto_pdf(par_ikdc), align='C')
-    pdf.ln(8)
+    pdf.ln(6) 
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_ikdc), align='C')
+    pdf.ln(6)
 
     # 3. Evolução
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
+    pdf.cell(0, 7, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
     
-    y_ev = pdf.get_y() + 5
-    pdf.image(imgs['ev'], x=15, y=y_ev, w=180) 
+    y_ev = pdf.get_y() + 4
+    # Imagem ligeiramente menor (w=170) e centralizada (x=20)
+    pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
     
-    # Adiciona a altura EXATA da imagem + 8mm de distância visual
-    h_ev = get_img_height(imgs['ev'], 180)
-    pdf.set_y(y_ev + h_ev + 8) 
+    # Altura da imagem + apenas 2mm (o gráfico já tem a margem própria)
+    h_ev = get_img_height(imgs['ev'], 170)
+    pdf.set_y(y_ev + h_ev + 2) 
     
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
-    pdf.multi_cell(0, 6, limpar_texto_pdf(par_ev), align='C')
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
 
     # ==========================================
     # --- PÁGINA 2: INCHAÇO ---
     # ==========================================
     pdf.add_page()
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
 
     # 4. Inchaço
-    pdf.cell(0, 8, limpar_texto_pdf(" 4. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
+    pdf.cell(0, 7, limpar_texto_pdf(" 4. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
     
-    y_inc = pdf.get_y() + 5
-    pdf.image(imgs['inchaco'], x=15, y=y_inc, w=180)
+    y_inc = pdf.get_y() + 4
+    pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170)
     
-    # Adiciona a altura EXATA da imagem + 8mm de distância visual
-    h_inc = get_img_height(imgs['inchaco'], 180)
-    pdf.set_y(y_inc + h_inc + 8) 
+    h_inc = get_img_height(imgs['inchaco'], 170)
+    pdf.set_y(y_inc + h_inc + 2) 
     
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
-    pdf.multi_cell(0, 6, limpar_texto_pdf(par_inc), align='C')
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
 
     # ==========================================
     # --- PÁGINA 3: BIOPSICOSSOCIAL ---
     # ==========================================
     pdf.add_page()
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
 
     # 5. Sono vs Dor
-    pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
+    pdf.cell(0, 7, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     
-    y_sono = pdf.get_y() + 5
-    pdf.image(imgs['sono'], x=15, y=y_sono, w=180)
+    y_sono = pdf.get_y() + 4
+    pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
 
-    # Adiciona a altura EXATA da imagem + 8mm de distância visual
-    h_sono = get_img_height(imgs['sono'], 180)
-    pdf.set_y(y_sono + h_sono + 8) 
+    h_sono = get_img_height(imgs['sono'], 170)
+    pdf.set_y(y_sono + h_sono + 2) 
     
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
-    pdf.multi_cell(0, 6, limpar_texto_pdf(par_sono), align='C')
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_sono), align='C')
 
     return bytes(pdf.output())
 
