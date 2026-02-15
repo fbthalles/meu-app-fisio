@@ -136,7 +136,9 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         except:
             u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-        # 3. GERAÇÃO DE GRÁFICOS (COM LEGENDAS INFERIORES)
+        # --- 3. GERAÇÃO DE GRÁFICOS 
+        
+        # Intervalo de 5 sessões para o Eixo X
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
@@ -148,47 +150,53 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         ax_ev.set_ylim(-0.5, 11)
         ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
         
-        # NOVA LEGENDA ADICIONADA AQUI:
+        # Legenda posicionada e configurada para exportação
         ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
-        
         plt.subplots_adjust(bottom=0.25)
-        buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
+        
+        # O segredo para sair no PDF é o 'bbox_inches=tight'
+        buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight', dpi=150); plt.close(fig_ev)
 
         # B) Inchaço (Cores de Alerta + Legenda)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
-        # Cores: Verde (0-1), Amarelo (2), Vermelho (3)
         cores_inc = ['#008091' if x <= 1 else '#FFB300' if x == 2 else '#D32F2F' for x in df_p['Inchaco_N']]
-        # Adicionado label='Grau de Inchaço' na barra
+        
+        # Adicionado 'label' para a legenda aparecer
         ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, width=0.7, label='Grau de Inchaço (Stroke Test)')
         ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold', pad=10)
         ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)")
         ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
         
-        # NOVA LEGENDA ADICIONADA AQUI:
+        # Legenda do Inchaço
         ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False)
-        
         plt.subplots_adjust(bottom=0.3)
-        buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
+        
+        buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight', dpi=150); plt.close(fig_inc)
 
-        # C) Perfil por Teste (Barras)
+        # C) Perfil por Teste (Barras com Rótulos)
         fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
         testes = ['Agachamento', 'Step Up', 'Step Down']
         valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step_Down']]]
         barras = ax_cap.bar(testes, valores, color='#008091', width=0.6)
-        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold') # Rótulos de dados
-        ax_cap.set_title("Perfil de Capacidade por Teste Funcional", fontweight='bold')
+        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold')
+        ax_cap.set_title("Capacidade Funcional por Teste", fontweight='bold')
         ax_cap.set_ylim(0, 11)
-        buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight'); plt.close(fig_cap)
+        
+        buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight', dpi=150); plt.close(fig_cap)
 
-        # D) Sono vs Dor
+        # D) Sono vs Dor (Biopsicossocial)
         fig_s, ax_s = plt.subplots(figsize=(10, 4))
         ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
         ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
         ax_s.set_title("Impacto Biopsicossocial: Qualidade do Sono vs. Dor", fontweight='bold', pad=15)
         ax_s.set_ylim(-0.5, 11)
+        
+        # Legenda do Sono
         ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         ax_s.set_xticks(indices_5); ax_s.set_xticklabels(labels_5)
-        plt.subplots_adjust(bottom=0.3); buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
+        plt.subplots_adjust(bottom=0.3)
+        
+        buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight', dpi=150); plt.close(fig_s)
 
         # 4. EXIBIÇÃO NO DASHBOARD
         m1, m2, m3, m4 = st.columns(4)
