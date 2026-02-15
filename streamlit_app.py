@@ -108,7 +108,7 @@ elif menu == "Avaliação IKDC 📋":
             conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
             st.success("Score IKDC registrado!")
 
-else: # PAINEL ANALÍTICO (V18.12 - FIX DEFINITIVO DE VARIÁVEIS)
+else: # PAINEL ANALÍTICO (V18.13 - FIX DEFINITIVO DE LEGENDAS E CORES)
     st.header("📊 Painel Analítico & Clinical Intelligence")
     df = conn.read(ttl=0).dropna(how="all")
     
@@ -116,7 +116,7 @@ else: # PAINEL ANALÍTICO (V18.12 - FIX DEFINITIVO DE VARIÁVEIS)
         p_sel = st.selectbox("Selecione o Paciente para Análise", df['Paciente'].unique())
         df_p = df[df['Paciente'] == p_sel].copy()
         
-        # 1. PROCESSAMENTO DE DADOS (ESSENCIAL PARA O EIXO X)
+        # 1. PROCESSAMENTO DE DADOS E EIXO X (ESSENCIAL)
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
         mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
         df_p['Score_Função'] = (df_p['Agachamento'].map(mapa_func) + df_p['Step_Up'].map(mapa_func) + df_p['Step_Down'].map(mapa_func)) / 3
@@ -125,7 +125,7 @@ else: # PAINEL ANALÍTICO (V18.12 - FIX DEFINITIVO DE VARIÁVEIS)
         df_p['Inchaco_N'] = pd.to_numeric(df_p[col_inc], errors='coerce').fillna(0)
         ultima = df_p.iloc[-1]
 
-        # DEFINIÇÃO DO EIXO X (Aqui resolve o erro do indices_5)
+        # Definição dos intervalos de 5 em 5 para o Eixo X
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
@@ -146,14 +146,39 @@ else: # PAINEL ANALÍTICO (V18.12 - FIX DEFINITIVO DE VARIÁVEIS)
             emoji_ikdc = "🏆" if status_clinico == "Bom" else "🟢" if status_clinico == "Regular" else "🔴"
         except: u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-        # 3. GERAÇÃO DE GRÁFICOS (BLINDAGEM DE LEGENDA E CORES)
+        # 3. GERAÇÃO DE GRÁFICOS (BLINDAGEM CONTRA CORTES NO PDF)
         
-        # A) Evolução + Tendência
+        # A) Evolução Clínica (CORREÇÃO DA LINHA 159)
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o')
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s')
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
         if len(trend_line) > 0:
             ax_ev.plot(df_p['Sessão_Num'], trend_line, '--', color='#5D6D7E', alpha=0.5, label='Tendência de Alta')
+        
         ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold')
         ax_ev.set_ylim(-0.5, 11); ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
-        lgd_ev = ax
+        
+        # Legenda capturada para o PDF
+        lgd_ev = ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
+        
+        buf_ev = io.BytesIO()
+        fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_ev,), dpi=150)
+        buf_ev.seek(0); plt.close(fig_ev)
+
+        # B) Inchaço (CORES DE ALERTA ATIVADAS)
+        fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
+        cores_inc = ['#D32F2F' if x == 3 else '#FFB300' if x == 2 else '#008091' for x in df_p['Inchaco_N']]
+        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, label='Grau de Inchaço (Stroke Test)')
+        
+        ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold')
+        ax_inc.set_ylim(0, 3.5); ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
+        lgd_inc = ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False)
+        
+        buf_inc = io.BytesIO()
+        fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_inc,), dpi=150)
+        buf_inc.seek(0); plt.close(fig_inc)
+
+        # C) Perfil por Teste
+        fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
+        testes = ['Agachamento', 'Step Up', 'Step Down']
+        valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step
