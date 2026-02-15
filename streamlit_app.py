@@ -20,7 +20,9 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf = FPDF()
     azul_genua = (0, 128, 145)
     
-    # --- PÁGINA 1 ---
+    # ==========================================
+    # --- PÁGINA 1: DADOS E EVOLUÇÃO CLÍNICA ---
+    # ==========================================
     pdf.add_page()
     try: 
         pdf.image("Ativo-1.png", x=10, y=8, w=35)
@@ -64,33 +66,46 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_text_color(0, 0, 0)
     pdf.ln(5)
 
-    # 3. Gráficos - Layout Matemático para A4
+    # 3. Evolução (Único gráfico da página 1, sem chance de cortar legenda)
     pdf.set_fill_color(*azul_genua)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
+    pdf.cell(0, 8, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
     
-    y_ev = pdf.get_y() + 5
-    # Largura ajustada para 170 e centralizada (x=20) para a altura escalar perfeitamente
-    pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
-    
-    y_inc = y_ev + 125 # Regra de salto exato de 125mm garantida
-    pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170) 
-    
-    # --- PÁGINA 2 ---
+    # Gráfico 1: Maior e com muito espaço
+    pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 5, w=180) 
+
+    # ==========================================
+    # --- PÁGINA 2: INCHAÇO E CAPACIDADE ---
+    # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
+
+    # 4. Inchaço
+    pdf.cell(0, 8, limpar_texto_pdf(" 4. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
     
-    y_cap = pdf.get_y() + 5
+    y_inc = pdf.get_y() + 5
+    pdf.image(imgs['inchaco'], x=15, y=y_inc, w=180)
+    
+    # 5. Capacidade (Salto inegociável de 125mm)
+    y_cap = y_inc + 125 
+    pdf.set_y(y_cap - 10) # Garante que o título fique antes do gráfico
+    pdf.cell(0, 8, limpar_texto_pdf(" 5. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
     pdf.image(imgs['cap'], x=30, y=y_cap, w=150)
-    
-    y_sono = y_cap + 125 # Salto de 125mm garantido na segunda página
-    pdf.set_y(y_sono - 10) # Título 5 ficará sempre ANTES do gráfico
-    pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
-    pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
+
+    # ==========================================
+    # --- PÁGINA 3: BIOPSICOSSOCIAL ---
+    # ==========================================
+    pdf.add_page()
+    pdf.set_fill_color(*azul_genua)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", 'B', 11)
+
+    # 6. Sono vs Dor (Único gráfico da página 3)
+    pdf.cell(0, 8, limpar_texto_pdf(" 6. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
+    pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 5, w=180)
 
     return bytes(pdf.output())
 
