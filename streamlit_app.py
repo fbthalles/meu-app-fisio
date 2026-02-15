@@ -9,16 +9,16 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import io
 
-# 1. CORES DA MARCA (Extraídas do seu Logo Oficial GENUA)
+# 1. CORES DA MARCA (Extraídas do novo Logo GENUA Transparente)
 CORES_GENUA = {
-    'primaria': '#5CA4D7',      # Azul claro do fundo do seu logo (Primária)
-    'secundaria': '#33CFC4',    # Turquesa/Verde-água das letras "GENUA"
-    'fundo_claro': '#F4F7F9',   # Um cinza/azul beeeeem clarinho para o fundo do app ficar chique
-    'texto_escuro': '#2B3A4A',  # Azul marinho muito escuro para o texto (melhor que preto puro)
-    'texto_suave': '#6c757d',   # Cinza médio
-    'alerta_sucesso': '#28a745',# Verde
-    'alerta_aviso': '#ffc107',  # Amarelo
-    'alerta_erro': '#dc3545',   # Vermelho
+    'primaria': '#103E55',      # Azul-Petróleo Escuro (Cor das letras GENUA, traz autoridade e seriedade)
+    'secundaria': '#398E9B',    # Verde-Água/Teal Claro (Destaques do joelho, traz frescor e modernidade)
+    'fundo_claro': '#F4F7F9',   # Cinza Gelo levemente azulado para um fundo clínico e limpo
+    'texto_escuro': '#1A252C',  # Um cinza-chumbo profundo (muito mais elegante que o preto puro)
+    'texto_suave': '#6c757d',   # Cinza médio para legendas discretas
+    'alerta_sucesso': '#28a745',# Verde padrão (positivo)
+    'alerta_aviso': '#ffc107',  # Amarelo padrão (atenção)
+    'alerta_erro': '#dc3545',   # Vermelho padrão (alerta grave)
 }
 
 # 2. CAMINHO DO NOVO LOGOTIPO
