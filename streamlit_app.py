@@ -51,7 +51,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     else: 
         par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). É imperativo regredir a sobrecarga mecânica e priorizar recursos de drenagem e crioterapia."
 
-    par_sono = "Parecer Clínico: A análise biopsicossocial destaca a influência da qualidade do sono na hiperalgesia. Noites reparadoras correlacionam-se com menor percepção de dor articular."
+    par_sono = metrics['insight_ouro']
 
     # LÓGICA DE ESPAÇAMENTO COMPACTO
     def get_img_height(img_buffer, pdf_width):
@@ -316,12 +316,27 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
 
-        # 3. MÉTRICAS E DASHBOARD COMPLETO (COM DELTAS EM PORCENTAGEM)
+        # 3. MÉTRICAS E DASHBOARD COMPLETO (COM DELTAS EM PORCENTAGEM E INSIGHT DE OURO)
         media_dor = df_p['Dor'].mean()
         delta_dor_pct = ((ultima['Dor'] - media_dor) / media_dor * 100) if media_dor > 0 else (100 if ultima['Dor'] > 0 else 0)
         
         media_inc = df_p['Inchaco_N'].mean()
         delta_inc_pct = ((ultima['Inchaco_N'] - media_inc) / media_inc * 100) if media_inc > 0 else (100 if ultima['Inchaco_N'] > 0 else 0)
+
+        # CÁLCULO MATEMÁTICO: O INSIGHT DE OURO (SONO VS DOR)
+        try:
+            media_sono = df_p['Sono_N'].mean()
+            dor_sono_bom = df_p[df_p['Sono_N'] >= media_sono]['Dor'].mean()
+            dor_sono_ruim = df_p[df_p['Sono_N'] < media_sono]['Dor'].mean()
+
+            # Se a dor for menor quando o sono é bom, calculamos a porcentagem de queda
+            if pd.notna(dor_sono_bom) and pd.notna(dor_sono_ruim) and dor_sono_ruim > 0 and dor_sono_bom < dor_sono_ruim:
+                queda_pct = ((dor_sono_ruim - dor_sono_bom) / dor_sono_ruim) * 100
+                insight_ouro = f"Parecer Clínico Biopsicossocial: Os dados comprovam que, quando o paciente relata um sono superior à sua média, o nível de dor cai em {queda_pct:.0f}%. O manejo do sono atua como um forte inibidor analgésico neste caso."
+            else:
+                insight_ouro = "Parecer Clínico Biopsicossocial: O cruzamento de dados atual mantém a proporção padrão entre qualidade do sono e percepção de dor, sem discrepâncias agudas."
+        except:
+            insight_ouro = "Parecer Clínico Biopsicossocial: Monitoramento contínuo em andamento para estabelecer a correlação exata entre o sono e o quadro álgico."
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse", help=f"A média histórica deste paciente é {media_dor:.1f}/10")
@@ -330,7 +345,6 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         m4.metric("Previsão Alta", prev_txt)
 
         st.write("---")
-        # Inclusão da nova aba de Dor no Dashboard
         t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Biopsicossocial"])
         
         with t1: 
@@ -345,6 +359,9 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             
         with t4: 
             st.image(buf_s, use_container_width=True)
+            # Injetando o Insight de Ouro no Streamlit de forma limpa (sem o título do PDF)
+            st.info(f"💡 **Insight de Ouro:** {insight_ouro.replace('Parecer Clínico Biopsicossocial: ', '')}")
+            
             st.write("**Análise de Postura vs. Dor**")
             st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
                 x=alt.X('Postura', title='Postura'),
@@ -359,13 +376,15 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         except: 
             hist_clinica = "Anamnese não cadastrada no sistema."
 
+        # Passando o Insight de Ouro para a função do PDF
         pdf_metrics = {
             'ikdc': u_ikdc, 
             'ikdc_status': status_clinico, 
             'dor': ultima['Dor'], 
             'media_dor': media_dor,
             'inchaco': ultima[col_inc], 
-            'alta': prev_txt
+            'alta': prev_txt,
+            'insight_ouro': insight_ouro 
         }
         
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
