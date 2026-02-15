@@ -152,7 +152,16 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     df = conn.read(ttl=0).dropna(how="all")
     
     if not df.empty:
-        p_sel = st.selectbox("Selecione o Paciente para Análise", df['Paciente'].unique())
+        # Barra de Pesquisa Inteligente de Pacientes
+        p_sel = st.selectbox(
+            "🔍 Buscar Paciente:", 
+            options=df_p['Nome'].unique(), # ou a variável que você usa para a lista de nomes
+            index=None, 
+            placeholder="Digite 3 letras do nome..."
+        )
+        
+        # Trava de segurança: só mostra o painel se um paciente for efetivamente selecionado/pesquisado
+        if p_sel is not None:
         df_p = df[df['Paciente'] == p_sel].copy()
         
         # 1. PROCESSAMENTO DE DADOS E EIXO X (DE 5 EM 5 SESSÕES)
