@@ -259,7 +259,7 @@ def create_pdf(p_name, hist, metrics, imgs):
         import urllib.parse
         
         # COLOQUE O SEU LINK AQUI (Ex: Link do seu WhatsApp, Linktree ou Drive)
-        link_destino = "https://wa.me/5511999999999?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20meu%20retorno"
+        link_destino = "https://wa.me/5511933660220?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20meu%20retorno"
         url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(link_destino)}"
         
         req = urllib.request.Request(url_qr, headers={'User-Agent': 'Mozilla/5.0'})
