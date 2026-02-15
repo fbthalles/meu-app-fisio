@@ -9,38 +9,32 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import io
 
-# ==========================================
-# --- IDENTIDADE VISUAL GENUA 2.0 (GUIA DE ESTILO) ---
-# ==========================================
-# Centralização de todas as cores e assets visuais do aplicativo.
-# Mude aqui e o aplicativo inteiro será atualizado automaticamente.
-
-# 1. CORES DA MARCA (Substitua pelos códigos HEX da sua nova paleta)
+# 1. CORES DA MARCA (Extraídas do seu Logo Oficial GENUA)
 CORES_GENUA = {
-    'primaria': '#0056b3',      # Ex: Azul Royal Profundo (para botões principais, títulos fortes)
-    'secundaria': '#00c4cc',    # Ex: Turquesa Tecnológico (para destaques, ícones, barras de progresso)
-    'fundo_claro': '#f8f9fa',   # Ex: Cinza Gelo (para o fundo das páginas e cartões)
-    'texto_escuro': '#212529',  # Ex: Quase Preto (para o texto principal, facilitando a leitura)
-    'texto_suave': '#6c757d',   # Ex: Cinza Médio (para legendas, textos secundários)
-    'alerta_sucesso': '#28a745',# Verde (para indicadores positivos, metas atingidas)
-    'alerta_aviso': '#ffc107',  # Amarelo (para atenção, platôs)
-    'alerta_erro': '#dc3545',   # Vermelho (para regressão, dor alta)
+    'primaria': '#5CA4D7',      # Azul claro do fundo do seu logo (Primária)
+    'secundaria': '#33CFC4',    # Turquesa/Verde-água das letras "GENUA"
+    'fundo_claro': '#F4F7F9',   # Um cinza/azul beeeeem clarinho para o fundo do app ficar chique
+    'texto_escuro': '#2B3A4A',  # Azul marinho muito escuro para o texto (melhor que preto puro)
+    'texto_suave': '#6c757d',   # Cinza médio
+    'alerta_sucesso': '#28a745',# Verde
+    'alerta_aviso': '#ffc107',  # Amarelo
+    'alerta_erro': '#dc3545',   # Vermelho
 }
 
 # 2. CAMINHO DO NOVO LOGOTIPO
-# Faça upload do seu novo arquivo de logo para a mesma pasta do script e coloque o nome aqui.
-NOVO_LOGO_GENUA = "seu_novo_logo.png" 
+# ATENÇÃO THALLES: Troque o nome abaixo para o nome EXATO do arquivo que você fez upload!
+# Exemplo: Se o arquivo chama "Logo_Genua.jpg", escreva "Logo_Genua.jpg" entre as aspas.
+NOVO_LOGO_GENUA = "Screenshot 2026-02-15 at 16.44.56.jpg" 
 
-# 3. CONFIGURAÇÃO INICIAL DA PÁGINA (Aplica o novo logo no topo do navegador)
+# 3. CONFIGURAÇÃO INICIAL DA PÁGINA 
 st.set_page_config(
     page_title="GENUA | Inteligência Clínica",
-    page_icon=NOVO_LOGO_GENUA, # O novo logo será o ícone da aba do navegador
+    page_icon=NOVO_LOGO_GENUA, 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # 4. APLICAÇÃO DO TEMA GLOBAL (CSS INJETADO)
-# Força o aplicativo a usar as novas cores de fundo e texto.
 st.markdown(f"""
     <style>
         .stApp {{
@@ -55,6 +49,7 @@ st.markdown(f"""
             color: white !important;
             border: none;
             border-radius: 8px;
+            font-weight: bold;
         }}
     </style>
 """, unsafe_allow_html=True)
