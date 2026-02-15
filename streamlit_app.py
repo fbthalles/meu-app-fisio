@@ -279,15 +279,17 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
 
         # 3. MÉTRICAS E DASHBOARD COMPLETO
         media_dor = df_p['Dor'].mean()
-        delta_dor = ultima['Dor'] - media_dor
+        # Cálculo do delta em % (com proteção contra divisão por zero)
+        delta_dor_pct = ((ultima['Dor'] - media_dor) / media_dor * 100) if media_dor > 0 else (100 if ultima['Dor'] > 0 else 0)
         
         media_inc = df_p['Inchaco_N'].mean()
-        delta_inc = ultima['Inchaco_N'] - media_inc
+        # Cálculo do delta em % (com proteção contra divisão por zero)
+        delta_inc_pct = ((ultima['Inchaco_N'] - media_inc) / media_inc * 100) if media_inc > 0 else (100 if ultima['Inchaco_N'] > 0 else 0)
 
         m1, m2, m3, m4 = st.columns(4)
-        # delta_color="inverse" faz com que reduções de dor (negativo) fiquem VERDES (positivo para a clínica)
-        m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor:.1f} pts", delta_color="inverse", help=f"A média histórica deste paciente é {media_dor:.1f}/10")
-        m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc:.1f}", delta_color="inverse", help=f"A média histórica de inchaço é Grau {media_inc:.1f}")
+        # O delta_color="inverse" garante que % negativas (menos dor) fiquem verdes, e % positivas (mais dor) fiquem vermelhas
+        m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse", help=f"A média histórica deste paciente é {media_dor:.1f}/10")
+        m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc_pct:.0f}%", delta_color="inverse", help=f"A média histórica de inchaço é Grau {media_inc:.1f}")
         m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
         m4.metric("Previsão Alta", prev_txt)
 
