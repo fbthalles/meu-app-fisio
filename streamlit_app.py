@@ -36,13 +36,13 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
     pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. Avaliação IKDC (Inteiro + Status)
+    # 2. Avaliação IKDC (Legenda de Score Inclusa)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'I', 9); pdf.ln(1)
-    pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro para avaliação funcional do joelho."), align='C')
+    # Legenda explicativa do IKDC
+    pdf.multi_cell(0, 5, limpar_texto_pdf("Legenda IKDC: <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
     
-    # Moldura do Resultado
     pdf.ln(2); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
     pdf.set_x((pdf.w - 115) / 2) 
     score_val = int(float(metrics['ikdc']))
@@ -51,23 +51,23 @@ def create_pdf(p_name, hist, metrics, imgs):
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
-    # 3. Evolução e Inchaço (AJUSTE DE ESPAÇO PARA LEGENDA)
+    # 3. Evolução e Inchaço (Espaço aumentado para caber legendas)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
     
-    # Imagem da Evolução: Aumentamos o deslocamento vertical para 105 para caber a legenda
+    # Imagem Evolução (Sobe um pouco para dar espaço à legenda em baixo)
     pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 5, w=175)
-    pdf.set_y(pdf.get_y() + 105) 
-    
-    # Imagem do Inchaço
+    # Pulo maior (110) para a legenda da evolução não sumir
+    pdf.set_y(pdf.get_y() + 110) 
     pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
     # --- PÁGINA 2 ---
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255)
     pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
-    pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145); pdf.set_y(pdf.get_y() + 110)
+    pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145)
     
+    pdf.set_y(pdf.get_y() + 115)
     pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 10, w=175)
 
