@@ -34,6 +34,16 @@ def create_pdf(p_name, hist, metrics, imgs):
     else: 
         par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância do paciente. O foco atual é afastar a curva de função da curva de dor para garantir progressão segura."
 
+    # Inteligência para o novo Gráfico de Dor
+    dor_atual = float(metrics['dor'])
+    media_dor = float(metrics['media_dor'])
+    if dor_atual < media_dor:
+        par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) está abaixo da média histórica do paciente ({media_dor:.1f}), indicando uma dessensibilização efetiva e resposta positiva à analgesia."
+    elif dor_atual == media_dor:
+        par_dor = f"Parecer Clínico: O quadro álgico encontra-se estabilizado na média histórica ({media_dor:.1f}). Foco atual em romper o platô de sintomas."
+    else:
+        par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se cautela com a progressão de carga e reforço nas estratégias analgésicas."
+
     grau_inc = int(float(metrics['inchaco']))
     if grau_inc <= 1: 
         par_inc = "Parecer Clínico: Articulação estável e sem inchaço clinicamente relevante (Grau 0-1). Cenário totalmente seguro para aumento de intensidade no treinamento."
@@ -47,6 +57,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     # LÓGICA DE ESPAÇAMENTO COMPACTO
     def get_img_height(img_buffer, pdf_width):
         img_buffer.seek(0)
+        from PIL import Image
         with Image.open(img_buffer) as im:
             return pdf_width * (im.height / im.width)
 
@@ -65,13 +76,11 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
     pdf.ln(3)
 
-    # 1. Identificação
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
     pdf.cell(0, 7, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 9); pdf.ln(2)
     pdf.multi_cell(0, 5, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. IKDC
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
     pdf.cell(0, 7, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     
@@ -86,13 +95,11 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_ikdc), align='C')
     pdf.ln(6)
 
-    # 3. Evolução
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
     pdf.cell(0, 7, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
     
     y_ev = pdf.get_y() + 4
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
-    
     h_ev = get_img_height(imgs['ev'], 170)
     pdf.set_y(y_ev + h_ev + 2) 
     
@@ -100,40 +107,43 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
 
     # ==========================================
-    # --- PÁGINA 2: INCHAÇO E BIOPSICOSSOCIAL ---
+    # --- PÁGINA 2: DOR ISOLADA E INCHAÇO ---
     # ==========================================
     pdf.add_page()
+    
+    # 4. Dor Isolada
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
+    pdf.cell(0, 7, limpar_texto_pdf(" 4. COMPORTAMENTO ISOLADO DA DOR (QUADRO ÁLGICO)"), ln=True, fill=True, align='C')
+    
+    y_dor = pdf.get_y() + 4
+    pdf.image(imgs['dor'], x=20, y=y_dor, w=170)
+    h_dor = get_img_height(imgs['dor'], 170)
+    pdf.set_y(y_dor + h_dor + 2) 
+    
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_dor), align='C')
 
-    # 4. Inchaço
-    pdf.cell(0, 7, limpar_texto_pdf(" 4. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
+    pdf.ln(10)
+
+    # 5. Inchaço
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
+    pdf.cell(0, 7, limpar_texto_pdf(" 5. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
     
     y_inc = pdf.get_y() + 4
     pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170)
-    
     h_inc = get_img_height(imgs['inchaco'], 170)
     pdf.set_y(y_inc + h_inc + 2) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
 
-    # Salto matemático para separar o parecer do Inchaço do título do Sono
-    pdf.ln(10)
-
-    # 5. Sono vs Dor (Aglutinado na mesma página)
+    # ==========================================
+    # --- PÁGINA 3: BIOPSICOSSOCIAL ---
+    # ==========================================
+    pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
-    
-    y_sono = pdf.get_y() + 4
-    pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
 
-    h_sono = get_img_height(imgs['sono'], 170)
-    pdf.set_y(y_sono + h_sono + 2) 
-    
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(par_sono), align='C')
-
-    return bytes(pdf.output())
+    pdf.cell(0, 7, limpar_texto_pdf(" 6. ANÁLISE BIOPSICOSSOCIAL (SONO VS
 
 # --- 2. INTERFACE E CONEXÃO ---
 st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="🏥")
@@ -237,11 +247,24 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_ev,), dpi=150)
         buf_ev.seek(0); plt.close(fig_ev)
 
-        # B) Inchaço Articular (Cores de Alerta e Legenda Customizada)
+        # B) Novo Gráfico: Dor Isolada (Preenchimento Visual Vermelho)
+        fig_dor, ax_dor = plt.subplots(figsize=(10, 3.5))
+        # fill_between cria uma "área" colorida abaixo da linha, muito visual para o paciente
+        ax_dor.fill_between(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', alpha=0.2)
+        ax_dor.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
+        ax_dor.set_title("Comportamento Isolado da Dor (Quadro Álgico)", fontweight='bold')
+        ax_dor.set_ylim(-0.5, 11)
+        ax_dor.set_xticks(indices_5)
+        ax_dor.set_xticklabels(labels_5)
+        
+        lgd_dor = ax_dor.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False, fontsize=9)
+        buf_dor = io.BytesIO()
+        fig_dor.savefig(buf_dor, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_dor,), dpi=150)
+        buf_dor.seek(0); plt.close(fig_dor)
+
+        # C) Inchaço Articular (Cores de Alerta e Legenda Customizada)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         cores_inc = ['#D32F2F' if x == 3 else '#FFB300' if x == 2 else '#008091' for x in df_p['Inchaco_N']]
-        
-        # O 'label' foi retirado daqui, pois criaremos a legenda manualmente
         ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8)
         
         ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold')
@@ -249,22 +272,19 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         ax_inc.set_xticks(indices_5)
         ax_inc.set_xticklabels(labels_5)
         
-        # Criação de Legenda Customizada com as Cores Exatas
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='#D32F2F', alpha=0.8, label='Grau 3 (Alerta/Grave)'),
+            Patch(facecolor='#D32F2F', alpha=0.8, label='Grau 3 (Grave)'),
             Patch(facecolor='#FFB300', alpha=0.8, label='Grau 2 (Moderado)'),
             Patch(facecolor='#008091', alpha=0.8, label='Grau 0-1 (Estável)')
         ]
-        
-        # A legenda agora terá 3 colunas e mostrará as 3 cores
         lgd_inc = ax_inc.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=3, frameon=False, fontsize=9)
         
         buf_inc = io.BytesIO()
         fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_inc,), dpi=150)
         buf_inc.seek(0); plt.close(fig_inc)
 
-        # C) Sono vs Dor (O Gráfico de Capacidade foi removido daqui)
+        # D) Sono vs Dor
         fig_s, ax_s = plt.subplots(figsize=(10, 4))
         ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
         ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
@@ -277,34 +297,34 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
 
-        # 3. MÉTRICAS E DASHBOARD COMPLETO
+        # 3. MÉTRICAS E DASHBOARD COMPLETO (COM DELTAS EM PORCENTAGEM)
         media_dor = df_p['Dor'].mean()
-        # Cálculo do delta em % (com proteção contra divisão por zero)
         delta_dor_pct = ((ultima['Dor'] - media_dor) / media_dor * 100) if media_dor > 0 else (100 if ultima['Dor'] > 0 else 0)
         
         media_inc = df_p['Inchaco_N'].mean()
-        # Cálculo do delta em % (com proteção contra divisão por zero)
         delta_inc_pct = ((ultima['Inchaco_N'] - media_inc) / media_inc * 100) if media_inc > 0 else (100 if ultima['Inchaco_N'] > 0 else 0)
 
         m1, m2, m3, m4 = st.columns(4)
-        # O delta_color="inverse" garante que % negativas (menos dor) fiquem verdes, e % positivas (mais dor) fiquem vermelhas
         m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse", help=f"A média histórica deste paciente é {media_dor:.1f}/10")
         m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc_pct:.0f}%", delta_color="inverse", help=f"A média histórica de inchaço é Grau {media_inc:.1f}")
         m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
         m4.metric("Previsão Alta", prev_txt)
 
         st.write("---")
-        # Aba de Capacidade removida, mantendo Evolução, Inchaço e Biopsicossocial
-        t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌊 Inchaço", "🎯 Biopsicossocial"])
+        # Inclusão da nova aba de Dor no Dashboard
+        t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Biopsicossocial"])
         
         with t1: 
             st.image(buf_ev, use_container_width=True)
             st.success(f"🔮 **Inteligência GENUA:** A linha pontilhada indica a tendência de recuperação. Alta estimada: **{prev_txt}**.")
             
-        with t2: 
-            st.image(buf_inc, use_container_width=True)
+        with t2:
+            st.image(buf_dor, use_container_width=True)
             
         with t3: 
+            st.image(buf_inc, use_container_width=True)
+            
+        with t4: 
             st.image(buf_s, use_container_width=True)
             st.write("**Análise de Postura vs. Dor**")
             st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
@@ -324,13 +344,14 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             'ikdc': u_ikdc, 
             'ikdc_status': status_clinico, 
             'dor': ultima['Dor'], 
+            'media_dor': media_dor,
             'inchaco': ultima[col_inc], 
             'alta': prev_txt
         }
         
-        # Removemos a imagem 'cap' do envio para o PDF
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
             'ev': buf_ev, 
+            'dor': buf_dor,
             'sono': buf_s, 
             'inchaco': buf_inc
         })
