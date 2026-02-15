@@ -9,6 +9,58 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import io
 
+# ==========================================
+# --- IDENTIDADE VISUAL GENUA 2.0 (GUIA DE ESTILO) ---
+# ==========================================
+# Centralização de todas as cores e assets visuais do aplicativo.
+# Mude aqui e o aplicativo inteiro será atualizado automaticamente.
+
+# 1. CORES DA MARCA (Substitua pelos códigos HEX da sua nova paleta)
+CORES_GENUA = {
+    'primaria': '#0056b3',      # Ex: Azul Royal Profundo (para botões principais, títulos fortes)
+    'secundaria': '#00c4cc',    # Ex: Turquesa Tecnológico (para destaques, ícones, barras de progresso)
+    'fundo_claro': '#f8f9fa',   # Ex: Cinza Gelo (para o fundo das páginas e cartões)
+    'texto_escuro': '#212529',  # Ex: Quase Preto (para o texto principal, facilitando a leitura)
+    'texto_suave': '#6c757d',   # Ex: Cinza Médio (para legendas, textos secundários)
+    'alerta_sucesso': '#28a745',# Verde (para indicadores positivos, metas atingidas)
+    'alerta_aviso': '#ffc107',  # Amarelo (para atenção, platôs)
+    'alerta_erro': '#dc3545',   # Vermelho (para regressão, dor alta)
+}
+
+# 2. CAMINHO DO NOVO LOGOTIPO
+# Faça upload do seu novo arquivo de logo para a mesma pasta do script e coloque o nome aqui.
+NOVO_LOGO_GENUA = "seu_novo_logo.png" 
+
+# 3. CONFIGURAÇÃO INICIAL DA PÁGINA (Aplica o novo logo no topo do navegador)
+st.set_page_config(
+    page_title="GENUA | Inteligência Clínica",
+    page_icon=NOVO_LOGO_GENUA, # O novo logo será o ícone da aba do navegador
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 4. APLICAÇÃO DO TEMA GLOBAL (CSS INJETADO)
+# Força o aplicativo a usar as novas cores de fundo e texto.
+st.markdown(f"""
+    <style>
+        .stApp {{
+            background-color: {CORES_GENUA['fundo_claro']};
+            color: {CORES_GENUA['texto_escuro']};
+        }}
+        h1, h2, h3 {{
+            color: {CORES_GENUA['primaria']} !important;
+        }}
+        .stButton>button {{
+            background-color: {CORES_GENUA['primaria']} !important;
+            color: white !important;
+            border: none;
+            border-radius: 8px;
+        }}
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+
 # --- 1. FUNÇÕES DE SUPORTE E PDF ---
 
 def limpar_texto_pdf(txt):
