@@ -191,10 +191,55 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO)
             hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
         except: hist_clinica = "Anamnese não cadastrada."
 
-        pdf_metrics = {'dor': ultima['Dor'], 'inchaco': ultima[col_inc], 'ikdc': u_ikdc, 'ikdc_emoji': emoji_ikdc, 'alta': prev_txt}
-        pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {'ev': buf_ev, 'sono': buf_s, 'cap': buf_cap, 'inchaco': buf_inc})
+       # --- PREPARAÇÃO DOS DADOS E DOWNLOAD DO PDF ---
+        st.write("---")
         
-        st.download_button("📥 BAIXAR RELATÓRIO CLÍNICO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_{p_sel}.pdf")
-        st.info(f"Cópia ZenFisio: Evolução {p_sel} - Dor {ultima['Dor']}/10, Inchaço Grau {ultima[col_inc]}, IKDC {u_ikdc:.0f}/100.")
+        # 1. Definição da Classificação Clínica do IKDC (Garante que o PDF não trave)
+        if u_ikdc > 70:
+            status_clinico = "Bom"
+        elif u_ikdc > 45:
+            status_clinico = "Regular"
+        else:
+            status_clinico = "Severo"
+
+        # 2. Dicionário de métricas completo para a sua função create_pdf
+        pdf_metrics = {
+            'dor': ultima['Dor'], 
+            'inchaco': ultima[col_inc], 
+            'ikdc': u_ikdc, 
+            'ikdc_emoji': emoji_ikdc, 
+            'ikdc_status': status_clinico, 
+            'alta': prev_txt
+        }
+        
+        # 3. Bloco de Geração e Botão de Download
+        try:
+            # Busca a história clínica para o laudo
+            df_cad = conn.read(worksheet="Cadastro", ttl=0)
+            hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
+        except:
+            hist_clinica = "História clínica não cadastrada."
+
+        try:
+            # Chama a função que criamos no topo do seu arquivo
+            pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
+                'ev': buf_ev, 
+                'sono': buf_s, 
+                'cap': buf_cap, 
+                'inchaco': buf_inc
+            })
+            
+            st.download_button(
+                label="📥 BAIXAR RELATÓRIO CLÍNICO MASTER (PDF)",
+                data=pdf_bytes,
+                file_name=f"Relatorio_GENUA_{p_sel}.pdf",
+                mime="application/pdf"
+            )
+            
+            # Texto pronto para o prontuário do ZenFisio
+            st.info(f"📝 Cópia ZenFisio: Paciente {p_sel} - Dor {ultima['Dor']}/10, Inchaço Grau {ultima[col_inc]}, IKDC {u_ikdc:.0f}/100 ({status_clinico}).")
+            
+        except Exception as e:
+            st.error(f"Erro ao processar o PDF: {e}")
     else:
         st.info("Aguardando entrada de dados na planilha.")
