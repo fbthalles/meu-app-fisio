@@ -46,28 +46,8 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
-    # 3. Gráficos
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
-    
-    pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 5, w=175)
-    
-    # SOLUÇÃO CIRÚRGICA: Reduzido de 125 para 105. 
-    # Isso dá espaço para a legenda do primeiro gráfico, mas impede que o segundo caia para fora do papel A4.
-    pdf.set_y(pdf.get_y() + 105) 
-    pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
-    
-    # --- PÁGINA 2 ---
-    pdf.add_page()
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
-    pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145)
-    
-    pdf.set_y(pdf.get_y() + 105) # Ajustado aqui também para manter o mesmo padrão de espaçamento
-    pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
-    pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 10, w=175)
-
-    return bytes(pdf.output())
+    # 3. Gráficos - Layout Matemático para A4
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_
 
 # --- 2. INTERFACE E CONEXÃO ---
 st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="🏥")
