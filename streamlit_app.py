@@ -237,17 +237,29 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_ev,), dpi=150)
         buf_ev.seek(0); plt.close(fig_ev)
 
-        # B) Inchaço Articular (Cores de Alerta)
+        # B) Inchaço Articular (Cores de Alerta e Legenda Customizada)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         cores_inc = ['#D32F2F' if x == 3 else '#FFB300' if x == 2 else '#008091' for x in df_p['Inchaco_N']]
-        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, label='Grau de Inchaço (Stroke Test)')
+        
+        # O 'label' foi retirado daqui, pois criaremos a legenda manualmente
+        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8)
         
         ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold')
         ax_inc.set_ylim(0, 3.5)
         ax_inc.set_xticks(indices_5)
         ax_inc.set_xticklabels(labels_5)
         
-        lgd_inc = ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False)
+        # Criação de Legenda Customizada com as Cores Exatas
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='#D32F2F', alpha=0.8, label='Grau 3 (Alerta/Grave)'),
+            Patch(facecolor='#FFB300', alpha=0.8, label='Grau 2 (Moderado)'),
+            Patch(facecolor='#008091', alpha=0.8, label='Grau 0-1 (Estável)')
+        ]
+        
+        # A legenda agora terá 3 colunas e mostrará as 3 cores
+        lgd_inc = ax_inc.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=3, frameon=False, fontsize=9)
+        
         buf_inc = io.BytesIO()
         fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_inc,), dpi=150)
         buf_inc.seek(0); plt.close(fig_inc)
