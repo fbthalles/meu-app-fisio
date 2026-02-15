@@ -44,6 +44,12 @@ def create_pdf(p_name, hist, metrics, imgs):
 
     par_sono = "Parecer Clínico: A análise biopsicossocial destaca a influência da qualidade do sono na hiperalgesia. Noites reparadoras correlacionam-se com menor percepção de dor articular."
 
+    # LÓGICA CIRÚRGICA DE ESPAÇAMENTO: Calcula a altura exata da imagem gerada
+    def get_img_height(img_buffer, pdf_width):
+        img_buffer.seek(0)
+        with Image.open(img_buffer) as im:
+            return pdf_width * (im.height / im.width)
+
     # ==========================================
     # --- PÁGINA 1: DADOS E EVOLUÇÃO ---
     # ==========================================
@@ -87,7 +93,10 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_ev = pdf.get_y() + 5
     pdf.image(imgs['ev'], x=15, y=y_ev, w=180) 
     
-    pdf.set_y(y_ev + 105) # Padronização baseada na altura do gráfico
+    # Adiciona a altura EXATA da imagem + 8mm de distância visual
+    h_ev = get_img_height(imgs['ev'], 180)
+    pdf.set_y(y_ev + h_ev + 8) 
+    
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
     pdf.multi_cell(0, 6, limpar_texto_pdf(par_ev), align='C')
 
@@ -103,7 +112,10 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_inc = pdf.get_y() + 5
     pdf.image(imgs['inchaco'], x=15, y=y_inc, w=180)
     
-    pdf.set_y(y_inc + 85) # Padronização baseada na altura do gráfico
+    # Adiciona a altura EXATA da imagem + 8mm de distância visual
+    h_inc = get_img_height(imgs['inchaco'], 180)
+    pdf.set_y(y_inc + h_inc + 8) 
+    
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
     pdf.multi_cell(0, 6, limpar_texto_pdf(par_inc), align='C')
 
@@ -113,13 +125,16 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
 
-    # 5. Sono vs Dor (Era 6, agora é 5 pois removemos a capacidade)
+    # 5. Sono vs Dor
     pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     
     y_sono = pdf.get_y() + 5
     pdf.image(imgs['sono'], x=15, y=y_sono, w=180)
 
-    pdf.set_y(y_sono + 95) # Padronização baseada na altura do gráfico
+    # Adiciona a altura EXATA da imagem + 8mm de distância visual
+    h_sono = get_img_height(imgs['sono'], 180)
+    pdf.set_y(y_sono + h_sono + 8) 
+    
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
     pdf.multi_cell(0, 6, limpar_texto_pdf(par_sono), align='C')
 
