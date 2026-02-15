@@ -278,9 +278,16 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
 
         # 3. MÉTRICAS E DASHBOARD COMPLETO
+        media_dor = df_p['Dor'].mean()
+        delta_dor = ultima['Dor'] - media_dor
+        
+        media_inc = df_p['Inchaco_N'].mean()
+        delta_inc = ultima['Inchaco_N'] - media_inc
+
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Dor Atual", f"{ultima['Dor']}/10")
-        m2.metric("Inchaço", f"Grau {ultima[col_inc]}")
+        # delta_color="inverse" faz com que reduções de dor (negativo) fiquem VERDES (positivo para a clínica)
+        m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor:.1f} pts", delta_color="inverse", help=f"A média histórica deste paciente é {media_dor:.1f}/10")
+        m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc:.1f}", delta_color="inverse", help=f"A média histórica de inchaço é Grau {media_inc:.1f}")
         m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
         m4.metric("Previsão Alta", prev_txt)
 
