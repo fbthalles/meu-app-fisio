@@ -71,13 +71,26 @@ def create_pdf(p_name, hist, metrics, imgs):
     from fpdf import FPDF
     from datetime import datetime
     import io
+    import os
     from PIL import Image
+    import urllib.request
+    import urllib.parse
     
     def hex_to_rgb(hex_code):
         hex_code = hex_code.lstrip('#')
         return tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
         
     cor_primaria_rgb = hex_to_rgb(CORES_GENUA['primaria'])
+
+    # 1. ENGENHARIA DO LOGO: Cria uma versão segura (sem transparência) para o FPDF repetir em todas as páginas
+    logo_pdf_path = "temp_logo_pdf.jpg"
+    try:
+        img_logo = Image.open(NOVO_LOGO_GENUA).convert("RGBA")
+        fundo_branco = Image.new("RGBA", img_logo.size, "WHITE")
+        fundo_branco.paste(img_logo, (0, 0), img_logo)
+        fundo_branco.convert('RGB').save(logo_pdf_path, format="JPEG", quality=95)
+    except:
+        logo_pdf_path = None
 
     class PDF_GENUA(FPDF):
         def footer(self):
@@ -86,6 +99,13 @@ def create_pdf(p_name, hist, metrics, imgs):
             self.set_text_color(150, 150, 150)
             hoje = datetime.now().strftime("%d/%m/%Y às %H:%M")
             self.cell(0, 10, f'GENUA Instituto | Inteligência Clínica | Emitido em {hoje} | Página {self.page_no()}', 0, 0, 'C')
+            
+            # UX VISUAL: Injeta o logo no canto inferior direito de TODAS as páginas como chancela
+            if logo_pdf_path:
+                try:
+                    self.image(logo_pdf_path, x=175, y=self.get_y() + 1, w=22)
+                except:
+                    pass
 
     pdf = PDF_GENUA()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -94,7 +114,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     cinza_bg = (245, 245, 245) 
     cinza_txt = (80, 80, 80)
     
-    # 1. CORES DAS CAIXAS DE INSIGHT
+    # 2. CORES DAS CAIXAS DE INSIGHT
     bg_azul_claro = (209, 236, 241); txt_azul_escuro = (12, 84, 96)
     bg_amarelo_claro = (255, 243, 205); txt_amarelo_escuro = (133, 100, 4)
     bg_vermelho_claro = (248, 215, 218); txt_vermelho_escuro = (114, 28, 36)
@@ -148,15 +168,10 @@ def create_pdf(p_name, hist, metrics, imgs):
     # --- PÁGINA 1: SNAPSHOT EXECUTIVO E EVOLUÇÃO ---
     # ==========================================
     pdf.add_page()
-    try:
-        img_logo = Image.open(NOVO_LOGO_GENUA).convert("RGBA")
-        fundo_branco = Image.new("RGBA", img_logo.size, "WHITE")
-        fundo_branco.paste(img_logo, (0, 0), img_logo)
-        buf_logo = io.BytesIO()
-        fundo_branco.convert('RGB').save(buf_logo, format="PNG")
-        buf_logo.seek(0)
-        pdf.image(buf_logo, x=10, y=8, w=35) 
-    except Exception as e: 
+    
+    if logo_pdf_path:
+        pdf.image(logo_pdf_path, x=10, y=8, w=35)
+    else:
         pdf.set_font("helvetica", 'B', 14); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
     pdf.ln(12)
@@ -190,7 +205,6 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_ev = pdf.get_y() + 4
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
     
-    # Ajuste Fino Dinâmico (Colando na Legenda)
     pdf.set_y(y_ev + get_img_height(imgs['ev'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
@@ -206,7 +220,6 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_dor = pdf.get_y() + 4
     pdf.image(imgs['dor'], x=20, y=y_dor, w=170)
     
-    # Ajuste Fino Dinâmico (Colando na Legenda)
     pdf.set_y(y_dor + get_img_height(imgs['dor'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
@@ -222,7 +235,6 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_inc = pdf.get_y() + 4
     pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170)
     
-    # Ajuste Fino Dinâmico (Colando na Legenda)
     pdf.set_y(y_inc + get_img_height(imgs['inchaco'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
@@ -230,7 +242,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     desenhar_caixa_insight("⚠️ INSIGHT MECÂNICO", metrics['insight_mecanico'], bg_amarelo_claro, txt_amarelo_escuro)
 
     # ==========================================
-    # --- PÁGINA 4: BIOPSICOSSOCIAL E FATORES EXTERNOS ---
+    # --- PÁGINA 4: BIOPSICOSSOCIAL E QR CODE ---
     # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
@@ -238,7 +250,6 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_sono = pdf.get_y() + 4
     pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
     
-    # Ajuste Fino Dinâmico (Colando na Legenda)
     pdf.set_y(y_sono + get_img_height(imgs['sono'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
@@ -247,19 +258,13 @@ def create_pdf(p_name, hist, metrics, imgs):
     desenhar_caixa_insight("💤 INSIGHT DO SONO", metrics['insight_ouro'], bg_verde_claro, txt_verde_escuro)
     desenhar_caixa_insight("🔴 INSIGHT POSTURAL (GATILHO BIOMECÂNICO)", metrics['insight_postura'], bg_vermelho_claro, txt_vermelho_escuro)
 
-    # ==========================================
     # --- NOVO: BLOCO DE ASSINATURA E QR CODE ---
-    # ==========================================
     pdf.ln(10)
     y_assinatura = pdf.get_y()
     
     try:
-        # Motor que gera o QR Code dinâmico sem precisar instalar nada
-        import urllib.request
-        import urllib.parse
-        
-        # COLOQUE O SEU LINK AQUI (Ex: Link do seu WhatsApp, Linktree ou Drive)
-        link_destino = "https://wa.me/5511933660220?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20meu%20retorno"
+        # ATENÇÃO THALLES: Mude o link abaixo para o seu WhatsApp ou Linktree real
+        link_destino = "https://wa.me/5511999999999?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20meu%20retorno"
         url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(link_destino)}"
         
         req = urllib.request.Request(url_qr, headers={'User-Agent': 'Mozilla/5.0'})
@@ -268,9 +273,8 @@ def create_pdf(p_name, hist, metrics, imgs):
             
         pdf.image(buf_qr, x=20, y=y_assinatura, w=28)
     except:
-        pass # Se estiver sem internet, ele simplesmente pula o QR code e não trava o app
+        pass 
         
-    # Textos da Assinatura ao lado do QR Code
     pdf.set_y(y_assinatura + 4)
     pdf.set_x(52)
     pdf.set_font("helvetica", 'B', 11)
@@ -287,6 +291,13 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 5, limpar_texto_pdf("Aponte a câmera do celular para o QR Code ao lado para agendar seu retorno,"), ln=True)
     pdf.set_x(52)
     pdf.cell(0, 5, limpar_texto_pdf("acessar sua cartilha de exercícios ou falar diretamente com nossa equipe."), ln=True)
+
+    # Faxina de sistema: Remove o arquivo temporário gerado para não pesar seu servidor
+    try:
+        if os.path.exists(logo_pdf_path):
+            os.remove(logo_pdf_path)
+    except:
+        pass
 
     return bytes(pdf.output())
 
