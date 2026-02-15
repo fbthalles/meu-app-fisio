@@ -604,12 +604,11 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             st.info(f"💡 **Insight do Sono:** {insight_ouro.replace('Parecer Biopsicossocial: ', '')}")
             
             st.write("**Análise de Postura vs. Dor**")
-            st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
+            st.altair_chart(alt.Chart(df_p).mark_bar(color=CORES_GENUA['secundaria'], cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
                 x=alt.X('Postura', title='Postura'),
                 y=alt.Y('mean(Dor)', title='Média de Dor'),
                 tooltip=['Postura', 'mean(Dor)']
             ), use_container_width=True)
-            st.error(f"💡 **Insight Postural:** {insight_postura}")
 
         # 5. PREPARAÇÃO E DOWNLOAD DO PDF
         try:
