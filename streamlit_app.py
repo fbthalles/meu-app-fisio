@@ -108,7 +108,7 @@ elif menu == "Avaliação IKDC 📋":
             conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
             st.success("Score IKDC registrado!")
 
-else: # PAINEL ANALÍTICO (V18.13 - FIX DEFINITIVO DE LEGENDAS E CORES)
+else: # PAINEL ANALÍTICO (V18.14 - RESOLUÇÃO DE SYNTAX E CONTINUIDADE)
     st.header("📊 Painel Analítico & Clinical Intelligence")
     df = conn.read(ttl=0).dropna(how="all")
     
@@ -116,7 +116,7 @@ else: # PAINEL ANALÍTICO (V18.13 - FIX DEFINITIVO DE LEGENDAS E CORES)
         p_sel = st.selectbox("Selecione o Paciente para Análise", df['Paciente'].unique())
         df_p = df[df['Paciente'] == p_sel].copy()
         
-        # 1. PROCESSAMENTO DE DADOS E EIXO X (ESSENCIAL)
+        # 1. PROCESSAMENTO DE DADOS E EIXO X
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
         mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
         df_p['Score_Função'] = (df_p['Agachamento'].map(mapa_func) + df_p['Step_Up'].map(mapa_func) + df_p['Step_Down'].map(mapa_func)) / 3
@@ -125,30 +125,35 @@ else: # PAINEL ANALÍTICO (V18.13 - FIX DEFINITIVO DE LEGENDAS E CORES)
         df_p['Inchaco_N'] = pd.to_numeric(df_p[col_inc], errors='coerce').fillna(0)
         ultima = df_p.iloc[-1]
 
-        # Definição dos intervalos de 5 em 5 para o Eixo X
+        # Intervalos de 5 sessões para o Eixo X
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
-        # TENDÊNCIA E ALTA
+        # CÁLCULO DE TENDÊNCIA E PREVISÃO DE ALTA
         try:
             df_p['Data_DT'] = pd.to_datetime(df_p['Data'], dayfirst=True)
             df_p['Dias'] = (df_p['Data_DT'] - df_p['Data_DT'].min()).dt.days
             z = np.polyfit(df_p['Dias'].values, df_p['Score_Função'].values, 1)
             trend_line = z[0] * df_p['Dias'].values + z[1]
-            prev_txt = (df_p['Data_DT'].min() + pd.to_timedelta((9.0 - z[1]) / z[0], unit='d')).strftime("%d/%m/%Y") if z[0] > 0 else "Estabilizado"
-        except: trend_line = []; prev_txt = "Em análise"
+            # Projeção para score 9.0 (Alta Estimada)
+            dia_estimado_alta = (9.0 - z[1]) / z[0] if z[0] > 0 else 0
+            prev_txt = (df_p['Data_DT'].min() + pd.to_timedelta(dia_estimado_alta, unit='d')).strftime("%d/%m/%Y") if dia_estimado_alta > 0 else "Estabilizado"
+        except: 
+            trend_line = []
+            prev_txt = "Em análise"
 
-        # SCORE IKDC
+        # SCORE CIENTÍFICO IKDC
         try:
             df_ikdc = conn.read(worksheet="IKDC", ttl=0)
             u_ikdc = float(df_ikdc[df_ikdc['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1])
             status_clinico = "Bom" if u_ikdc > 70 else "Regular" if u_ikdc > 45 else "Severo"
             emoji_ikdc = "🏆" if status_clinico == "Bom" else "🟢" if status_clinico == "Regular" else "🔴"
-        except: u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
+        except: 
+            u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-        # 3. GERAÇÃO DE GRÁFICOS (BLINDAGEM CONTRA CORTES NO PDF)
+        # 2. GERAÇÃO DE GRÁFICOS (FIX DE LEGENDAS E VISIBILIDADE)
         
-        # A) Evolução Clínica (CORREÇÃO DA LINHA 159)
+        # A) Evolução Clínica (Dor vs Capacidade + Tendência)
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
         ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
         ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
@@ -157,19 +162,16 @@ else: # PAINEL ANALÍTICO (V18.13 - FIX DEFINITIVO DE LEGENDAS E CORES)
         
         ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold')
         ax_ev.set_ylim(-0.5, 11); ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
-        
-        # Legenda capturada para o PDF
         lgd_ev = ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
         
         buf_ev = io.BytesIO()
         fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_ev,), dpi=150)
         buf_ev.seek(0); plt.close(fig_ev)
 
-        # B) Inchaço (CORES DE ALERTA ATIVADAS)
+        # B) Inchaço Articular (Cores de Alerta)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         cores_inc = ['#D32F2F' if x == 3 else '#FFB300' if x == 2 else '#008091' for x in df_p['Inchaco_N']]
         ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, label='Grau de Inchaço (Stroke Test)')
-        
         ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold')
         ax_inc.set_ylim(0, 3.5); ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
         lgd_inc = ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False)
@@ -178,7 +180,60 @@ else: # PAINEL ANALÍTICO (V18.13 - FIX DEFINITIVO DE LEGENDAS E CORES)
         fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_inc,), dpi=150)
         buf_inc.seek(0); plt.close(fig_inc)
 
-        # C) Perfil por Teste
+        # C) Perfil de Capacidade (CORREÇÃO DA LINHA 184)
         fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
         testes = ['Agachamento', 'Step Up', 'Step Down']
-        valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step
+        valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step_Down']]]
+        barras = ax_cap.bar(testes, valores, color='#008091')
+        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold')
+        ax_cap.set_title("Perfil de Capacidade por Teste", fontweight='bold')
+        buf_cap = io.BytesIO(); fig_cap.savefig(buf_cap, format='png', bbox_inches='tight', dpi=150); buf_cap.seek(0); plt.close(fig_cap)
+
+        # D) Sono vs Dor
+        fig_s, ax_s = plt.subplots(figsize=(10, 4))
+        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
+        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
+        lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
+        buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
+
+        # 3. MÉTRICAS E DASHBOARD
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Dor Atual", f"{ultima['Dor']}/10")
+        m2.metric("Inchaço", f"Grau {ultima[col_inc]}")
+        m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
+        m4.metric("Previsão Alta", prev_txt)
+
+        st.write("---")
+        t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌊 Inchaço", "🎯 Testes & Sono"])
+        with t1: st.image(buf_ev, use_container_width=True)
+        with t2: st.image(buf_inc, use_container_width=True)
+        with t3: 
+            st.image(buf_cap, use_container_width=True)
+            st.image(buf_s, use_container_width=True)
+
+        # 4. PREPARAÇÃO E DOWNLOAD DO PDF
+        try:
+            df_cad = conn.read(worksheet="Cadastro", ttl=0)
+            hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
+        except: 
+            hist_clinica = "Anamnese não cadastrada no sistema."
+
+        pdf_metrics = {
+            'ikdc': u_ikdc, 
+            'ikdc_status': status_clinico, 
+            'dor': ultima['Dor'], 
+            'inchaco': ultima[col_inc], 
+            'alta': prev_txt
+        }
+        
+        pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
+            'ev': buf_ev, 
+            'sono': buf_s, 
+            'cap': buf_cap, 
+            'inchaco': buf_inc
+        })
+        
+        st.download_button("📥 BAIXAR RELATÓRIO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf")
+        st.info(f"📝 ZenFisio: {p_sel} - Dor {ultima['Dor']}, IKDC {int(u_ikdc)}, Alta est. {prev_txt}.")
+    else:
+        st.info("Aguardando entrada de dados na planilha.")
