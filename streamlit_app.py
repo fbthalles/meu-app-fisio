@@ -313,20 +313,37 @@ with st.sidebar:
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
 if menu == "Check-in Diário 📝":
-    st.header("Check-in Diário de Evolução")
+    st.header("📝 Check-in Diário de Evolução")
+    st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Preencha os dados da sessão atual para alimentar a Inteligência Artificial.</p>", unsafe_allow_html=True)
+    
     with st.form("checkin", clear_on_submit=True):
-        paciente = st.text_input("Nome do Paciente")
+        paciente = st.text_input("👤 Nome do Paciente", placeholder="Ex: Thiago Rocha")
+        
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Sintomas e Quadro Clínico</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
-            dor = st.select_slider("Dor atual (0-10)", options=list(range(11)))
-            sono = st.radio("Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
-            postura = st.radio("Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
+            dor = st.slider("💥 Dor atual (EVA 0-10)", 0, 10, 0)
         with c2:
-            agac = st.selectbox("Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-            sup = st.selectbox("Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-            sdn = st.selectbox("Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-            inchaco = st.select_slider("Inchaço (Stroke Test)", options=["0", "1", "2", "3"])
-        if st.form_submit_button("REGISTRAR SESSÃO"):
+            inchaco = st.select_slider("💧 Inchaço (Stroke Test)", options=["0", "1", "2", "3"])
+            
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Função Biomecânica</h4>", unsafe_allow_html=True)
+        c3, c4, c5 = st.columns(3)
+        with c3:
+            agac = st.selectbox("🏋️ Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+        with c4:
+            sup = st.selectbox("🪜 Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+        with c5:
+            sdn = st.selectbox("📉 Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+            
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
+        c6, c7 = st.columns(2)
+        with c6:
+            sono = st.radio("💤 Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
+        with c7:
+            postura = st.radio("🧍 Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
             df = conn.read(ttl=0).dropna(how="all")
             nova = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), "Dor": int(dor), "Inchaço": str(inchaco), "Sono": sono, "Postura": postura, "Agachamento": agac, "Step_Up": sup, "Step_Down": sdn}])
             conn.update(data=pd.concat([df, nova], ignore_index=True))
