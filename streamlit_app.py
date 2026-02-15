@@ -599,8 +599,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         st.write("---")
         t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Fatores Externos"])
         
-        with t1: 
-        with t1: 
+        with t1:  
             # 1. Alerta de Platô (Caso exista)
             if plato_detectado:
                 st.error("🚨 **ALERTA DE PLATÔ TERAPÊUTICO DETECTADO**")
