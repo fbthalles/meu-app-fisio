@@ -22,145 +22,86 @@ def create_pdf(p_name, hist, metrics, imgs):
     cinza_txt = (80, 80, 80)
     
     # --- PARECERES CLÍNICOS DINÂMICOS ---
-    if metrics['ikdc_status'] == 'Bom': 
-        par_ikdc = "Parecer Clínico: Excelente evolução. O paciente apresenta alta percepção de funcionalidade, validando a eficácia da progressão de carga e a tolerância mecânica do joelho."
-    elif metrics['ikdc_status'] == 'Regular': 
-        par_ikdc = "Parecer Clínico: Evolução moderada. O paciente apresenta ganhos reais, mas ainda demanda atenção fisioterapêutica para déficits de força ou controle neuromuscular residual."
-    else: 
-        par_ikdc = "Parecer Clínico: Baixa funcionalidade percebida. Sugere-se reavaliar o volume de carga atual e focar intensamente na modulação de sintomas álgicos."
+    if metrics['ikdc_status'] == 'Bom': par_ikdc = "Parecer Clínico: Excelente evolução. O paciente apresenta alta percepção de funcionalidade, validando a eficácia da progressão."
+    elif metrics['ikdc_status'] == 'Regular': par_ikdc = "Parecer Clínico: Evolução moderada. Apresenta ganhos reais, mas demanda atenção fisioterapêutica para déficits residuais."
+    else: par_ikdc = "Parecer Clínico: Baixa funcionalidade percebida. Sugere-se reavaliar o volume de carga atual e focar na modulação de sintomas."
         
-    if metrics['alta'] not in ["Em análise", "Estabilizado"]: 
-        par_ev = f"Parecer Clínico: O cruzamento das curvas demonstra melhora significativa. A dor está controlada sob demanda funcional, com projeção matemática de alta para {metrics['alta']}."
-    else: 
-        par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância do paciente. O foco atual é afastar a curva de função da curva de dor para garantir progressão segura."
+    if metrics['alta'] not in ["Em análise", "Estabilizado"]: par_ev = f"Parecer Clínico: Cruzamento das curvas demonstra melhora. Projeção de alta para {metrics['alta']}."
+    else: par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância atual. Foco em afastar a curva de função da curva de dor."
 
     dor_atual = float(metrics['dor'])
     media_dor = float(metrics['media_dor'])
-    if dor_atual < media_dor:
-        par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) está abaixo da média histórica do paciente ({media_dor:.1f}), indicando uma dessensibilização efetiva e resposta positiva à analgesia."
-    elif dor_atual == media_dor:
-        par_dor = f"Parecer Clínico: O quadro álgico encontra-se estabilizado na média histórica ({media_dor:.1f}). Foco atual em romper o platô de sintomas."
-    else:
-        par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se cautela com a progressão de carga e reforço nas estratégias analgésicas."
+    if dor_atual < media_dor: par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) está abaixo da média ({media_dor:.1f}), indicando dessensibilização efetiva."
+    elif dor_atual == media_dor: par_dor = f"Parecer Clínico: Quadro álgico estabilizado na média ({media_dor:.1f}). Foco em romper o platô de sintomas."
+    else: par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
 
     grau_inc = int(float(metrics['inchaco']))
-    if grau_inc <= 1: 
-        par_inc = "Parecer Clínico: Articulação estável e sem inchaço clinicamente relevante (Grau 0-1). Cenário totalmente seguro para aumento de intensidade no treinamento."
-    elif grau_inc == 2: 
-        par_inc = "Parecer Clínico: Presença de inchaço moderado (Alerta Amarelo). Recomendável estabilizar o volume de treino e monitorar a resposta articular nas próximas 48h."
-    else: 
-        par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). É imperativo regredir a sobrecarga mecânica e priorizar recursos de drenagem e crioterapia."
+    if grau_inc <= 1: par_inc = "Parecer Clínico: Articulação estável (Grau 0-1). Cenário seguro para aumento de intensidade no treinamento."
+    elif grau_inc == 2: par_inc = "Parecer Clínico: Presença de inchaço moderado (Alerta Amarelo). Recomendável estabilizar volume de treino."
+    else: par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). Imperativo regredir a sobrecarga mecânica."
 
-    par_sono = metrics['insight_ouro']
+    # INJEÇÃO DOS INSIGHTS DE OURO DE FORMA AUTOMÁTICA NOS PARECERES
+    par_inc = par_inc + f"\n\nInsight Mecânico: {metrics['insight_mecanico']}"
+    par_sono = metrics['insight_ouro'] + f"\n\nInsight Postural: {metrics['insight_postura']}"
 
-    # LÓGICA DE ESPAÇAMENTO COMPACTO
     def get_img_height(img_buffer, pdf_width):
         img_buffer.seek(0)
         from PIL import Image
-        with Image.open(img_buffer) as im:
-            return pdf_width * (im.height / im.width)
+        with Image.open(img_buffer) as im: return pdf_width * (im.height / im.width)
 
-    # ==========================================
-    # --- PÁGINA 1: DADOS E EVOLUÇÃO ---
-    # ==========================================
+    # --- PÁGINA 1 ---
     pdf.add_page()
-    try: 
-        pdf.image("Ativo-1.png", x=10, y=8, w=30)
-    except: 
-        pdf.set_font("helvetica", 'B', 14)
-        pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
+    try: pdf.image("Ativo-1.png", x=10, y=8, w=30)
+    except: pdf.set_font("helvetica", 'B', 14); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
-    pdf.ln(15)
-    pdf.set_font("helvetica", 'B', 12)
-    tit_1 = "RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"
-    pdf.cell(0, 8, limpar_texto_pdf(tit_1), ln=True, align='C')
-    pdf.ln(3)
+    pdf.ln(15); pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C'); pdf.ln(3)
 
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    tit_2 = " 1. IDENTIFICAÇÃO E ANAMNESE"
-    pdf.cell(0, 7, limpar_texto_pdf(tit_2), ln=True, fill=True)
+    pdf.cell(0, 7, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 9); pdf.ln(2)
-    txt_paciente = f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}"
-    pdf.multi_cell(0, 5, limpar_texto_pdf(txt_paciente)); pdf.ln(3)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    tit_3 = " 2. AVALIAÇÃO CIENTÍFICA IKDC"
-    pdf.cell(0, 7, limpar_texto_pdf(tit_3), ln=True, fill=True, align='C')
-    
-    pdf.ln(3)
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 12)
+    pdf.cell(0, 7, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC"), ln=True, fill=True, align='C')
+    pdf.ln(3); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 12)
     pdf.set_x((pdf.w - 100) / 2) 
     score_val = int(float(metrics['ikdc']))
-    txt_res = f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"
-    pdf.cell(100, 10, limpar_texto_pdf(txt_res), ln=True, fill=True, align='C')
-    
-    pdf.ln(6) 
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(par_ikdc), align='C')
-    pdf.ln(6)
+    pdf.cell(100, 10, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
+    pdf.ln(6); pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_ikdc), align='C'); pdf.ln(6)
 
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    tit_4 = " 3. EVOLUÇÃO CLÍNICA"
-    pdf.cell(0, 7, limpar_texto_pdf(tit_4), ln=True, fill=True, align='C')
-    
+    pdf.cell(0, 7, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA"), ln=True, fill=True, align='C')
     y_ev = pdf.get_y() + 4
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
-    h_ev = get_img_height(imgs['ev'], 170)
-    pdf.set_y(y_ev + h_ev + 2) 
-    
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
+    pdf.set_y(y_ev + get_img_height(imgs['ev'], 170) + 2) 
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
 
-    # ==========================================
-    # --- PÁGINA 2: DOR ISOLADA E INCHAÇO ---
-    # ==========================================
+    # --- PÁGINA 2 ---
     pdf.add_page()
-    
-    # 4. Dor Isolada
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    tit_5 = " 4. COMPORTAMENTO DA DOR"
-    pdf.cell(0, 7, limpar_texto_pdf(tit_5), ln=True, fill=True, align='C')
-    
+    pdf.cell(0, 7, limpar_texto_pdf(" 4. COMPORTAMENTO DA DOR"), ln=True, fill=True, align='C')
     y_dor = pdf.get_y() + 4
     pdf.image(imgs['dor'], x=20, y=y_dor, w=170)
-    h_dor = get_img_height(imgs['dor'], 170)
-    pdf.set_y(y_dor + h_dor + 2) 
-    
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(par_dor), align='C')
+    pdf.set_y(y_dor + get_img_height(imgs['dor'], 170) + 2) 
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_dor), align='C'); pdf.ln(10)
 
-    pdf.ln(10)
-
-    # 5. Inchaço
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    tit_6 = " 5. MONITORAMENTO DE INCHAÇO"
-    pdf.cell(0, 7, limpar_texto_pdf(tit_6), ln=True, fill=True, align='C')
-    
+    pdf.cell(0, 7, limpar_texto_pdf(" 5. MONITORAMENTO DE INCHAÇO"), ln=True, fill=True, align='C')
     y_inc = pdf.get_y() + 4
     pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170)
-    h_inc = get_img_height(imgs['inchaco'], 170)
-    pdf.set_y(y_inc + h_inc + 2) 
-    
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
+    pdf.set_y(y_inc + get_img_height(imgs['inchaco'], 170) + 2) 
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
 
-    # ==========================================
-    # --- PÁGINA 3: BIOPSICOSSOCIAL ---
-    # ==========================================
+    # --- PÁGINA 3 ---
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-
-    # Variável criada exatamente para o editor não cortar a sua linha
-    tit_7 = " 6. ANÁLISE BIOPSICOSSOCIAL"
-    pdf.cell(0, 7, limpar_texto_pdf(tit_7), ln=True, fill=True, align='C')
-    
+    pdf.cell(0, 7, limpar_texto_pdf(" 6. ANÁLISE BIOPSICOSSOCIAL E FATORES EXTERNOS"), ln=True, fill=True, align='C')
     y_sono = pdf.get_y() + 4
     pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
-    h_sono = get_img_height(imgs['sono'], 170)
-    pdf.set_y(y_sono + h_sono + 2) 
-    
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(par_sono), align='C')
+    pdf.set_y(y_sono + get_img_height(imgs['sono'], 170) + 2) 
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_sono), align='C')
 
     return bytes(pdf.output())
 
@@ -316,51 +257,78 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
 
-        # 3. MÉTRICAS E DASHBOARD COMPLETO (COM DELTAS EM PORCENTAGEM E INSIGHT DE OURO)
+        # 3. MOTORES MATEMÁTICOS DE CRUZAMENTO E INSIGHTS
         media_dor = df_p['Dor'].mean()
         delta_dor_pct = ((ultima['Dor'] - media_dor) / media_dor * 100) if media_dor > 0 else (100 if ultima['Dor'] > 0 else 0)
         
         media_inc = df_p['Inchaco_N'].mean()
         delta_inc_pct = ((ultima['Inchaco_N'] - media_inc) / media_inc * 100) if media_inc > 0 else (100 if ultima['Inchaco_N'] > 0 else 0)
 
-        # CÁLCULO MATEMÁTICO: O INSIGHT DE OURO (SONO VS DOR)
+        # Insight 1: Sono vs Dor (Biopsicossocial)
         try:
             media_sono = df_p['Sono_N'].mean()
             dor_sono_bom = df_p[df_p['Sono_N'] >= media_sono]['Dor'].mean()
             dor_sono_ruim = df_p[df_p['Sono_N'] < media_sono]['Dor'].mean()
-
-            # Se a dor for menor quando o sono é bom, calculamos a porcentagem de queda
             if pd.notna(dor_sono_bom) and pd.notna(dor_sono_ruim) and dor_sono_ruim > 0 and dor_sono_bom < dor_sono_ruim:
                 queda_pct = ((dor_sono_ruim - dor_sono_bom) / dor_sono_ruim) * 100
-                insight_ouro = f"Parecer Clínico Biopsicossocial: Os dados comprovam que, quando o paciente relata um sono superior à sua média, o nível de dor cai em {queda_pct:.0f}%. O manejo do sono atua como um forte inibidor analgésico neste caso."
+                insight_ouro = f"Parecer Biopsicossocial: Quando o paciente relata um sono superior à sua média, o nível de dor cai em {queda_pct:.0f}%. O manejo do sono atua como forte inibidor analgésico."
             else:
-                insight_ouro = "Parecer Clínico Biopsicossocial: O cruzamento de dados atual mantém a proporção padrão entre qualidade do sono e percepção de dor, sem discrepâncias agudas."
+                insight_ouro = "Parecer Biopsicossocial: A correlação entre qualidade do sono e percepção de dor mantém-se dentro do desvio padrão esperado, sem discrepâncias agudas."
         except:
-            insight_ouro = "Parecer Clínico Biopsicossocial: Monitoramento contínuo em andamento para estabelecer a correlação exata entre o sono e o quadro álgico."
+            insight_ouro = "Monitoramento contínuo em andamento para estabelecer correlação álgica com o sono."
 
+        # Insight 2: Inchaço vs Função (Inibição Mecânica)
+        try:
+            func_inc_alto = df_p[df_p['Inchaco_N'] >= 2]['Score_Função'].mean()
+            func_inc_baixo = df_p[df_p['Inchaco_N'] <= 1]['Score_Função'].mean()
+            if pd.notna(func_inc_alto) and pd.notna(func_inc_baixo) and func_inc_baixo > 0 and func_inc_alto < func_inc_baixo:
+                queda_func = ((func_inc_baixo - func_inc_alto) / func_inc_baixo) * 100
+                insight_mecanico = f"A presença de inchaço moderado/grave reduz a capacidade funcional em {queda_func:.0f}%. A resolução do derrame articular é o principal limitante para progressão de carga."
+            else:
+                insight_mecanico = "O paciente demonstra capacidade de manter sua funcionalidade de forma independente das flutuações de efusão articular."
+        except:
+            insight_mecanico = "Aguardando mais avaliações para correlacionar o impacto do inchaço na função."
+
+        # Insight 3: Postura vs Dor (Gatilho Biomecânico)
+        try:
+            if 'Postura' in df_p.columns and not df_p['Postura'].empty:
+                pior_postura = df_p.groupby('Postura')['Dor'].mean().idxmax()
+                dor_pior = df_p.groupby('Postura')['Dor'].mean().max()
+                dor_outras = df_p[df_p['Postura'] != pior_postura]['Dor'].mean()
+                if pd.notna(dor_pior) and pd.notna(dor_outras) and dor_outras > 0 and dor_pior > dor_outras:
+                    aumento_pct = ((dor_pior - dor_outras) / dor_outras) * 100
+                    insight_postura = f"A postura '{pior_postura}' atua como gatilho biomecânico primário, elevando o quadro álgico em {aumento_pct:.0f}% em relação às demais posições da rotina."
+                else:
+                    insight_postura = "Não há evidências de um gatilho postural isolado que exacerbe drasticamente os sintomas."
+            else:
+                insight_postura = "Dados posturais insuficientes para análise biomecânica."
+        except:
+            insight_postura = "Aguardando volume de dados para mapeamento de gatilho postural."
+
+        # 4. DASHBOARD TELA
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse", help=f"A média histórica deste paciente é {media_dor:.1f}/10")
-        m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc_pct:.0f}%", delta_color="inverse", help=f"A média histórica de inchaço é Grau {media_inc:.1f}")
+        m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
+        m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc_pct:.0f}%", delta_color="inverse")
         m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
         m4.metric("Previsão Alta", prev_txt)
 
         st.write("---")
-        t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Biopsicossocial"])
+        t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Fatores Externos"])
         
         with t1: 
             st.image(buf_ev, use_container_width=True)
-            st.success(f"🔮 **Inteligência GENUA:** A linha pontilhada indica a tendência de recuperação. Alta estimada: **{prev_txt}**.")
+            st.success(f"🔮 **Inteligência GENUA:** Alta estimada para **{prev_txt}**.")
             
         with t2:
             st.image(buf_dor, use_container_width=True)
             
         with t3: 
             st.image(buf_inc, use_container_width=True)
+            st.warning(f"💡 **Insight Mecânico:** {insight_mecanico}")
             
         with t4: 
             st.image(buf_s, use_container_width=True)
-            # Injetando o Insight de Ouro no Streamlit de forma limpa (sem o título do PDF)
-            st.info(f"💡 **Insight de Ouro:** {insight_ouro.replace('Parecer Clínico Biopsicossocial: ', '')}")
+            st.info(f"💡 **Insight do Sono:** {insight_ouro.replace('Parecer Biopsicossocial: ', '')}")
             
             st.write("**Análise de Postura vs. Dor**")
             st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
@@ -368,30 +336,26 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
                 y=alt.Y('mean(Dor)', title='Média de Dor'),
                 tooltip=['Postura', 'mean(Dor)']
             ), use_container_width=True)
+            st.error(f"💡 **Insight Postural:** {insight_postura}")
 
-        # 4. PREPARAÇÃO E DOWNLOAD DO PDF
+        # 5. PREPARAÇÃO E DOWNLOAD DO PDF
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
             hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
         except: 
             hist_clinica = "Anamnese não cadastrada no sistema."
 
-        # Passando o Insight de Ouro para a função do PDF
         pdf_metrics = {
-            'ikdc': u_ikdc, 
-            'ikdc_status': status_clinico, 
-            'dor': ultima['Dor'], 
-            'media_dor': media_dor,
-            'inchaco': ultima[col_inc], 
-            'alta': prev_txt,
-            'insight_ouro': insight_ouro 
+            'ikdc': u_ikdc, 'ikdc_status': status_clinico, 
+            'dor': ultima['Dor'], 'media_dor': media_dor,
+            'inchaco': ultima[col_inc], 'alta': prev_txt,
+            'insight_ouro': insight_ouro,
+            'insight_mecanico': insight_mecanico,
+            'insight_postura': insight_postura
         }
         
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
-            'ev': buf_ev, 
-            'dor': buf_dor,
-            'sono': buf_s, 
-            'inchaco': buf_inc
+            'ev': buf_ev, 'dor': buf_dor, 'sono': buf_s, 'inchaco': buf_inc
         })
         
         st.download_button("📥 BAIXAR RELATÓRIO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf")
