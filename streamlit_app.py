@@ -247,6 +247,47 @@ def create_pdf(p_name, hist, metrics, imgs):
     desenhar_caixa_insight("💤 INSIGHT DO SONO", metrics['insight_ouro'], bg_verde_claro, txt_verde_escuro)
     desenhar_caixa_insight("🔴 INSIGHT POSTURAL (GATILHO BIOMECÂNICO)", metrics['insight_postura'], bg_vermelho_claro, txt_vermelho_escuro)
 
+    # ==========================================
+    # --- NOVO: BLOCO DE ASSINATURA E QR CODE ---
+    # ==========================================
+    pdf.ln(10)
+    y_assinatura = pdf.get_y()
+    
+    try:
+        # Motor que gera o QR Code dinâmico sem precisar instalar nada
+        import urllib.request
+        import urllib.parse
+        
+        # COLOQUE O SEU LINK AQUI (Ex: Link do seu WhatsApp, Linktree ou Drive)
+        link_destino = "https://wa.me/5511999999999?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20meu%20retorno"
+        url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(link_destino)}"
+        
+        req = urllib.request.Request(url_qr, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            buf_qr = io.BytesIO(response.read())
+            
+        pdf.image(buf_qr, x=20, y=y_assinatura, w=28)
+    except:
+        pass # Se estiver sem internet, ele simplesmente pula o QR code e não trava o app
+        
+    # Textos da Assinatura ao lado do QR Code
+    pdf.set_y(y_assinatura + 4)
+    pdf.set_x(52)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.set_text_color(*azul_genua)
+    pdf.cell(0, 5, limpar_texto_pdf("DR. THALLES - FISIOTERAPIA ESPORTIVA"), ln=True)
+    
+    pdf.set_x(52)
+    pdf.set_font("helvetica", '', 9)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 5, limpar_texto_pdf("Especialista em Reabilitação e Inteligência Clínica"), ln=True)
+    
+    pdf.set_x(52)
+    pdf.set_font("helvetica", 'I', 8)
+    pdf.cell(0, 5, limpar_texto_pdf("Aponte a câmera do celular para o QR Code ao lado para agendar seu retorno,"), ln=True)
+    pdf.set_x(52)
+    pdf.cell(0, 5, limpar_texto_pdf("acessar sua cartilha de exercícios ou falar diretamente com nossa equipe."), ln=True)
+
     return bytes(pdf.output())
 
 # --- 2. INTERFACE E CONEXÃO ---
