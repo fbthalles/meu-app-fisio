@@ -24,7 +24,7 @@ CORES_GENUA = {
 # 2. CAMINHO DO NOVO LOGOTIPO
 # ATENÇÃO THALLES: Troque o nome abaixo para o nome EXATO do arquivo que você fez upload!
 # Exemplo: Se o arquivo chama "Logo_Genua.jpg", escreva "Logo_Genua.jpg" entre as aspas.
-NOVO_LOGO_GENUA = "NOVO_LOGO_GENUA.png" 
+NOVO_LOGO_GENUA = "logo_genua_novo_v2.png" 
 
 # 3. CONFIGURAÇÃO INICIAL DA PÁGINA 
 st.set_page_config(
