@@ -573,18 +573,31 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             insight_dor = f"A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
             cor_dor = "error"
 
-        # 1. Cálculo de LSI Estimado (Limb Symmetry Index) baseado na função atual
+        # 1. Definição do Alerta de Platô
+        plato_detectado = False
+        if len(df_p) >= 3:
+            ultimas_3 = df_p.tail(3)
+            dor_estagnada = ultimas_3['Dor'].nunique() == 1
+            # Critério: Inchaço não cedeu e função não mudou
+            inchaco_estagnado = (ultimas_3['Inchaco_N'].iloc[-1] >= ultimas_3['Inchaco_N'].iloc[-2])
+            funcao_estagnada = ultimas_3['Score_Função'].nunique() == 1
+            
+            if dor_estagnada and inchaco_estagnado and funcao_estagnada:
+                plato_detectado = True
+
+        # 2. Cálculo de LSI Estimado (Limb Symmetry Index)
         lsi_estimado = (df_p['Score_Função'].iloc[-1] / 10) * 100 
         
-        # 2. Rastreio de Nociplasticidade (Dor vs. Inchaço/Função)
+        # 3. Rastreio de Nociplasticidade (Baseado na Pesquisa Vasta 2025)
         descompasso_nociplastico = False
         if ultima['Dor'] > 5 and ultima['Inchaco_N'] <= 1 and df_p['Score_Função'].iloc[-1] >= 7:
             descompasso_nociplastico = True
             
-        # 3. Alerta de Inibição Muscular Artrogênica (AMI)
+        # 4. Alerta de Inibição Muscular Artrogênica (AMI)
         alerta_ami = False
         if ultima['Inchaco_N'] >= 2:
             alerta_ami = True
+            
         # ----------------------------------------------------------------------------
 
         # 4. DASHBOARD TELA (O código continua aqui...)
