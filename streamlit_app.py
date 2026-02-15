@@ -113,7 +113,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     elif grau_inc == 2: par_inc = "Parecer Clínico: Presença de inchaço moderado (Alerta Amarelo). Recomendável estabilizar volume de treino."
     else: par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). Imperativo regredir a sobrecarga mecânica."
 
-    # LÓGICA DO INSIGHT ÁLGICO (DOR) RECUPERADO
+    # LÓGICA DO INSIGHT ÁLGICO (DOR)
     dor_atual = float(metrics['dor'])
     media_dor = float(metrics['media_dor'])
     
@@ -190,16 +190,15 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_ev = pdf.get_y() + 4
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
     
-    margem_y = max(125, get_img_height(imgs['ev'], 170))
-    pdf.set_y(y_ev + margem_y + 2) 
+    # Ajuste Fino Dinâmico (Colando na Legenda)
+    pdf.set_y(y_ev + get_img_height(imgs['ev'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
-    
     desenhar_caixa_insight("💡 INSIGHT EVOLUTIVO", metrics['insight_evolucao'], bg_azul_claro, txt_azul_escuro)
 
     # ==========================================
-    # --- PÁGINA 2: DOR ISOLADA (Página Própria) ---
+    # --- PÁGINA 2: DOR ISOLADA ---
     # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
@@ -207,17 +206,15 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_dor = pdf.get_y() + 4
     pdf.image(imgs['dor'], x=20, y=y_dor, w=170)
     
-    margem_y = max(125, get_img_height(imgs['dor'], 170))
-    pdf.set_y(y_dor + margem_y + 2) 
+    # Ajuste Fino Dinâmico (Colando na Legenda)
+    pdf.set_y(y_dor + get_img_height(imgs['dor'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_dor), align='C')
-    
-    # Injeção do Insight Álgico Faltante
     desenhar_caixa_insight("🧠 INSIGHT ÁLGICO", insight_dor_texto, cor_bg_dor, cor_txt_dor)
 
     # ==========================================
-    # --- PÁGINA 3: INCHAÇO (Página Própria para não vazar) ---
+    # --- PÁGINA 3: INCHAÇO ---
     # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
@@ -225,12 +222,11 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_inc = pdf.get_y() + 4
     pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170)
     
-    margem_y = max(125, get_img_height(imgs['inchaco'], 170))
-    pdf.set_y(y_inc + margem_y + 2) 
+    # Ajuste Fino Dinâmico (Colando na Legenda)
+    pdf.set_y(y_inc + get_img_height(imgs['inchaco'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
-    
     desenhar_caixa_insight("⚠️ INSIGHT MECÂNICO", metrics['insight_mecanico'], bg_amarelo_claro, txt_amarelo_escuro)
 
     # ==========================================
@@ -242,15 +238,13 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_sono = pdf.get_y() + 4
     pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
     
-    margem_y = max(125, get_img_height(imgs['sono'], 170))
-    pdf.set_y(y_sono + margem_y + 2) 
+    # Ajuste Fino Dinâmico (Colando na Legenda)
+    pdf.set_y(y_sono + get_img_height(imgs['sono'], 170) + 5) 
     
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf("Parecer Clínico: O gráfico acima ilustra a interação do sono com a dor. Abaixo, os diagnósticos cruzados da Inteligência Artificial sobre fatores modificáveis."), align='C')
     
     desenhar_caixa_insight("💤 INSIGHT DO SONO", metrics['insight_ouro'], bg_verde_claro, txt_verde_escuro)
-    
-    # Texto de Postura agora separado e contextualizado
     desenhar_caixa_insight("🔴 INSIGHT POSTURAL (GATILHO BIOMECÂNICO)", metrics['insight_postura'], bg_vermelho_claro, txt_vermelho_escuro)
 
     return bytes(pdf.output())
