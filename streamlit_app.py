@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
-import altair as alt  # IMPORT CORRIGIDO AQUI
+import altair as alt
 import numpy as np
 from fpdf import FPDF
 from PIL import Image
@@ -30,37 +30,37 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
     pdf.ln(5)
 
-    # 1. Identificação
+    # 1. Identificação (Título Padronizado com Fundo Preenchido)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
     pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. Avaliação IKDC (Com Status)
+    # 2. Avaliação IKDC (Sem decimais e com Status)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'I', 9); pdf.ln(1)
-    pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro para avaliação funcional do joelho."), align='C')
+    pdf.multi_cell(0, 5, limpar_texto_pdf("O IKDC é o padrão ouro para avaliação funcional. <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
     
-    # Moldura do Resultado com Classificação (ex: BOM, REGULAR)
-    pdf.ln(2); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
-    pdf.set_x((pdf.w - 115) / 2) 
-    score_val = int(float(metrics['ikdc']))
+    # Moldura do Score Centralizado (Inteiro + Status)
+    pdf.ln(2); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 14)
+    pdf.set_x((pdf.w - 110) / 2) 
+    score_val = int(float(metrics['ikdc'])) # Remove decimais
     status_msg = f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"
-    pdf.cell(115, 12, limpar_texto_pdf(status_msg), ln=True, fill=True, align='C')
+    pdf.cell(110, 12, limpar_texto_pdf(status_msg), ln=True, fill=True, align='C')
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
     # 3. Evolução e Inchaço
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA E MONITORAMENTO DE INCHAÇO"), ln=True, fill=True, align='C')
+    pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
     pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 10, w=175); pdf.set_y(pdf.get_y() + 95)
     pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
     # --- PÁGINA 2 ---
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL"), ln=True, fill=True, align='C')
+    pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
     pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145); pdf.set_y(pdf.get_y() + 110)
     
     pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
@@ -77,7 +77,7 @@ with st.sidebar:
     except: st.header("GENUA")
     menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
 
-# --- 3. MÓDULOS DE NAVEGAÇÃO
+# --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
 if menu == "Check-in Diário 📝":
     st.header("Check-in Diário de Evolução")
@@ -131,12 +131,12 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         try:
             df_ikdc = conn.read(worksheet="IKDC", ttl=0)
             u_ikdc = float(df_ikdc[df_ikdc['Paciente'].str.strip() == p_sel]['Score_IKDC'].values[-1])
-            emoji_ikdc = "🏆" if u_ikdc >= 85 else "🟢" if u_ikdc >= 70 else "🟡" if u_ikdc >= 45 else "🔴"
             status_clinico = "Bom" if u_ikdc > 70 else "Regular" if u_ikdc > 45 else "Severo"
+            emoji_ikdc = "🏆" if status_clinico == "Bom" else "🟢" if status_clinico == "Regular" else "🔴"
         except:
             u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-        # 3. GERAÇÃO DE GRÁFICOS (MATPLOTLIB)
+        # 3. GERAÇÃO DE GRÁFICOS (EIXO X DE 5 EM 5)
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
@@ -148,15 +148,16 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         ax_ev.set_ylim(-0.5, 11)
         ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
         ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
-        plt.subplots_adjust(bottom=0.25)
-        buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
+        plt.subplots_adjust(bottom=0.25); buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
 
-        # B) Inchaço (Cores de Alerta)
+        # B) Inchaço (Design Refinado com Cores de Alerta)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
+        # Cores: Verde (0-1), Amarelo (2), Vermelho (3)
         cores_inc = ['#008091' if x <= 1 else '#FFB300' if x == 2 else '#D32F2F' for x in df_p['Inchaco_N']]
-        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8)
+        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, width=0.7)
         ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
-        ax_inc.set_ylim(0, 3.5); ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
+        ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)")
+        ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
         buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
 
         # C) Perfil por Teste (Barras)
@@ -164,7 +165,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         testes = ['Agachamento', 'Step Up', 'Step Down']
         valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step_Down']]]
         barras = ax_cap.bar(testes, valores, color='#008091', width=0.6)
-        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold')
+        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold') # Rótulos de dados
         ax_cap.set_title("Perfil de Capacidade por Teste Funcional", fontweight='bold')
         ax_cap.set_ylim(0, 11)
         buf_cap = io.BytesIO(); plt.savefig(buf_cap, format='png', bbox_inches='tight'); plt.close(fig_cap)
@@ -173,12 +174,11 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         fig_s, ax_s = plt.subplots(figsize=(10, 4))
         ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
         ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
-        ax_s.set_title("Impacto Biopsicossocial: Sono vs. Dor", fontweight='bold', pad=15)
+        ax_s.set_title("Impacto Biopsicossocial: Qualidade do Sono vs. Dor", fontweight='bold', pad=15)
         ax_s.set_ylim(-0.5, 11)
         ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         ax_s.set_xticks(indices_5); ax_s.set_xticklabels(labels_5)
-        plt.subplots_adjust(bottom=0.3)
-        buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
+        plt.subplots_adjust(bottom=0.3); buf_s = io.BytesIO(); plt.savefig(buf_s, format='png', bbox_inches='tight'); plt.close(fig_s)
 
         # 4. EXIBIÇÃO NO DASHBOARD
         m1, m2, m3, m4 = st.columns(4)
@@ -188,7 +188,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         m4.metric("Status Clínico", status_clinico)
 
         st.write("---")
-        t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌊 Monitoramento de Inchaço", "🎯 Capacidade & Biopsicossocial"])
+        t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌊 Monitoramento de Inchaço", "🎯 Capacidade & Postura"])
         with t1:
             st.pyplot(fig_ev)
         with t2:
@@ -198,8 +198,8 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             st.pyplot(fig_s)
             st.write("**Análise de Postura vs. Dor**")
             st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
-                x=alt.X('Postura', title='Postura'),
-                y=alt.Y('mean(Dor)', title='Média de Dor'),
+                x=alt.X('Postura', title='Postura Predominante'),
+                y=alt.Y('mean(Dor)', title='Média de Dor (0-10)'),
                 tooltip=['Postura', 'mean(Dor)']
             ), use_container_width=True)
 
@@ -215,8 +215,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             'inchaco': ultima[col_inc], 
             'ikdc': u_ikdc, 
             'ikdc_emoji': emoji_ikdc, 
-            'ikdc_status': status_clinico,
-            'alta': "Em análise"
+            'ikdc_status': status_clinico
         }
         
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
@@ -224,6 +223,6 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         })
         
         st.download_button("📥 BAIXAR RELATÓRIO CLÍNICO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf")
-        st.info(f"Cópia ZenFisio: {p_sel} - Dor {ultima['Dor']}, Inchaço Grau {ultima[col_inc]}, IKDC {int(u_ikdc)} ({status_clinico}).")
+        st.info(f"📝 ZenFisio: {p_sel} - Dor {ultima['Dor']}, Inchaço Grau {ultima[col_inc]}, IKDC {int(u_ikdc)} ({status_clinico}).")
     else:
         st.info("Aguardando entrada de dados na planilha.")
