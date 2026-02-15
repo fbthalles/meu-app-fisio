@@ -160,17 +160,47 @@ else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
         buf_ev.seek(0) 
         plt.close(fig_ev)
 
-        # B) Inchaço (Cores de Alerta)
+       # --- B) INCHAÇO (CORES DE ALERTA + FIX DE LEGENDA PARA PDF) ---
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
-        cores_inc = ['#D32F2F' if x == 3 else '#FFB300' if x == 2 else '#008091' for x in df_p['Inchaco_N']]
-        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, label='Grau de Inchaço (Stroke Test)')
-        ax_inc.set_ylim(0, 3.5); ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
         
-        lgd_inc = ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False)
+        # Lógica de Cores: Verde (0-1), Amarelo (2), Vermelho (3)
+        cores_inc = [
+            '#008091' if x <= 1 else 
+            '#FFB300' if x == 2 else 
+            '#D32F2F' for x in df_p['Inchaco_N']
+        ]
         
+        # Criamos a barra com o rótulo para a legenda
+        ax_inc.bar(
+            df_p['Sessão_Num'], 
+            df_p['Inchaco_N'], 
+            color=cores_inc, 
+            alpha=0.8, 
+            width=0.7, 
+            label='Grau de Inchaço (Stroke Test)'
+        )
+        
+        ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
+        ax_inc.set_ylim(0, 3.5)
+        ax_inc.set_ylabel("Grau (0-3)")
+        
+        # Eixo X de 5 em 5 sessões
+        ax_inc.set_xticks(indices_5)
+        ax_inc.set_xticklabels(labels_5)
+        
+        # Criamos a legenda e guardamos na variável lgd_inc
+        lgd_inc = ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False, fontsize=10)
+        
+        # Salvamento blindado para o PDF
         buf_inc = io.BytesIO()
-        fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_inc,), dpi=150)
-        buf_inc.seek(0)
+        fig_inc.savefig(
+            buf_inc, 
+            format='png', 
+            bbox_inches='tight', 
+            bbox_extra_artists=(lgd_inc,), 
+            dpi=150
+        )
+        buf_inc.seek(0) # Garante que apareça no tablet
         plt.close(fig_inc)
 
         # C) Perfil e D) Sono (Seguindo o mesmo padrão de segurança)
