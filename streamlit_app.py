@@ -414,54 +414,63 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
         # 2. GERAÇÃO DE GRÁFICOS (FIX ABSOLUTO DE LEGENDAS E VISIBILIDADE)
+        cor_dor_grafico = CORES_GENUA['alerta_erro'] 
+        cor_func_grafico = CORES_GENUA['secundaria'] 
+        cor_trend_grafico = CORES_GENUA['texto_suave'] 
+        cor_prim_grafico = CORES_GENUA['primaria'] 
         
         # A) Evolução Clínica
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
-        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=cor_dor_grafico, label='Nível de Dor (EVA)', marker='o', linewidth=2)
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color=cor_func_grafico, label='Capacidade Funcional', marker='s', linewidth=3)
         if len(trend_line) > 0:
-            ax_ev.plot(df_p['Sessão_Num'], trend_line, '--', color='#5D6D7E', alpha=0.5, label='Tendência de Alta')
+            ax_ev.plot(df_p['Sessão_Num'], trend_line, '--', color=cor_trend_grafico, alpha=0.5, label='Tendência de Alta')
         
-        ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold')
+        ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold', color=cor_prim_grafico)
         ax_ev.set_ylim(-0.5, 11)
         ax_ev.set_xticks(indices_5)
         ax_ev.set_xticklabels(labels_5)
+        ax_ev.spines['top'].set_visible(False)
+        ax_ev.spines['right'].set_visible(False)
         
         lgd_ev = ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
         buf_ev = io.BytesIO()
         fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_ev,), dpi=150)
         buf_ev.seek(0); plt.close(fig_ev)
 
-        # B) Novo Gráfico: Dor Isolada (Preenchimento Visual Vermelho)
+        # B) Novo Gráfico: Dor Isolada 
         fig_dor, ax_dor = plt.subplots(figsize=(10, 3.5))
-        # fill_between cria uma "área" colorida abaixo da linha, muito visual para o paciente
-        ax_dor.fill_between(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', alpha=0.2)
-        ax_dor.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
-        ax_dor.set_title("Comportamento Isolado da Dor (Quadro Álgico)", fontweight='bold')
+        ax_dor.fill_between(df_p['Sessão_Num'], df_p['Dor'], color=cor_dor_grafico, alpha=0.15)
+        ax_dor.plot(df_p['Sessão_Num'], df_p['Dor'], color=cor_dor_grafico, label='Nível de Dor (EVA)', marker='o', linewidth=2)
+        ax_dor.set_title("Comportamento Isolado da Dor (Quadro Álgico)", fontweight='bold', color=cor_prim_grafico)
         ax_dor.set_ylim(-0.5, 11)
         ax_dor.set_xticks(indices_5)
         ax_dor.set_xticklabels(labels_5)
+        ax_dor.spines['top'].set_visible(False)
+        ax_dor.spines['right'].set_visible(False)
         
         lgd_dor = ax_dor.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False, fontsize=9)
         buf_dor = io.BytesIO()
         fig_dor.savefig(buf_dor, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_dor,), dpi=150)
         buf_dor.seek(0); plt.close(fig_dor)
 
-        # C) Inchaço Articular (Cores de Alerta e Legenda Customizada)
+        # C) Inchaço Articular 
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
-        cores_inc = ['#D32F2F' if x == 3 else '#FFB300' if x == 2 else '#008091' for x in df_p['Inchaco_N']]
-        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8)
+        cores_inc = [CORES_GENUA['alerta_erro'] if x == 3 else CORES_GENUA['alerta_aviso'] if x == 2 else cor_func_grafico for x in df_p['Inchaco_N']]
+        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.85, width=0.6, edgecolor='white')
         
-        ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold')
+        ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold', color=cor_prim_grafico)
         ax_inc.set_ylim(0, 3.5)
         ax_inc.set_xticks(indices_5)
         ax_inc.set_xticklabels(labels_5)
+        ax_inc.spines['top'].set_visible(False)
+        ax_inc.spines['right'].set_visible(False)
         
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='#D32F2F', alpha=0.8, label='Grau 3 (Grave)'),
-            Patch(facecolor='#FFB300', alpha=0.8, label='Grau 2 (Moderado)'),
-            Patch(facecolor='#008091', alpha=0.8, label='Grau 0-1 (Estável)')
+            Patch(facecolor=CORES_GENUA['alerta_erro'], alpha=0.85, label='Grau 3 (Grave)'),
+            Patch(facecolor=CORES_GENUA['alerta_aviso'], alpha=0.85, label='Grau 2 (Moderado)'),
+            Patch(facecolor=cor_func_grafico, alpha=0.85, label='Grau 0-1 (Estável)')
         ]
         lgd_inc = ax_inc.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=3, frameon=False, fontsize=9)
         
@@ -471,17 +480,19 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
 
         # D) Sono vs Dor
         fig_s, ax_s = plt.subplots(figsize=(10, 4))
-        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
-        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
+        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color=cor_func_grafico, alpha=0.2, label='Qualidade do Sono')
+        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color=cor_dor_grafico, marker='o', linewidth=2, label='Nível de Dor')
         
-        ax_s.set_title("Impacto Biopsicossocial: Sono vs Dor", fontweight='bold')
+        ax_s.set_title("Impacto Biopsicossocial: Sono vs Dor", fontweight='bold', color=cor_prim_grafico)
         ax_s.set_ylim(-0.5, 11)
         ax_s.set_xticks(indices_5)
         ax_s.set_xticklabels(labels_5)
+        ax_s.spines['top'].set_visible(False)
+        ax_s.spines['right'].set_visible(False)
         
         lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
-
+        
         # 3. MOTORES MATEMÁTICOS DE CRUZAMENTO E INSIGHTS
         media_dor = df_p['Dor'].mean()
         delta_dor_pct = ((ultima['Dor'] - media_dor) / media_dor * 100) if media_dor > 0 else (100 if ultima['Dor'] > 0 else 0)
