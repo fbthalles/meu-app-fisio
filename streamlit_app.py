@@ -54,6 +54,10 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# 5. INJEÇÃO DO LOGO NA INTERFACE (BARRA LATERAL)
+st.sidebar.image(NOVO_LOGO_GENUA, use_container_width=True)
+st.sidebar.markdown("---") # Cria uma linha divisória elegante abaixo do logo
+
 # ==========================================
 
 # --- 1. FUNÇÕES DE SUPORTE E PDF ---
@@ -99,7 +103,7 @@ def create_pdf(p_name, hist, metrics, imgs):
 
     # --- PÁGINA 1 ---
     pdf.add_page()
-    try: pdf.image("Ativo-1.png", x=10, y=8, w=30)
+    try: pdf.image("NOVO_LOGO_GENUA", x=10, y=8, w=30)
     except: pdf.set_font("helvetica", 'B', 14); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
     pdf.ln(15); pdf.set_font("helvetica", 'B', 12)
@@ -158,7 +162,7 @@ st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="�
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 with st.sidebar:
-    try: st.image("Ativo-1.png", width=220)
+    try: st.image("NOVO_LOGO_GENUA", width=220)
     except: st.header("GENUA")
     menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
 
