@@ -19,7 +19,36 @@ def limpar_texto_pdf(txt):
 def create_pdf(p_name, hist, metrics, imgs):
     pdf = FPDF()
     azul_genua = (0, 128, 145)
+    cinza_txt = (80, 80, 80) # Cor elegante para o parecer clínico
     
+    # --- GERAÇÃO DE PARECERES CLÍNICOS DINÂMICOS ---
+    # 1. Parecer IKDC
+    if metrics['ikdc_status'] == 'Bom': 
+        par_ikdc = "Parecer Clínico: Excelente evolução. O paciente apresenta alta percepção de funcionalidade, validando a eficácia da progressão de carga e a tolerância mecânica do joelho."
+    elif metrics['ikdc_status'] == 'Regular': 
+        par_ikdc = "Parecer Clínico: Evolução moderada. O paciente apresenta ganhos reais, mas ainda demanda atenção fisioterapêutica para déficits de força ou controle neuromuscular residual."
+    else: 
+        par_ikdc = "Parecer Clínico: Baixa funcionalidade percebida. Sugere-se reavaliar o volume de carga atual e focar intensamente na modulação de sintomas álgicos."
+        
+    # 2. Parecer Evolução
+    if metrics['alta'] not in ["Em análise", "Estabilizado"]: 
+        par_ev = f"Parecer Clínico: O cruzamento das curvas demonstra melhora significativa. A dor está controlada sob demanda funcional, com projeção matemática de alta para {metrics['alta']}."
+    else: 
+        par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância do paciente. O foco atual é afastar a curva de função da curva de dor para garantir progressão segura."
+
+    # 3. Parecer Inchaço
+    grau_inc = int(float(metrics['inchaco']))
+    if grau_inc <= 1: 
+        par_inc = "Parecer Clínico: Articulação estável e sem efusão clinicamente relevante (Grau 0-1). Cenário totalmente seguro para aumento de intensidade no treinamento."
+    elif grau_inc == 2: 
+        par_inc = "Parecer Clínico: Presença de efusão moderada (Alerta Amarelo). Recomendável estabilizar o volume de treino e monitorar a resposta articular nas próximas 48h."
+    else: 
+        par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). É imperativo regredir a sobrecarga mecânica e priorizar recursos de drenagem e crioterapia."
+
+    # 4. Parecer Capacidade e Sono
+    par_cap = "Parecer Clínico: O perfil funcional identifica assimetrias biomecânicas. O teste com menor pontuação direciona o foco do fortalecimento para a próxima fase do tratamento."
+    par_sono = "Parecer Clínico: A análise biopsicossocial destaca a influência da qualidade do sono na hiperalgesia. Noites reparadoras correlacionam-se com menor percepção de dor articular."
+
     # ==========================================
     # --- PÁGINA 1: DADOS E EVOLUÇÃO CLÍNICA ---
     # ==========================================
@@ -35,77 +64,86 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
     pdf.ln(5)
 
-    # 1. Identificação
-    pdf.set_fill_color(*azul_genua)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", 'B', 11)
+    # Identificação
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("helvetica", '', 10)
-    pdf.ln(2)
-    pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}"))
-    pdf.ln(3)
+    pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
+    pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. IKDC
-    pdf.set_fill_color(*azul_genua)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", 'B', 11)
+    # IKDC
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("helvetica", 'I', 9)
-    pdf.ln(1)
-    pdf.multi_cell(0, 5, limpar_texto_pdf("Legenda Score: <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
     
-    pdf.ln(2)
-    pdf.set_fill_color(*azul_genua)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", 'B', 13)
+    pdf.ln(4)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
     pdf.set_x((pdf.w - 115) / 2) 
     score_val = int(float(metrics['ikdc']))
     pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
-    pdf.set_text_color(0, 0, 0)
+    
+    # Inserção do Parecer IKDC
+    pdf.ln(15)
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
+    pdf.multi_cell(0, 6, limpar_texto_pdf(par_ikdc), align='C')
     pdf.ln(5)
 
-    # 3. Evolução (Único gráfico da página 1, sem chance de cortar legenda)
-    pdf.set_fill_color(*azul_genua)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", 'B', 11)
+    # Evolução
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
     
-    # Gráfico 1: Maior e com muito espaço
-    pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 5, w=180) 
+    y_ev = pdf.get_y() + 5
+    pdf.image(imgs['ev'], x=15, y=y_ev, w=180) 
+    
+    # Inserção do Parecer Evolução (Calculando matematicamente o fim da imagem)
+    pdf.set_y(y_ev + 95) 
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
+    pdf.multi_cell(0, 6, limpar_texto_pdf(par_ev), align='C')
 
     # ==========================================
     # --- PÁGINA 2: INCHAÇO E CAPACIDADE ---
     # ==========================================
     pdf.add_page()
-    pdf.set_fill_color(*azul_genua)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", 'B', 11)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
 
-    # 4. Inchaço
+    # Inchaço
     pdf.cell(0, 8, limpar_texto_pdf(" 4. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
     
     y_inc = pdf.get_y() + 5
     pdf.image(imgs['inchaco'], x=15, y=y_inc, w=180)
     
-    # 5. Capacidade (Salto inegociável de 125mm)
-    y_cap = y_inc + 125 
-    pdf.set_y(y_cap - 10) # Garante que o título fique antes do gráfico
+    # Parecer Inchaço
+    pdf.set_y(y_inc + 70) 
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
+    pdf.multi_cell(0, 6, limpar_texto_pdf(par_inc), align='C')
+    pdf.ln(10)
+
+    # Capacidade
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 5. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
+    
+    y_cap = pdf.get_y() + 5
     pdf.image(imgs['cap'], x=30, y=y_cap, w=150)
+
+    # Parecer Capacidade
+    pdf.set_y(y_cap + 100)
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
+    pdf.multi_cell(0, 6, limpar_texto_pdf(par_cap), align='C')
 
     # ==========================================
     # --- PÁGINA 3: BIOPSICOSSOCIAL ---
     # ==========================================
     pdf.add_page()
-    pdf.set_fill_color(*azul_genua)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("helvetica", 'B', 11)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
 
-    # 6. Sono vs Dor (Único gráfico da página 3)
+    # Sono vs Dor
     pdf.cell(0, 8, limpar_texto_pdf(" 6. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
-    pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 5, w=180)
+    
+    y_sono = pdf.get_y() + 5
+    pdf.image(imgs['sono'], x=15, y=y_sono, w=180)
+
+    # Parecer Sono
+    pdf.set_y(y_sono + 80)
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
+    pdf.multi_cell(0, 6, limpar_texto_pdf(par_sono), align='C')
 
     return bytes(pdf.output())
 
