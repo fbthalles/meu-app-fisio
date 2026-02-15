@@ -65,7 +65,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
     pdf.ln(3)
 
-    # 1. Identificação (Fontes reduzidas)
+    # 1. Identificação
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
     pdf.cell(0, 7, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 9); pdf.ln(2)
@@ -91,10 +91,8 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 7, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
     
     y_ev = pdf.get_y() + 4
-    # Imagem ligeiramente menor (w=170) e centralizada (x=20)
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
     
-    # Altura da imagem + apenas 2mm (o gráfico já tem a margem própria)
     h_ev = get_img_height(imgs['ev'], 170)
     pdf.set_y(y_ev + h_ev + 2) 
     
@@ -102,7 +100,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
 
     # ==========================================
-    # --- PÁGINA 2: INCHAÇO ---
+    # --- PÁGINA 2: INCHAÇO E BIOPSICOSSOCIAL ---
     # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
@@ -119,13 +117,11 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
     pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
 
-    # ==========================================
-    # --- PÁGINA 3: BIOPSICOSSOCIAL ---
-    # ==========================================
-    pdf.add_page()
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
+    # Salto matemático para separar o parecer do Inchaço do título do Sono
+    pdf.ln(10)
 
-    # 5. Sono vs Dor
+    # 5. Sono vs Dor (Aglutinado na mesma página)
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
     pdf.cell(0, 7, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     
     y_sono = pdf.get_y() + 4
