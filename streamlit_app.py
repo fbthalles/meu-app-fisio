@@ -34,7 +34,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
     pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. IKDC (Com a Legenda de Score)
+    # 2. IKDC
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'I', 9); pdf.ln(1)
@@ -46,14 +46,18 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
-    # 3. Gráficos com Salto de Linha Protegido (Distância de 125 para não engolir legendas)
+    # 3. Gráficos com Salto de Linha Protegido
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
     
     pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 5, w=175)
-    pdf.set_y(pdf.get_y() + 125) # ESPAÇO AMPLIADO PARA AS 3 COLUNAS DA LEGENDA
     
-    pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
+    # Regra 3 aplicada: Margem Y de segurança de 125 entre as imagens
+    pdf.set_y(pdf.get_y() + 125) 
+    
+    # SOLUÇÃO CIRÚRGICA: A largura (w) foi ajustada de 175 para 130 e centralizada (x=40).
+    # Isso escala a altura da imagem milimetricamente, impedindo que ela passe dos 297mm da folha A4.
+    pdf.image(imgs['inchaco'], x=40, y=pdf.get_y(), w=130)
     
     # --- PÁGINA 2 ---
     pdf.add_page()
@@ -61,7 +65,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
     pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145)
     
-    pdf.set_y(pdf.get_y() + 125) # ESPAÇO AMPLIADO
+    pdf.set_y(pdf.get_y() + 125)
     pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 10, w=175)
 
