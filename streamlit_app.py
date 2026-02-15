@@ -326,6 +326,18 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         except:
             insight_evolucao = "Aguardando volume de dados para calcular o ganho percentual de função vs. dor."
 
+        # Insight 5: Comportamento Isolado da Dor (Inteligência de Cores para o Painel)
+        dor_atual = ultima['Dor']
+        if dor_atual < media_dor:
+            insight_dor = f"A dor atual ({int(dor_atual)}) está abaixo da média histórica ({media_dor:.1f}), indicando dessensibilização efetiva."
+            cor_dor = "success"
+        elif dor_atual == media_dor:
+            insight_dor = f"O quadro álgico encontra-se estabilizado na média ({media_dor:.1f}). Foco em romper o platô de sintomas."
+            cor_dor = "warning"
+        else:
+            insight_dor = f"A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
+            cor_dor = "error"
+
         # 4. DASHBOARD TELA
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
@@ -339,11 +351,14 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         with t1: 
             st.image(buf_ev, use_container_width=True)
             st.success(f"🔮 **Inteligência GENUA:** Alta estimada para **{prev_txt}**.")
-            # Injetando o insight evolutivo na primeira aba
             st.info(f"💡 **Insight Evolutivo:** {insight_evolucao}")
             
         with t2:
             st.image(buf_dor, use_container_width=True)
+            # Injeção dinâmica do alerta com base na cor/gravidade calculada
+            if cor_dor == "success": st.success(f"💡 **Insight Álgico:** {insight_dor}")
+            elif cor_dor == "warning": st.warning(f"💡 **Insight Álgico:** {insight_dor}")
+            else: st.error(f"💡 **Insight Álgico:** {insight_dor}")
             
         with t3: 
             st.image(buf_inc, use_container_width=True)
@@ -375,7 +390,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             'insight_ouro': insight_ouro,
             'insight_mecanico': insight_mecanico,
             'insight_postura': insight_postura,
-            'insight_evolucao': insight_evolucao # Enviando para o PDF
+            'insight_evolucao': insight_evolucao
         }
         
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
