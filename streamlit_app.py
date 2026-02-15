@@ -136,7 +136,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         except:
             u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-        # --- 3. GERAÇÃO DE GRÁFICOS (V18.2 - AJUSTE DE CAPTURA PARA PDF) ---
+        # --- 3. GERAÇÃO DE GRÁFICOS ---
         
         # Intervalo de 5 sessões para o Eixo X
         indices_5 = np.arange(0, len(df_p), 5)
@@ -175,7 +175,35 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         
         buf_inc = io.BytesIO()
         fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', dpi=150)
-        plt.close
+        plt.close(fig_inc)
+
+        # C) Perfil por Teste (Barras com Rótulos)
+        fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
+        testes = ['Agachamento', 'Step Up', 'Step Down']
+        valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step_Down']]]
+        barras = ax_cap.bar(testes, valores, color='#008091', width=0.6)
+        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold')
+        ax_cap.set_title("Perfil de Capacidade por Teste Funcional", fontweight='bold')
+        ax_cap.set_ylim(0, 11)
+        
+        buf_cap = io.BytesIO()
+        fig_cap.savefig(buf_cap, format='png', bbox_inches='tight', dpi=150)
+        plt.close(fig_cap)
+
+        # D) Sono vs Dor (Biopsicossocial)
+        fig_s, ax_s = plt.subplots(figsize=(10, 4))
+        ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
+        ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
+        ax_s.set_title("Impacto Biopsicossocial: Qualidade do Sono vs. Dor", fontweight='bold', pad=15)
+        ax_s.set_ylim(-0.5, 11)
+        
+        ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.22), ncol=2, frameon=False, fontsize=10)
+        ax_s.set_xticks(indices_5); ax_s.set_xticklabels(labels_5)
+        fig_s.tight_layout(rect=[0, 0.03, 1, 0.95])
+        
+        buf_s = io.BytesIO()
+        fig_s.savefig(buf_s, format='png', bbox_inches='tight', dpi=150)
+        plt.close(fig_s)
 
         # 4. EXIBIÇÃO NO DASHBOARD
         m1, m2, m3, m4 = st.columns(4)
