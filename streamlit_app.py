@@ -20,15 +20,12 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf = FPDF()
     azul_genua = (0, 128, 145)
     
-    # --- PÁGINA 1 ---
     pdf.add_page()
     try: pdf.image("Ativo-1.png", x=10, y=8, w=35)
     except: pdf.set_font("helvetica", 'B', 16); pdf.cell(0, 10, "GENUA INSTITUTO", ln=True, align='C')
     
     pdf.ln(18)
-    pdf.set_font("helvetica", 'B', 14)
-    pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
-    pdf.ln(5)
+    pdf.set_font("helvetica", 'B', 14); pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C'); pdf.ln(5)
 
     # 1. Identificação
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
@@ -36,38 +33,32 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
     pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # 2. Avaliação IKDC (Com Legenda de Score)
+    # 2. IKDC com Legenda Explicativa (Igual ao da Camila)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'I', 9); pdf.ln(1)
-    pdf.multi_cell(0, 5, limpar_texto_pdf("Legenda Score: <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C')
+    pdf.multi_cell(0, 5, limpar_texto_pdf("Legenda Score: <45 (Severo), 45-70 (Regular), >70 (Bom)."), align='C') # [cite: 73]
     
-    # Resultado Centralizado
     pdf.ln(2); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 13)
     pdf.set_x((pdf.w - 115) / 2) 
     score_val = int(float(metrics['ikdc']))
-    status_msg = f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"
-    pdf.cell(115, 12, limpar_texto_pdf(status_msg), ln=True, fill=True, align='C')
-    
+    pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
     pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
-    # 3. Evolução e Inchaço (Espaço para Legendas)
+    # 3. Gráficos com Margem de Segurança
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 3. MONITORAMENTO DE EVOLUÇÃO E INCHAÇO"), ln=True, fill=True, align='C')
     
-    # Gráfico 1: Evolução (Sobe para dar espaço à legenda em baixo)
     pdf.image(imgs['ev'], x=15, y=pdf.get_y() + 5, w=175)
-    pdf.set_y(pdf.get_y() + 110) # Salto maior para não cortar a legenda
+    pdf.set_y(pdf.get_y() + 115) # Aumentado para 115 para a legenda não sumir
     
-    # Gráfico 2: Inchaço
     pdf.image(imgs['inchaco'], x=15, y=pdf.get_y(), w=175)
     
-    # --- PÁGINA 2 ---
+    # Página 2
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255)
     pdf.cell(0, 8, limpar_texto_pdf(" 4. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
     pdf.image(imgs['cap'], x=30, y=pdf.get_y() + 10, w=145)
-    
     pdf.set_y(pdf.get_y() + 115)
     pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     pdf.image(imgs['sono'], x=15, y=pdf.get_y() + 10, w=175)
@@ -148,34 +139,38 @@ else: # PAINEL ANALÍTICO (V18.8 - FOCO EM VISIBILIDADE E LEGENDA PDF)
             emoji_ikdc = "🏆" if status_clinico == "Bom" else "🟢" if status_clinico == "Regular" else "🔴"
         except: u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-        # 3. GERAÇÃO DE GRÁFICOS (FIX DEFINITIVO DE LEGENDA E VISIBILIDADE)
+       # --- 3. GRÁFICOS (FIX DEFINITIVO DE LEGENDA E VISIBILIDADE) ---
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
-        # A) Evolução + Tendência (Capture a legenda!)
+        # A) Evolução + Tendência (Captura a legenda!)
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
         ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o')
         ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s')
         if len(trend_line) > 0:
             ax_ev.plot(df_p['Sessão_Num'], trend_line, '--', color='#5D6D7E', alpha=0.5, label='Tendência de Alta')
         ax_ev.set_ylim(-0.5, 11); ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
+        
+        # Guardamos a legenda em uma variável 'lgd'
         lgd_ev = ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
         
         buf_ev = io.BytesIO()
+        # O SEGREDO: bbox_extra_artists garante que a legenda lgd_ev saia na foto!
         fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_ev,), dpi=150)
-        buf_ev.seek(0) # O SEGREDO: Faz a imagem aparecer no tablet!
+        buf_ev.seek(0) 
         plt.close(fig_ev)
 
-        # B) Inchaço
+        # B) Inchaço (Cores de Alerta)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         cores_inc = ['#D32F2F' if x == 3 else '#FFB300' if x == 2 else '#008091' for x in df_p['Inchaco_N']]
         ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, label='Grau de Inchaço (Stroke Test)')
         ax_inc.set_ylim(0, 3.5); ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
+        
         lgd_inc = ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False)
         
         buf_inc = io.BytesIO()
         fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_inc,), dpi=150)
-        buf_inc.seek(0) # Faz a imagem aparecer no tablet!
+        buf_inc.seek(0)
         plt.close(fig_inc)
 
         # C) Perfil e D) Sono (Seguindo o mesmo padrão de segurança)
