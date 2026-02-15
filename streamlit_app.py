@@ -34,7 +34,6 @@ def create_pdf(p_name, hist, metrics, imgs):
     else: 
         par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância do paciente. O foco atual é afastar a curva de função da curva de dor para garantir progressão segura."
 
-    # Inteligência para o novo Gráfico de Dor
     dor_atual = float(metrics['dor'])
     media_dor = float(metrics['media_dor'])
     if dor_atual < media_dor:
@@ -73,22 +72,27 @@ def create_pdf(p_name, hist, metrics, imgs):
     
     pdf.ln(15)
     pdf.set_font("helvetica", 'B', 12)
-    pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
+    tit_1 = "RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"
+    pdf.cell(0, 8, limpar_texto_pdf(tit_1), ln=True, align='C')
     pdf.ln(3)
 
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
+    tit_2 = " 1. IDENTIFICAÇÃO E ANAMNESE"
+    pdf.cell(0, 7, limpar_texto_pdf(tit_2), ln=True, fill=True)
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 9); pdf.ln(2)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
+    txt_paciente = f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}"
+    pdf.multi_cell(0, 5, limpar_texto_pdf(txt_paciente)); pdf.ln(3)
 
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
+    tit_3 = " 2. AVALIAÇÃO CIENTÍFICA IKDC"
+    pdf.cell(0, 7, limpar_texto_pdf(tit_3), ln=True, fill=True, align='C')
     
     pdf.ln(3)
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 12)
     pdf.set_x((pdf.w - 100) / 2) 
     score_val = int(float(metrics['ikdc']))
-    pdf.cell(100, 10, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
+    txt_res = f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"
+    pdf.cell(100, 10, limpar_texto_pdf(txt_res), ln=True, fill=True, align='C')
     
     pdf.ln(6) 
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
@@ -96,7 +100,8 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.ln(6)
 
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
+    tit_4 = " 3. EVOLUÇÃO CLÍNICA"
+    pdf.cell(0, 7, limpar_texto_pdf(tit_4), ln=True, fill=True, align='C')
     
     y_ev = pdf.get_y() + 4
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
@@ -113,7 +118,8 @@ def create_pdf(p_name, hist, metrics, imgs):
     
     # 4. Dor Isolada
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 4. COMPORTAMENTO ISOLADO DA DOR (QUADRO ÁLGICO)"), ln=True, fill=True, align='C')
+    tit_5 = " 4. COMPORTAMENTO DA DOR"
+    pdf.cell(0, 7, limpar_texto_pdf(tit_5), ln=True, fill=True, align='C')
     
     y_dor = pdf.get_y() + 4
     pdf.image(imgs['dor'], x=20, y=y_dor, w=170)
@@ -127,7 +133,8 @@ def create_pdf(p_name, hist, metrics, imgs):
 
     # 5. Inchaço
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 5. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
+    tit_6 = " 5. MONITORAMENTO DE INCHAÇO"
+    pdf.cell(0, 7, limpar_texto_pdf(tit_6), ln=True, fill=True, align='C')
     
     y_inc = pdf.get_y() + 4
     pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170)
@@ -143,7 +150,19 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
 
-    pdf.cell(0, 7, limpar_texto_pdf(" 6. ANÁLISE BIOPSICOSSOCIAL (SONO VS
+    # Variável criada exatamente para o editor não cortar a sua linha
+    tit_7 = " 6. ANÁLISE BIOPSICOSSOCIAL"
+    pdf.cell(0, 7, limpar_texto_pdf(tit_7), ln=True, fill=True, align='C')
+    
+    y_sono = pdf.get_y() + 4
+    pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
+    h_sono = get_img_height(imgs['sono'], 170)
+    pdf.set_y(y_sono + h_sono + 2) 
+    
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_sono), align='C')
+
+    return bytes(pdf.output())
 
 # --- 2. INTERFACE E CONEXÃO ---
 st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="🏥")
