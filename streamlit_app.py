@@ -136,28 +136,38 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         except:
             u_ikdc = 0; emoji_ikdc = "⚪"; status_clinico = "Pendente"
 
-        # 3. GERAÇÃO DE GRÁFICOS (EIXO X DE 5 EM 5)
+        # 3. GERAÇÃO DE GRÁFICOS (COM LEGENDAS INFERIORES)
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
-        # A) Evolução (Capacidade vs Dor)
+        # A) Evolução Clínica (Capacidade vs Dor)
         fig_ev, ax_ev = plt.subplots(figsize=(10, 5))
         ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', label='Nível de Dor (EVA)', marker='o', linewidth=2)
         ax_ev.plot(df_p['Sessão_Num'], df_p['Score_Função'], color='#008091', label='Capacidade Funcional', marker='s', linewidth=3)
         ax_ev.set_title("Evolução Clínica: Capacidade Funcional vs. Dor", fontweight='bold', pad=15)
         ax_ev.set_ylim(-0.5, 11)
         ax_ev.set_xticks(indices_5); ax_ev.set_xticklabels(labels_5)
+        
+        # NOVA LEGENDA ADICIONADA AQUI:
         ax_ev.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
-        plt.subplots_adjust(bottom=0.25); buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
+        
+        plt.subplots_adjust(bottom=0.25)
+        buf_ev = io.BytesIO(); plt.savefig(buf_ev, format='png', bbox_inches='tight'); plt.close(fig_ev)
 
-        # B) Inchaço (Design Refinado com Cores de Alerta)
+        # B) Inchaço (Cores de Alerta + Legenda)
         fig_inc, ax_inc = plt.subplots(figsize=(10, 3.5))
         # Cores: Verde (0-1), Amarelo (2), Vermelho (3)
         cores_inc = ['#008091' if x <= 1 else '#FFB300' if x == 2 else '#D32F2F' for x in df_p['Inchaco_N']]
-        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, width=0.7)
-        ax_inc.set_title("Linha do Tempo: Inchaço Articular (Stroke Test)", fontweight='bold', pad=10)
+        # Adicionado label='Grau de Inchaço' na barra
+        ax_inc.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc, alpha=0.8, width=0.7, label='Grau de Inchaço (Stroke Test)')
+        ax_inc.set_title("Linha do Tempo: Inchaço Articular", fontweight='bold', pad=10)
         ax_inc.set_ylim(0, 3.5); ax_inc.set_ylabel("Grau (0-3)")
         ax_inc.set_xticks(indices_5); ax_inc.set_xticklabels(labels_5)
+        
+        # NOVA LEGENDA ADICIONADA AQUI:
+        ax_inc.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), frameon=False)
+        
+        plt.subplots_adjust(bottom=0.3)
         buf_inc = io.BytesIO(); plt.savefig(buf_inc, format='png', bbox_inches='tight'); plt.close(fig_inc)
 
         # C) Perfil por Teste (Barras)
