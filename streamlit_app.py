@@ -148,21 +148,28 @@ elif menu == "Avaliação IKDC 📋":
             st.success("Score IKDC registrado!")
 
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
-    st.header("📊 Painel Analítico & Clinical Intelligence")
-    df = conn.read(ttl=0).dropna(how="all")
-    
-    if not df.empty:
-        # Barra de Pesquisa Inteligente de Pacientes
-        p_sel = st.selectbox(
-            "🔍 Buscar Paciente:", 
-            options=df_p['Nome'].unique(), # ou a variável que você usa para a lista de nomes
-            index=None, 
-            placeholder="Digite 3 letras do nome..."
-        )
+        st.header("📊 Painel Analítico & Clinical Intelligence")
+        df = conn.read(ttl=0).dropna(how="all")
         
-        # Trava de segurança: só mostra o painel se um paciente for efetivamente selecionado/pesquisado
-        if p_sel is not None:
-        df_p = df[df['Paciente'] == p_sel].copy()
+        if not df.empty:
+            # Barra de Pesquisa Inteligente (Puxa direto da coluna 'Paciente' do df geral)
+            lista_pacientes = df['Paciente'].dropna().unique()
+            
+            p_sel = st.selectbox(
+                "🔍 Buscar Paciente:", 
+                options=lista_pacientes,
+                index=None, 
+                placeholder="Digite 3 letras do nome..."
+            )
+            
+            # Trava cirúrgica: se a caixa estiver vazia, avisa e congela a tela aqui (st.stop)
+            # Isso salva você de ter que identar todas as linhas do resto do painel!
+            if p_sel is None:
+                st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
+                st.stop()
+                
+            # Se o paciente foi selecionado, o código flui normalmente a partir daqui:
+            df_p = df[df['Paciente'] == p_sel].copy()
         
         # 1. PROCESSAMENTO DE DADOS E EIXO X (DE 5 EM 5 SESSÕES)
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
