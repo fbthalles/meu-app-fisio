@@ -19,10 +19,9 @@ def limpar_texto_pdf(txt):
 def create_pdf(p_name, hist, metrics, imgs):
     pdf = FPDF()
     azul_genua = (0, 128, 145)
-    cinza_txt = (80, 80, 80) # Cor elegante para o parecer clínico
+    cinza_txt = (80, 80, 80)
     
-    # --- GERAÇÃO DE PARECERES CLÍNICOS DINÂMICOS ---
-    # 1. Parecer IKDC
+    # --- PARECERES CLÍNICOS DINÂMICOS ---
     if metrics['ikdc_status'] == 'Bom': 
         par_ikdc = "Parecer Clínico: Excelente evolução. O paciente apresenta alta percepção de funcionalidade, validando a eficácia da progressão de carga e a tolerância mecânica do joelho."
     elif metrics['ikdc_status'] == 'Regular': 
@@ -30,27 +29,23 @@ def create_pdf(p_name, hist, metrics, imgs):
     else: 
         par_ikdc = "Parecer Clínico: Baixa funcionalidade percebida. Sugere-se reavaliar o volume de carga atual e focar intensamente na modulação de sintomas álgicos."
         
-    # 2. Parecer Evolução
     if metrics['alta'] not in ["Em análise", "Estabilizado"]: 
         par_ev = f"Parecer Clínico: O cruzamento das curvas demonstra melhora significativa. A dor está controlada sob demanda funcional, com projeção matemática de alta para {metrics['alta']}."
     else: 
         par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância do paciente. O foco atual é afastar a curva de função da curva de dor para garantir progressão segura."
 
-    # 3. Parecer Inchaço
     grau_inc = int(float(metrics['inchaco']))
     if grau_inc <= 1: 
-        par_inc = "Parecer Clínico: Articulação estável e sem efusão clinicamente relevante (Grau 0-1). Cenário totalmente seguro para aumento de intensidade no treinamento."
+        par_inc = "Parecer Clínico: Articulação estável e sem inchaço clinicamente relevante (Grau 0-1). Cenário totalmente seguro para aumento de intensidade no treinamento."
     elif grau_inc == 2: 
-        par_inc = "Parecer Clínico: Presença de efusão moderada (Alerta Amarelo). Recomendável estabilizar o volume de treino e monitorar a resposta articular nas próximas 48h."
+        par_inc = "Parecer Clínico: Presença de inchaço moderado (Alerta Amarelo). Recomendável estabilizar o volume de treino e monitorar a resposta articular nas próximas 48h."
     else: 
         par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). É imperativo regredir a sobrecarga mecânica e priorizar recursos de drenagem e crioterapia."
 
-    # 4. Parecer Capacidade e Sono
-    par_cap = "Parecer Clínico: O perfil funcional identifica assimetrias biomecânicas. O teste com menor pontuação direciona o foco do fortalecimento para a próxima fase do tratamento."
     par_sono = "Parecer Clínico: A análise biopsicossocial destaca a influência da qualidade do sono na hiperalgesia. Noites reparadoras correlacionam-se com menor percepção de dor articular."
 
     # ==========================================
-    # --- PÁGINA 1: DADOS E EVOLUÇÃO CLÍNICA ---
+    # --- PÁGINA 1: DADOS E EVOLUÇÃO ---
     # ==========================================
     pdf.add_page()
     try: 
@@ -64,13 +59,13 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.cell(0, 10, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C')
     pdf.ln(5)
 
-    # Identificação
+    # 1. Identificação
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
     pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 10); pdf.ln(2)
     pdf.multi_cell(0, 7, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
 
-    # IKDC
+    # 2. IKDC
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC (SUBJETIVA)"), ln=True, fill=True, align='C')
     
@@ -80,53 +75,37 @@ def create_pdf(p_name, hist, metrics, imgs):
     score_val = int(float(metrics['ikdc']))
     pdf.cell(115, 12, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
     
-    # Inserção do Parecer IKDC
-    pdf.ln(15)
+    pdf.ln(12) 
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
     pdf.multi_cell(0, 6, limpar_texto_pdf(par_ikdc), align='C')
-    pdf.ln(5)
+    pdf.ln(8)
 
-    # Evolução
+    # 3. Evolução
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 8, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
     
     y_ev = pdf.get_y() + 5
     pdf.image(imgs['ev'], x=15, y=y_ev, w=180) 
     
-    # Inserção do Parecer Evolução (Calculando matematicamente o fim da imagem)
-    pdf.set_y(y_ev + 95) 
+    pdf.set_y(y_ev + 105) # Padronização baseada na altura do gráfico
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
     pdf.multi_cell(0, 6, limpar_texto_pdf(par_ev), align='C')
 
     # ==========================================
-    # --- PÁGINA 2: INCHAÇO E CAPACIDADE ---
+    # --- PÁGINA 2: INCHAÇO ---
     # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
 
-    # Inchaço
+    # 4. Inchaço
     pdf.cell(0, 8, limpar_texto_pdf(" 4. MONITORAMENTO DE INCHAÇO ARTICULAR"), ln=True, fill=True, align='C')
     
     y_inc = pdf.get_y() + 5
     pdf.image(imgs['inchaco'], x=15, y=y_inc, w=180)
     
-    # Parecer Inchaço
-    pdf.set_y(y_inc + 70) 
+    pdf.set_y(y_inc + 85) # Padronização baseada na altura do gráfico
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
     pdf.multi_cell(0, 6, limpar_texto_pdf(par_inc), align='C')
-    pdf.ln(10)
-
-    # Capacidade
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 8, limpar_texto_pdf(" 5. PERFIL DE CAPACIDADE FUNCIONAL POR TESTE"), ln=True, fill=True, align='C')
-    
-    y_cap = pdf.get_y() + 5
-    pdf.image(imgs['cap'], x=30, y=y_cap, w=150)
-
-    # Parecer Capacidade
-    pdf.set_y(y_cap + 100)
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
-    pdf.multi_cell(0, 6, limpar_texto_pdf(par_cap), align='C')
 
     # ==========================================
     # --- PÁGINA 3: BIOPSICOSSOCIAL ---
@@ -134,14 +113,13 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 11)
 
-    # Sono vs Dor
-    pdf.cell(0, 8, limpar_texto_pdf(" 6. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
+    # 5. Sono vs Dor (Era 6, agora é 5 pois removemos a capacidade)
+    pdf.cell(0, 8, limpar_texto_pdf(" 5. ANÁLISE BIOPSICOSSOCIAL (SONO VS. DOR)"), ln=True, fill=True, align='C')
     
     y_sono = pdf.get_y() + 5
     pdf.image(imgs['sono'], x=15, y=y_sono, w=180)
 
-    # Parecer Sono
-    pdf.set_y(y_sono + 80)
+    pdf.set_y(y_sono + 95) # Padronização baseada na altura do gráfico
     pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 10)
     pdf.multi_cell(0, 6, limpar_texto_pdf(par_sono), align='C')
 
@@ -264,16 +242,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         fig_inc.savefig(buf_inc, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_inc,), dpi=150)
         buf_inc.seek(0); plt.close(fig_inc)
 
-        # C) Perfil de Capacidade
-        fig_cap, ax_cap = plt.subplots(figsize=(8, 5))
-        testes = ['Agachamento', 'Step Up', 'Step Down']
-        valores = [mapa_func[ultima['Agachamento']], mapa_func[ultima['Step_Up']], mapa_func[ultima['Step_Down']]]
-        barras = ax_cap.bar(testes, valores, color='#008091')
-        ax_cap.bar_label(barras, padding=3, fmt='%.1f', fontweight='bold')
-        ax_cap.set_title("Perfil de Capacidade por Teste", fontweight='bold')
-        buf_cap = io.BytesIO(); fig_cap.savefig(buf_cap, format='png', bbox_inches='tight', dpi=150); buf_cap.seek(0); plt.close(fig_cap)
-
-        # D) Sono vs Dor
+        # C) Sono vs Dor (O Gráfico de Capacidade foi removido daqui)
         fig_s, ax_s = plt.subplots(figsize=(10, 4))
         ax_s.fill_between(df_p['Sessão_Num'], df_p['Sono_N'], color='#008091', alpha=0.2, label='Qualidade do Sono')
         ax_s.plot(df_p['Sessão_Num'], df_p['Dor'], color='#FF4B4B', marker='o', label='Nível de Dor')
@@ -294,20 +263,18 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         m4.metric("Previsão Alta", prev_txt)
 
         st.write("---")
+        # Aba de Capacidade removida, mantendo Evolução, Inchaço e Biopsicossocial
         t1, t2, t3 = st.tabs(["📈 Evolução & IA", "🌊 Inchaço", "🎯 Biopsicossocial"])
         
         with t1: 
             st.image(buf_ev, use_container_width=True)
-            # RESTAURADO: A inteligência preditiva no painel
             st.success(f"🔮 **Inteligência GENUA:** A linha pontilhada indica a tendência de recuperação. Alta estimada: **{prev_txt}**.")
             
         with t2: 
             st.image(buf_inc, use_container_width=True)
             
         with t3: 
-            st.image(buf_cap, use_container_width=True)
             st.image(buf_s, use_container_width=True)
-            # RESTAURADO: O gráfico Altair que havia sumido
             st.write("**Análise de Postura vs. Dor**")
             st.altair_chart(alt.Chart(df_p).mark_bar(color='#008091').encode(
                 x=alt.X('Postura', title='Postura'),
@@ -330,10 +297,10 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             'alta': prev_txt
         }
         
+        # Removemos a imagem 'cap' do envio para o PDF
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
             'ev': buf_ev, 
             'sono': buf_s, 
-            'cap': buf_cap, 
             'inchaco': buf_inc
         })
         
