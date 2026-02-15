@@ -68,17 +68,43 @@ def limpar_texto_pdf(txt):
     return txt.encode('latin-1', 'ignore').decode('latin-1')
 
 def create_pdf(p_name, hist, metrics, imgs):
-    pdf = FPDF()
-    azul_genua = (0, 128, 145)
+    from fpdf import FPDF
+    from datetime import datetime
+    
+    def hex_to_rgb(hex_code):
+        hex_code = hex_code.lstrip('#')
+        return tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
+        
+    cor_primaria_rgb = hex_to_rgb(CORES_GENUA['primaria'])
+
+    class PDF_GENUA(FPDF):
+        def footer(self):
+            self.set_y(-15) 
+            self.set_font('helvetica', 'I', 8)
+            self.set_text_color(150, 150, 150)
+            hoje = datetime.now().strftime("%d/%m/%Y às %H:%M")
+            self.cell(0, 10, f'GENUA Instituto | Inteligência Clínica | Emitido em {hoje} | Página {self.page_no()}', 0, 0, 'C')
+
+    pdf = PDF_GENUA()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    azul_genua = cor_primaria_rgb 
+    cinza_bg = (245, 245, 245) 
     cinza_txt = (80, 80, 80)
     
-    # --- PARECERES CLÍNICOS DINÂMICOS ---
-    if metrics['ikdc_status'] == 'Bom': par_ikdc = "Parecer Clínico: Excelente evolução. O paciente apresenta alta percepção de funcionalidade, validando a eficácia da progressão."
-    elif metrics['ikdc_status'] == 'Regular': par_ikdc = "Parecer Clínico: Evolução moderada. Apresenta ganhos reais, mas demanda atenção fisioterapêutica para déficits residuais."
-    else: par_ikdc = "Parecer Clínico: Baixa funcionalidade percebida. Sugere-se reavaliar o volume de carga atual e focar na modulação de sintomas."
+    # 1. CORES DAS CAIXAS DE INSIGHT (UX VISUAL)
+    bg_azul_claro = (209, 236, 241); txt_azul_escuro = (12, 84, 96)
+    bg_amarelo_claro = (255, 243, 205); txt_amarelo_escuro = (133, 100, 4)
+    bg_vermelho_claro = (248, 215, 218); txt_vermelho_escuro = (114, 28, 36)
+    bg_verde_claro = (212, 237, 218); txt_verde_escuro = (21, 87, 36)
+
+    # --- PARECERES CLÍNICOS DINÂMICOS (Base) ---
+    if metrics['ikdc_status'] == 'Bom': par_ikdc = "Parecer Clínico: Excelente evolução. O paciente apresenta alta percepção de funcionalidade."
+    elif metrics['ikdc_status'] == 'Regular': par_ikdc = "Parecer Clínico: Evolução moderada. Apresenta ganhos reais, mas demanda atenção fisioterapêutica."
+    else: par_ikdc = "Parecer Clínico: Baixa funcionalidade percebida. Focar intensamente na modulação de sintomas."
         
-    if metrics['alta'] not in ["Em análise", "Estabilizado"]: par_ev = f"Parecer Clínico: Cruzamento das curvas demonstra melhora. Projeção de alta para {metrics['alta']}."
-    else: par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância atual. Foco em afastar a curva de função da curva de dor."
+    if metrics['alta'] not in ["Em análise", "Estabilizado"]: par_ev = f"Parecer Clínico: Cruzamento demonstra melhora. Projeção matemática de alta para {metrics['alta']}."
+    else: par_ev = "Parecer Clínico: O gráfico mapeia a janela de tolerância. Foco atual em afastar a curva de função da curva de dor."
 
     dor_atual = float(metrics['dor'])
     media_dor = float(metrics['media_dor'])
@@ -87,25 +113,31 @@ def create_pdf(p_name, hist, metrics, imgs):
     else: par_dor = f"Parecer Clínico: A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
 
     grau_inc = int(float(metrics['inchaco']))
-    if grau_inc <= 1: par_inc = "Parecer Clínico: Articulação estável (Grau 0-1). Cenário seguro para aumento de intensidade no treinamento."
+    if grau_inc <= 1: par_inc = "Parecer Clínico: Articulação estável (Grau 0-1). Cenário totalmente seguro para progressão."
     elif grau_inc == 2: par_inc = "Parecer Clínico: Presença de inchaço moderado (Alerta Amarelo). Recomendável estabilizar volume de treino."
     else: par_inc = "Parecer Clínico: Derrame articular importante (Alerta Vermelho). Imperativo regredir a sobrecarga mecânica."
-
-    # INJEÇÃO DOS INSIGHTS DE OURO DE FORMA AUTOMÁTICA NOS PARECERES
-    par_ev = par_ev + f"\n\nInsight Evolutivo: {metrics['insight_evolucao']}"
-    par_inc = par_inc + f"\n\nInsight Mecânico: {metrics['insight_mecanico']}"
-    par_sono = metrics['insight_ouro'] + f"\n\nInsight Postural: {metrics['insight_postura']}"
 
     def get_img_height(img_buffer, pdf_width):
         img_buffer.seek(0)
         from PIL import Image
         with Image.open(img_buffer) as im: return pdf_width * (im.height / im.width)
 
-    # --- PÁGINA 1 ---
+    # 2. MOTOR DE CAIXAS DE DESTAQUE (Desenha os blocos coloridos)
+    def desenhar_caixa_insight(titulo, texto, cor_bg, cor_txt):
+        pdf.ln(3)
+        pdf.set_fill_color(*cor_bg); pdf.set_text_color(*cor_txt)
+        pdf.set_font("helvetica", 'B', 9)
+        # Limpa o texto das variáveis para evitar redundâncias na caixa
+        texto_limpo = str(texto).replace("Parecer Biopsicossocial: ", "").replace("Evolução Ideal: ", "")
+        pdf.cell(0, 6, limpar_texto_pdf(f" {titulo} "), ln=True, fill=True)
+        pdf.set_font("helvetica", '', 9)
+        pdf.multi_cell(0, 5, limpar_texto_pdf(f" {texto_limpo} "), fill=True)
+        pdf.ln(3)
+
+    # ==========================================
+    # --- PÁGINA 1: SNAPSHOT EXECUTIVO E EVOLUÇÃO ---
+    # ==========================================
     pdf.add_page()
-    
-    # ENGENHARIA CIRÚRGICA: O FPDF não aceita transparência (Canal Alfa). 
-    # Isso converte o logo transparente para fundo branco apenas na hora de imprimir o PDF.
     import io
     from PIL import Image
     try:
@@ -121,55 +153,91 @@ def create_pdf(p_name, hist, metrics, imgs):
     
     pdf.ln(12)
     pdf.set_font("helvetica", 'B', 13)
+    pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA"), ln=True, align='C')
     
-    pdf.ln(15); pdf.set_font("helvetica", 'B', 12)
-    pdf.cell(0, 8, limpar_texto_pdf("RELATÓRIO DE INTELIGÊNCIA CLÍNICA E EVOLUÇÃO"), ln=True, align='C'); pdf.ln(3)
+    pdf.set_font("helvetica", 'B', 10); pdf.set_text_color(*azul_genua)
+    pdf.cell(0, 6, limpar_texto_pdf(f"PACIENTE: {p_name.upper()}"), ln=True, align='C')
+    pdf.set_font("helvetica", 'I', 9); pdf.set_text_color(100, 100, 100)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(f"Anamnese Base: {hist}"), align='C')
+    pdf.ln(6)
 
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 1. IDENTIFICAÇÃO E ANAMNESE"), ln=True, fill=True)
-    pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", '', 9); pdf.ln(2)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(f"Paciente: {p_name.upper()}\nHistória Clínica: {hist}")); pdf.ln(3)
+    # GRID EXECUTIVO
+    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 9)
+    w_col = 47.5 
+    pdf.cell(w_col, 7, limpar_texto_pdf("DOR ATUAL"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 7, limpar_texto_pdf("INCHAÇO"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 7, limpar_texto_pdf("IKDC (FUNÇÃO)"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 7, limpar_texto_pdf("PREVISÃO ALTA"), border=1, fill=True, align='C')
+    pdf.ln()
+    pdf.set_fill_color(*cinza_bg); pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'B', 10)
+    pdf.cell(w_col, 8, limpar_texto_pdf(f"{int(dor_atual)}/10"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 8, limpar_texto_pdf(f"Grau {grau_inc}"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 8, limpar_texto_pdf(f"{int(float(metrics['ikdc']))}/100"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 8, limpar_texto_pdf(f"{metrics['alta']}"), border=1, fill=True, align='C')
+    pdf.ln(10)
 
+    # 1. EVOLUÇÃO CLÍNICA
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 2. AVALIAÇÃO CIENTÍFICA IKDC"), ln=True, fill=True, align='C')
-    pdf.ln(3); pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 12)
-    pdf.set_x((pdf.w - 100) / 2) 
-    score_val = int(float(metrics['ikdc']))
-    pdf.cell(100, 10, limpar_texto_pdf(f"RESULTADO: {score_val}/100 - {metrics['ikdc_status'].upper()}"), ln=True, fill=True, align='C')
-    pdf.ln(6); pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
-    pdf.multi_cell(0, 5, limpar_texto_pdf(par_ikdc), align='C'); pdf.ln(6)
-
-    pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 3. EVOLUÇÃO CLÍNICA"), ln=True, fill=True, align='C')
+    pdf.cell(0, 7, limpar_texto_pdf(" 1. EVOLUÇÃO CLÍNICA (FUNÇÃO VS. DOR)"), ln=True, fill=True, align='C')
     y_ev = pdf.get_y() + 4
     pdf.image(imgs['ev'], x=20, y=y_ev, w=170) 
-    pdf.set_y(y_ev + get_img_height(imgs['ev'], 170) + 2) 
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
+    
+    # 3. MARGEM Y DE SEGURANÇA MÁXIMA PARA NÃO CORTAR GRÁFICOS
+    margem_y = max(125, get_img_height(imgs['ev'], 170))
+    pdf.set_y(y_ev + margem_y + 2) 
+    
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_ev), align='C')
+    
+    # INJEÇÃO DA CAIXA DE INSIGHT 
+    desenhar_caixa_insight("💡 INSIGHT EVOLUTIVO", metrics['insight_evolucao'], bg_azul_claro, txt_azul_escuro)
 
-    # --- PÁGINA 2 ---
+    # ==========================================
+    # --- PÁGINA 2: DOR ISOLADA E INCHAÇO ---
+    # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 4. COMPORTAMENTO DA DOR"), ln=True, fill=True, align='C')
+    pdf.cell(0, 7, limpar_texto_pdf(" 2. COMPORTAMENTO DA DOR"), ln=True, fill=True, align='C')
     y_dor = pdf.get_y() + 4
     pdf.image(imgs['dor'], x=20, y=y_dor, w=170)
-    pdf.set_y(y_dor + get_img_height(imgs['dor'], 170) + 2) 
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_dor), align='C'); pdf.ln(10)
+    
+    margem_y = max(125, get_img_height(imgs['dor'], 170))
+    pdf.set_y(y_dor + margem_y + 2) 
+    
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_dor), align='C')
+    pdf.ln(6)
 
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 5. MONITORAMENTO DE INCHAÇO"), ln=True, fill=True, align='C')
+    pdf.cell(0, 7, limpar_texto_pdf(" 3. MONITORAMENTO DE INCHAÇO"), ln=True, fill=True, align='C')
     y_inc = pdf.get_y() + 4
     pdf.image(imgs['inchaco'], x=20, y=y_inc, w=170)
-    pdf.set_y(y_inc + get_img_height(imgs['inchaco'], 170) + 2) 
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
+    
+    margem_y = max(125, get_img_height(imgs['inchaco'], 170))
+    pdf.set_y(y_inc + margem_y + 2) 
+    
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf(par_inc), align='C')
+    
+    desenhar_caixa_insight("⚠️ INSIGHT MECÂNICO", metrics['insight_mecanico'], bg_amarelo_claro, txt_amarelo_escuro)
 
-    # --- PÁGINA 3 ---
+    # ==========================================
+    # --- PÁGINA 3: BIOPSICOSSOCIAL ---
+    # ==========================================
     pdf.add_page()
     pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
-    pdf.cell(0, 7, limpar_texto_pdf(" 6. ANÁLISE BIOPSICOSSOCIAL E FATORES EXTERNOS"), ln=True, fill=True, align='C')
+    pdf.cell(0, 7, limpar_texto_pdf(" 4. ANÁLISE BIOPSICOSSOCIAL E FATORES EXTERNOS"), ln=True, fill=True, align='C')
     y_sono = pdf.get_y() + 4
     pdf.image(imgs['sono'], x=20, y=y_sono, w=170)
-    pdf.set_y(y_sono + get_img_height(imgs['sono'], 170) + 2) 
-    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9); pdf.multi_cell(0, 5, limpar_texto_pdf(par_sono), align='C')
+    
+    margem_y = max(125, get_img_height(imgs['sono'], 170))
+    pdf.set_y(y_sono + margem_y + 2) 
+    
+    pdf.set_text_color(*cinza_txt); pdf.set_font("helvetica", 'I', 9)
+    pdf.multi_cell(0, 5, limpar_texto_pdf("Parecer Clínico: A análise destaca a correlação exata da qualidade do sono e dos gatilhos posturais com o quadro álgico do paciente."), align='C')
+    
+    desenhar_caixa_insight("💤 INSIGHT DO SONO", metrics['insight_ouro'], bg_verde_claro, txt_verde_escuro)
+    desenhar_caixa_insight("🔴 INSIGHT POSTURAL", metrics['insight_postura'], bg_vermelho_claro, txt_vermelho_escuro)
 
     return bytes(pdf.output())
 
