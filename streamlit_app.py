@@ -22,8 +22,7 @@ CORES_GENUA = {
 }
 
 # 2. CAMINHO DO NOVO LOGOTIPO
-# ATENÇÃO THALLES: Troque o nome abaixo para o nome EXATO do arquivo que você fez upload!
-# Exemplo: Se o arquivo chama "Logo_Genua.jpg", escreva "Logo_Genua.jpg" entre as aspas.
+
 NOVO_LOGO_GENUA = "logo_genua_novo_v2.png" 
 
 # 3. CONFIGURAÇÃO INICIAL DA PÁGINA 
@@ -306,7 +305,7 @@ st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="�
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # ==========================================
-# --- NOVO: PORTAL DO CIRURGIÃO (ROTEAMENTO E SEGURANÇA) ---
+# --- ROTEAMENTO SEGURANÇA (PORTAL DO CIRURGIÃO 360º) ---
 # ==========================================
 import base64
 import urllib.parse
@@ -314,14 +313,22 @@ import urllib.parse
 query_params = st.query_params
 is_medico = query_params.get("med", None)
 token_paciente = query_params.get("token", None)
+paciente_alvo = None
 
-# Se o parâmetro 'med=true' estiver na URL, renderiza o Portal e BLOQUEIA o resto
 if is_medico == "true" and token_paciente:
-    # 1. Decodifica o token de segurança (Segurança por Obscuridade)
     try:
         paciente_alvo = base64.b64decode(token_paciente.encode('utf-8')).decode('utf-8')
+        # Esconde menu lateral e barra superior do Streamlit para o médico
+        st.markdown("""
+            <style>
+                [data-testid="collapsedControl"] {display: none;}
+                [data-testid="stSidebar"] {display: none;}
+                header {display: none;}
+            </style>
+        """, unsafe_allow_html=True)
     except:
-        paciente_alvo = None
+        pass
+# ==========================================
 
     # 2. UX do Médico: Esconde o menu lateral e botões padrão do Streamlit
     st.markdown("""
@@ -382,9 +389,15 @@ if is_medico == "true" and token_paciente:
     st.stop() 
 
 with st.sidebar:
+    with st.sidebar:
     try: st.image("NOVO_LOGO_GENUA", width=220)
     except: st.header("GENUA")
-    menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
+    
+    # Se for o médico, trava a navegação no Painel Analítico
+    if paciente_alvo:
+        menu = "Painel Analítico 📊"
+    else:
+        menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
 
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
