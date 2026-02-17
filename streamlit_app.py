@@ -448,23 +448,33 @@ elif menu == "Avaliação IKDC 📋":
             conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
             st.success("Score IKDC registrado!")
 
+
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
-    st.header("📊 Painel Analítico & Clinical Intelligence")
     df = conn.read(ttl=0).dropna(how="all")
     
     if not df.empty:
-        lista_pacientes = df['Paciente'].dropna().unique()
-        
-        p_sel = st.selectbox(
-            "🔍 Buscar Paciente:", 
-            options=lista_pacientes,
-            index=None, 
-            placeholder="Digite 3 letras do nome..."
-        )
-        
-        if p_sel is None:
-            st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
-            st.stop()
+        if paciente_alvo:
+            # VISÃO DO MÉDICO: Título personalizado e bloqueio no paciente alvo
+            st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center; margin-bottom: 25px;'>🏥 Portal do Cirurgião | Visão 360º</h2>", unsafe_allow_html=True)
+            p_sel = paciente_alvo
+            if p_sel not in df['Paciente'].values:
+                st.error("Paciente não encontrado na base de dados.")
+                st.stop()
+        else:
+            # VISÃO DO FISIOTERAPEUTA: Título normal e barra de busca
+            st.header("📊 Painel Analítico & Clinical Intelligence")
+            lista_pacientes = df['Paciente'].dropna().unique()
+            
+            p_sel = st.selectbox(
+                "🔍 Buscar Paciente:", 
+                options=lista_pacientes,
+                index=None, 
+                placeholder="Digite 3 letras do nome..."
+            )
+            
+            if p_sel is None:
+                st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
+                st.stop()
             
 
     
