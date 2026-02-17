@@ -377,21 +377,38 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
             st.stop()
             
-        # --- BUSCA DA HISTÓRIA CLÍNICA (HMA) ---
+        # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
         try:
-            # Tenta ler a aba Cadastro para buscar a HMA
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
-            hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
-            idade_p = df_cad[df_cad['Nome'].str.strip() == p_sel]['Idade'].values[0]
+            registro_p = df_cad[df_cad['Nome'].str.strip() == p_sel].iloc[0]
+            hist_clinica = registro_p['Historia']
+            # Correção: Forçando inteiro para remover casas decimais
+            idade_p = int(registro_p['Idade']) if pd.notna(registro_p['Idade']) else "N/A"
         except: 
             hist_clinica = "Anamnese não cadastrada no sistema."
             idade_p = "N/A"
 
-        # EXIBIÇÃO DA HMA NO TOPO DO DASHBOARD
+        # INTERFACE: Cabeçalho Estético de Prontuário GENUA
         st.markdown(f"""
-            <div style='background-color: #e9ecef; padding: 15px; border-left: 5px solid {CORES_GENUA['primaria']}; border-radius: 5px; margin-bottom: 20px;'>
-                <h4 style='margin: 0; color: {CORES_GENUA['primaria']};'>📋 Prontuário: {p_sel} ({idade_p} anos)</h4>
-                <p style='margin: 10px 0 0 0; color: #495057; font-style: italic;'><b>HMA:</b> {hist_clinica}</p>
+            <div style='
+                background: linear-gradient(90deg, {CORES_GENUA['primaria']} 0%, {CORES_GENUA['secundaria']} 100%);
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                margin-bottom: 25px;
+                color: white;
+            '>
+                <h3 style='margin: 0; color: white; font-family: sans-serif; letter-spacing: 1px;'>
+                    👤 {p_sel.upper()}
+                </h3>
+                <p style='margin: 5px 0 15px 0; font-size: 1.1rem; opacity: 0.9;'>
+                    <b>Idade:</b> {idade_p} anos
+                </p>
+                <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; border-left: 4px solid white;'>
+                    <p style='margin: 0; font-size: 0.95rem; line-height: 1.5;'>
+                        <b>HMA:</b> {hist_clinica}
+                    </p>
+                </div>
             </div>
         """, unsafe_allow_html=True)
     
