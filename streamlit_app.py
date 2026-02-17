@@ -378,6 +378,10 @@ if menu == "Check-in Diário 📝":
             conn.update(data=pd.concat([df, nova], ignore_index=True))
             st.success("Dados registrados com sucesso!")
 
+            st.write("---")
+        with st.expander("⚖️ Conformidade LGPD e Privacidade"):
+            st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
+
 elif menu == "Avaliação IKDC 📋":
     st.header("Score Científico IKDC")
     with st.form("ikdc"):
