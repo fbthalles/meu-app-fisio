@@ -305,7 +305,7 @@ st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="�
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # ==========================================
-# --- ROTEAMENTO SEGURANÇA (PORTAL DO CIRURGIÃO 360º) ---
+# --- ROTEAMENTO SEGURANÇA (PORTAL DO CIRURGIÃO) ---
 # ==========================================
 import base64
 import urllib.parse
@@ -330,22 +330,14 @@ if is_medico == "true" and token_paciente:
         pass
 # ==========================================
 
-    
-    # Se for o médico, trava a navegação no Painel Analítico
-    if paciente_alvo:
-        menu = "Painel Analítico 📊"
-    else:
-        menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
-
 with st.sidebar:
-    # Removemos o st.image daqui para não duplicar o logo!
+    # O logo já foi injetado globalmente no topo do arquivo.
     
-    # Roteamento seguro: garante a criação da variável 'menu'
+    # Roteamento seguro: garante a criação da variável 'menu' sem duplicações
     if paciente_alvo:
         menu = "Painel Analítico 📊"
     else:
         menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
-    
 
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
