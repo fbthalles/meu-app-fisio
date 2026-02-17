@@ -379,8 +379,7 @@ if is_medico == "true" and token_paciente:
     else:
         st.error("Link de acesso inválido ou expirado.")
         
-    st.stop() # PARALISA O CÓDIGO AQUI. O médico nunca verá a sua tela de controle.
-# ==========================================
+    st.stop() 
 
 with st.sidebar:
     try: st.image("NOVO_LOGO_GENUA", width=220)
