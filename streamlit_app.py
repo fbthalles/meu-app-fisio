@@ -404,12 +404,9 @@ if is_medico == "true" and token_paciente:
         menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
 
 with st.sidebar:
-    try:
-        st.image(NOVO_LOGO_GENUA, use_container_width=True)
-    except:
-        st.header("GENUA")
-        
-    # ATENÇÃO: Este bloco garante a criação da variável 'menu'
+    # O logo já é carregado globalmente no topo do código, então aqui deixamos apenas o menu!
+    
+    # Roteamento seguro: garante a criação da variável 'menu'
     if paciente_alvo:
         menu = "Painel Analítico 📊"
     else:
