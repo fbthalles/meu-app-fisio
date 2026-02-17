@@ -371,13 +371,7 @@ if menu == "Check-in Diário 📝":
         with c7:
             postura = st.radio("🧍 Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
             
-         st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
-        c6, c7 = st.columns(2)
-        with c6:
-            sono = st.radio("💤 Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
-        with c7:
-            postura = st.radio("🧍 Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
-            
+        # --- NOVO: MÓDULO DE AMPLITUDE DE MOVIMENTO (ADM) ---
         st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Biomecânica (ADM)</h4>", unsafe_allow_html=True)
         c8, c9 = st.columns(2)
         with c8:
@@ -388,7 +382,6 @@ if menu == "Check-in Diário 📝":
         st.markdown("<br>", unsafe_allow_html=True)
         if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
             df = conn.read(ttl=0).dropna(how="all")
-            
             # Adicionamos Flexao e Extensao na base de dados
             nova = pd.DataFrame([{
                 "Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), 
@@ -398,10 +391,10 @@ if menu == "Check-in Diário 📝":
             }])
             conn.update(data=pd.concat([df, nova], ignore_index=True))
             st.success("Dados registrados com sucesso! A Inteligência Biomecânica foi alimentada.")
-
-            st.write("---")
-        with st.expander("⚖️ Conformidade LGPD e Privacidade"):
-            st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
+            
+    st.write("---")
+    with st.expander("⚖️ Conformidade LGPD e Privacidade"):
+        st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
 
 elif menu == "Avaliação IKDC 📋":
     st.header("Score Científico IKDC")
