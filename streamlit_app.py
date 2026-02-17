@@ -402,6 +402,18 @@ if is_medico == "true" and token_paciente:
         menu = "Painel Analítico 📊"
     else:
         menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
+
+with st.sidebar:
+    try:
+        st.image(NOVO_LOGO_GENUA, use_container_width=True)
+    except:
+        st.header("GENUA")
+        
+    # ATENÇÃO: Este bloco garante a criação da variável 'menu'
+    if paciente_alvo:
+        menu = "Painel Analítico 📊"
+    else:
+        menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
     
 
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
