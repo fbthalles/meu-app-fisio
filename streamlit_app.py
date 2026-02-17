@@ -627,7 +627,45 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         
         lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
+
+        # E) Cruzamento Biomecânico (ADM x Dor x Inchaço)
+        fig_adm, ax1_adm = plt.subplots(figsize=(10, 4.5))
         
+        # Linha da Flexão (Eixo Principal - Esquerda)
+        ax1_adm.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'], label='Graus de Flexão', marker='s', linewidth=3)
+        ax1_adm.set_ylim(0, 160)
+        ax1_adm.set_ylabel("Amplitude de Movimento (Graus)", color=CORES_GENUA['secundaria'], fontweight='bold')
+        ax1_adm.tick_params(axis='y', labelcolor=CORES_GENUA['secundaria'])
+        
+        # Eixo Secundário - Direita (Dor e Inchaço)
+        ax2_adm = ax1_adm.twinx()
+        
+        # Barras de Inchaço ao fundo
+        cores_inc_adm = [CORES_GENUA['alerta_erro'] if x == 3 else CORES_GENUA['alerta_aviso'] if x == 2 else CORES_GENUA['texto_suave'] for x in df_p['Inchaco_N']]
+        ax2_adm.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc_adm, alpha=0.25, label='Inchaço (Grau)', width=0.6)
+        
+        # Linha de Dor por cima das barras
+        ax2_adm.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], label='Nível de Dor (EVA)', marker='o', linewidth=2)
+        
+        ax2_adm.set_ylim(-0.5, 11)
+        ax2_adm.set_ylabel("Dor (0-10) / Inchaço (0-3)", color=CORES_GENUA['alerta_erro'], fontweight='bold')
+        ax2_adm.tick_params(axis='y', labelcolor=CORES_GENUA['alerta_erro'])
+        
+        ax1_adm.set_title("Evolução Biomecânica: ADM vs Dor vs Inchaço", fontweight='bold', color=cor_prim_grafico)
+        ax1_adm.set_xticks(indices_5)
+        ax1_adm.set_xticklabels(labels_5)
+        ax1_adm.spines['top'].set_visible(False)
+        ax2_adm.spines['top'].set_visible(False)
+        
+        # Juntando as legendas dos dois eixos para o design premium
+        lines_1, labels_1 = ax1_adm.get_legend_handles_labels()
+        lines_2, labels_2 = ax2_adm.get_legend_handles_labels()
+        lgd_adm = ax1_adm.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
+        
+        buf_adm = io.BytesIO()
+        fig_adm.savefig(buf_adm, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_adm,), dpi=150)
+        buf_adm.seek(0); plt.close(fig_adm)
+
         # 3. MOTORES MATEMÁTICOS DE CRUZAMENTO E INSIGHTS
         media_dor = df_p['Dor'].mean()
         delta_dor_pct = ((ultima['Dor'] - media_dor) / media_dor * 100) if media_dor > 0 else (100 if ultima['Dor'] > 0 else 0)
