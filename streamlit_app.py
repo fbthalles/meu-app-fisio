@@ -435,7 +435,17 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         df_p['Sono_N'] = df_p['Sono'].map({"Ruim": 1, "Regular": 5, "Bom": 10})
         col_inc = 'Inchaço' if 'Inchaço' in df_p.columns else 'Inchaco'
         df_p['Inchaco_N'] = pd.to_numeric(df_p[col_inc], errors='coerce').fillna(0)
-        ultima = df_p.iloc[-1]
+        
+        # --- NOVO: SELETOR TEMPORAL (MÁQUINA DO TEMPO CLÍNICA) ---
+        opcoes_sessoes = df_p['Sessão_Num'].tolist()[::-1] # Lista invertida (S15, S14, S13...)
+        
+        st.write("") # Espaçamento
+        c_vazio, c_seletor = st.columns([4, 1])
+        with c_seletor:
+            sessao_escolhida = st.selectbox("📅 Analisar Sessão:", options=opcoes_sessoes, index=0)
+            
+        # A variável 'ultima' agora reflete EXATAMENTE a sessão escolhida no seletor
+        ultima = df_p[df_p['Sessão_Num'] == sessao_escolhida].iloc[0]
 
         # Intervalos de 5 sessões para o Eixo X em todos os gráficos
         indices_5 = np.arange(0, len(df_p), 5)
