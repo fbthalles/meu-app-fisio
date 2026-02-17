@@ -680,7 +680,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         m4.metric("Previsão Alta", prev_txt)
 
         st.write("---")
-        t1, t2, t3, t4 = st.tabs(["📈 Evolução & IA", "🩸 Dor Isolada", "🌊 Inchaço", "🎯 Fatores Externos"])
+        t1, t2, t3, t4 = st.tabs(["📈 Progresso Funcional", "🩸 Quadro Álgico", "🌊 Inchaço", "🎯 Fatores Modificáveis"])
         
         with t1: 
             # 1. Alerta de Platô (Caso exista)
