@@ -396,7 +396,7 @@ if is_medico == "true" and token_paciente:
         
     st.stop() 
 
-with st.sidebar:
+
     with st.sidebar:
     try: st.image("NOVO_LOGO_GENUA", width=220)
     except: st.header("GENUA")
