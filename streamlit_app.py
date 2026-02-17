@@ -748,18 +748,20 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             
     
         # --- NOVO: GERADOR DE LINK PARA O CIRURGIÃO (WhatsApp) ---
-        # Codifica o nome do paciente para segurança
-        token_gerado = base64.b64encode(p_sel.encode('utf-8')).decode('utf-8')
-        
-        # ATENÇÃO THALLES: Quando você publicar o app na internet, troque a URL abaixo pela sua URL oficial do Streamlit!
-        url_base = "https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app/" # Use a sua URL de produção depois (ex: https://genua.streamlit.app/)
-        url_medico = f"{url_base}?med=true&token={token_gerado}"
-        
-        texto_whatsapp = f"Olá, Doutor! O prontuário atualizado em tempo real do paciente *{p_sel}* está disponível no Portal GENUA. Acesse o link seguro para ver a evolução de dor, inchaço e minha conduta: {url_medico}"
-        link_wpp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(texto_whatsapp)}"
-        
-        st.link_button("📲 Enviar Resumo para o Cirurgião (WhatsApp)", link_wpp, type="secondary", use_container_width=True)
-        st.write("---")
+        if not paciente_alvo: # <-- ESTA É A TRAVA DE INVISIBILIDADE PARA O MÉDICO
+            # Codifica o nome do paciente para segurança
+            token_gerado = base64.b64encode(p_sel.encode('utf-8')).decode('utf-8')
+            
+            # ATENÇÃO THALLES: URL de produção já configurada!
+            url_base = "https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app/" 
+            url_medico = f"{url_base}?med=true&token={token_gerado}"
+            
+            texto_whatsapp = f"Olá, Doutor! O prontuário atualizado em tempo real do paciente *{p_sel}* está disponível no Portal GENUA. Acesse o link seguro para ver a evolução de dor, inchaço e minha conduta: {url_medico}"
+            link_wpp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(texto_whatsapp)}"
+            
+            st.link_button("📲 Enviar Resumo para o Cirurgião (WhatsApp)", link_wpp, type="secondary", use_container_width=True)
+            st.write("---")
+       
 
         # 4. DASHBOARD TELA
         m1, m2, m3, m4 = st.columns(4)
