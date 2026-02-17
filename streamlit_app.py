@@ -380,6 +380,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     
         # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
     
+        # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
             registro_p = df_cad[df_cad['Nome'].str.strip() == p_sel].iloc[0]
@@ -390,7 +391,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             hist_clinica = "Histórico não disponível para este paciente."
             idade_p = "-"
 
-        # INTERFACE: Cabeçalho Estético de Prontuário GENUA (Baseado no design aprovado)
+        # INTERFACE: Cabeçalho Estético de Prontuário GENUA (Design Teal)
         st.markdown(f"""
             <div style='
                 background-color: {CORES_GENUA['secundaria']};
@@ -408,41 +409,6 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
                 <div style='background-color: rgba(255, 255, 255, 0.15); padding: 12px 15px; border-radius: 6px; border-left: 3px solid #ffffff;'>
                     <p style='margin: 0; color: #ffffff; font-size: 0.95rem; line-height: 1.5;'>
                         <b>HMA:</b> {hist_clinica}
-                    </p>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # INTERFACE: Cabeçalho Clean & Soft (Padrão GENUA)
-        st.markdown(f"""
-            <div style='
-                background-color: #ffffff;
-                border: 1px solid #e9ecef;
-                border-left: 5px solid {CORES_GENUA['primaria']};
-                padding: 20px 25px;
-                border-radius: 8px;
-                margin-bottom: 30px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Sombra muito suave */
-            '>
-                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;'>
-                    <h3 style='margin: 0; color: {CORES_GENUA['primaria']}; font-weight: 700; font-family: sans-serif;'>
-                        👤 {p_sel}
-                    </h3>
-                    <span style='
-                        background-color: #f1f3f5; 
-                        color: {CORES_GENUA['primaria']}; 
-                        padding: 6px 15px; 
-                        border-radius: 20px; 
-                        font-size: 0.95rem; 
-                        font-weight: 600;
-                        border: 1px solid #e9ecef;
-                    '>
-                        {idade_p} anos
-                    </span>
-                </div>
-                <div style='background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #e9ecef;'>
-                    <p style='margin: 0; color: #495057; line-height: 1.6; font-family: sans-serif;'>
-                        <strong style='color: {CORES_GENUA['primaria']};'>HMA:</strong> {hist_clinica}
                     </p>
                 </div>
             </div>
@@ -693,7 +659,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             
         # ----------------------------------------------------------------------------
 
-        # 4. DASHBOARD TELA (O código continua aqui...)
+        # 4. DASHBOARD TELA 
 
         # 4. DASHBOARD TELA
         m1, m2, m3, m4 = st.columns(4)
