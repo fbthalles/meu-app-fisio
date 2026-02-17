@@ -257,6 +257,19 @@ def create_pdf(p_name, hist, metrics, imgs):
     desenhar_caixa_insight("💤 INSIGHT DO SONO", metrics['insight_ouro'], bg_verde_claro, txt_verde_escuro)
     desenhar_caixa_insight("🔴 INSIGHT POSTURAL (GATILHO BIOMECÂNICO)", metrics['insight_postura'], bg_vermelho_claro, txt_vermelho_escuro)
 
+    # ==========================================
+    # --- PÁGINA 5: CRUZAMENTO BIOMECÂNICO (ADM) ---
+    # ==========================================
+    if 'adm' in imgs:
+        pdf.add_page()
+        pdf.set_fill_color(*azul_genua); pdf.set_text_color(255, 255, 255); pdf.set_font("helvetica", 'B', 10)
+        pdf.cell(0, 7, limpar_texto_pdf(" 5. CRUZAMENTO BIOMECÂNICO (ADM x DOR x INCHAÇO)"), ln=True, fill=True, align='C')
+        y_adm = pdf.get_y() + 4
+        pdf.image(imgs['adm'], x=20, y=y_adm, w=170)
+        
+        pdf.set_y(y_adm + get_img_height(imgs['adm'], 170) + 5)
+        desenhar_caixa_insight("📐 PARECER BIOMECÂNICO", metrics['insight_mecanico'], bg_azul_claro, txt_azul_escuro)
+
     # --- NOVO: BLOCO DE ASSINATURA E QR CODE ---
     pdf.ln(10)
     y_assinatura = pdf.get_y()
@@ -911,7 +924,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         }
         
         pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
-            'ev': buf_ev, 'dor': buf_dor, 'sono': buf_s, 'inchaco': buf_inc
+            'ev': buf_ev, 'dor': buf_dor, 'sono': buf_s, 'inchaco': buf_inc, 'adm': buf_adm # 
         })
         
         st.download_button("📥 BAIXAR RELATÓRIO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf")
