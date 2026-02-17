@@ -392,15 +392,28 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         indices_5 = np.arange(0, len(df_p), 5)
         labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
 
-        # CÁLCULO DE TENDÊNCIA E PREVISÃO DE ALTA
+       # CÁLCULO DE TENDÊNCIA E PREVISÃO DE ALTA (BLINDADO)
         try:
             df_p['Data_DT'] = pd.to_datetime(df_p['Data'], dayfirst=True)
             df_p['Dias'] = (df_p['Data_DT'] - df_p['Data_DT'].min()).dt.days
-            z = np.polyfit(df_p['Dias'].values, df_p['Score_Função'].values, 1)
-            trend_line = z[0] * df_p['Dias'].values + z[1]
-            dia_estimado_alta = (9.0 - z[1]) / z[0] if z[0] > 0 else 0
-            prev_txt = (df_p['Data_DT'].min() + pd.to_timedelta(dia_estimado_alta, unit='d')).strftime("%d/%m/%Y") if dia_estimado_alta > 0 else "Estabilizado"
-        except: 
+            
+            # Correção Matemática: Regressão exige no mínimo 2 pontos
+            if len(df_p) > 1:
+                z = np.polyfit(df_p['Dias'].values, df_p['Score_Função'].values, 1)
+                trend_line = z[0] * df_p['Dias'].values + z[1]
+                
+                # Previsão Matemática de Alta (Score = 9.0)
+                # Fórmula: y = ax + b -> 9 = ax + b -> x = (9 - b) / a
+                if z[0] > 0.05: # Garante que a inclinação é positiva e relevante
+                    dia_estimado_alta = (9.0 - z[1]) / z[0]
+                    data_alta = df_p['Data_DT'].min() + pd.to_timedelta(dia_estimado_alta, unit='d')
+                    prev_txt = data_alta.strftime("%d/%m/%Y")
+                else:
+                    prev_txt = "Estabilizado (Sem inclinação de melhora)"
+            else:
+                trend_line = []
+                prev_txt = "Aguardando 2ª sessão"
+        except Exception as e: 
             trend_line = []
             prev_txt = "Em análise"
 
