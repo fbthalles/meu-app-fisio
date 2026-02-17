@@ -262,9 +262,17 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_assinatura = pdf.get_y()
     
     try:
-        # ATENÇÃO THALLES: Mude o link abaixo para o seu WhatsApp ou Linktree real
-        link_destino = "https://wa.me/5511999999999?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20meu%20retorno"
-        url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(link_destino)}"
+        # --- NOVO: GERADOR DE LINK PARA O CIRURGIÃO (WhatsApp) ---
+        if not paciente_alvo:
+            token_gerado = base64.b64encode(p_sel.encode('utf-8')).decode('utf-8')
+            url_base = "https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app" # Use a sua URL de produção depois (ex: https://genua.streamlit.app/)
+            url_medico = f"{url_base}?med=true&token={token_gerado}"
+            
+            texto_whatsapp = f"Olá, Doutor! O prontuário atualizado em tempo real do paciente *{p_sel}* está disponível no Portal GENUA. Acesse o link seguro para ver a evolução completa e a Máquina do Tempo Clínica: {url_medico}"
+            link_wpp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(texto_whatsapp)}"
+            
+            st.link_button("📲 Enviar Painel 360º para o Cirurgião (WhatsApp)", link_wpp, type="secondary", use_container_width=True)
+            st.write("---")
         
         req = urllib.request.Request(url_qr, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
