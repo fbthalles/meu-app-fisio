@@ -346,7 +346,7 @@ if is_medico == "true" and token_paciente:
         menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
 
 with st.sidebar:
-    # O logo já é carregado globalmente no topo do código, então aqui deixamos apenas o menu!
+    # Removemos o st.image daqui para não duplicar o logo!
     
     # Roteamento seguro: garante a criação da variável 'menu'
     if paciente_alvo:
