@@ -811,7 +811,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             elif cor_dor == "warning": st.warning(f"💡 **Insight Álgico:** {insight_dor}")
             else: st.error(f"💡 **Insight Álgico:** {insight_dor}")
             
-       with t3: 
+        with t3: 
             st.image(buf_inc, use_container_width=True)
             st.warning(f"💡 **Insight Mecânico:** {insight_mecanico}")
             
@@ -845,11 +845,11 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
                 # O CÉREBRO CLÍNICO: Cruzando Inchaço com Flexão
                 if ultima['Inchaco_N'] >= 2 and flex_atual < 110:
                     st.error("🚨 **Bloqueio Capsular:** O inchaço atual (Grau 2+) está limitando fisicamente a flexão.")
-                elif ultima['Dor'] > 5 and "Déficit" in ext_atual:
+                elif ultima['Dor'] > 5 and "Déficit" in str(ext_atual):
                     st.warning("⚠️ **Alerta AMI:** Dor moderada/alta gerando inibição de quadríceps e déficit de extensão.")
-                elif "Completa" in ext_atual and flex_atual >= 120:
+                elif "Completa" in str(ext_atual) and flex_atual >= 120:
                     st.success("✅ **Articulação Livre:** ADM funcional atingida. Foco total em força.")
-            
+                    
         with t4: 
             st.image(buf_s, use_container_width=True)
             st.info(f"💡 **Insight do Sono:** {insight_ouro.replace('Parecer Biopsicossocial: ', '')}")
