@@ -377,8 +377,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
             st.stop()
             
-        # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
-        try:
+    
         # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
