@@ -305,6 +305,83 @@ def create_pdf(p_name, hist, metrics, imgs):
 st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="🏥")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# ==========================================
+# --- NOVO: PORTAL DO CIRURGIÃO (ROTEAMENTO E SEGURANÇA) ---
+# ==========================================
+import base64
+import urllib.parse
+
+query_params = st.query_params
+is_medico = query_params.get("med", None)
+token_paciente = query_params.get("token", None)
+
+# Se o parâmetro 'med=true' estiver na URL, renderiza o Portal e BLOQUEIA o resto
+if is_medico == "true" and token_paciente:
+    # 1. Decodifica o token de segurança (Segurança por Obscuridade)
+    try:
+        paciente_alvo = base64.b64decode(token_paciente.encode('utf-8')).decode('utf-8')
+    except:
+        paciente_alvo = None
+
+    # 2. UX do Médico: Esconde o menu lateral e botões padrão do Streamlit
+    st.markdown("""
+        <style>
+            [data-testid="collapsedControl"] {display: none;}
+            [data-testid="stSidebar"] {display: none;}
+            header {display: none;}
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center;'>🏥 Portal do Cirurgião</h2>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; color: {CORES_GENUA['texto_suave']}; margin-top: -15px;'>Acompanhamento em Tempo Real | GENUA</p>", unsafe_allow_html=True)
+    st.divider()
+
+    if paciente_alvo:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        df_med = conn.read(ttl=0).dropna(how="all")
+        df_p_med = df_med[df_med['Paciente'] == paciente_alvo].copy()
+
+        if not df_p_med.empty:
+            ultima_med = df_p_med.iloc[-1]
+            
+            # 3. Interface Clean para Celular (15 Segundos)
+            st.markdown(f"<h3 style='color: {CORES_GENUA['secundaria']};'>👤 {paciente_alvo.upper()}</h3>", unsafe_allow_html=True)
+            st.caption(f"Última atualização: {ultima_med['Data']}")
+            
+            # Semáforo Clínico de Triagem Rápida
+            dor_med = int(ultima_med['Dor'])
+            col_inc_m = 'Inchaço' if 'Inchaço' in df_p_med.columns else 'Inchaco'
+            inc_med = int(pd.to_numeric(ultima_med[col_inc_m], errors='coerce'))
+            
+            if dor_med <= 3 and inc_med <= 1:
+                st.success("🟢 **Status Geral:** EVOLUÇÃO DENTRO DO ESPERADO. Articulação estável e quadro álgico controlado.")
+            elif dor_med <= 6 and inc_med <= 2:
+                st.warning("🟡 **Status Geral:** ATENÇÃO MODERADA. Paciente operando no limite da janela de tolerância de carga.")
+            else:
+                st.error("🔴 **Status Geral:** ALERTA CLÍNICO. Necessário controle agressivo de efusão e modulação de sintomas.")
+
+            # Métricas Diretas
+            c1, c2 = st.columns(2)
+            c1.metric("💥 Dor Atual (EVA)", f"{dor_med}/10")
+            c2.metric("🌊 Efusão Articular", f"Grau {inc_med}")
+            
+            # Conduta Recomendada
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 20px;'>📋 Conduta e Parecer do Fisioterapeuta</h4>", unsafe_allow_html=True)
+            parecer = ultima_med.get('Orientacoes', '')
+            if pd.isna(parecer) or parecer == "": 
+                parecer = "Nenhuma observação específica registrada na última sessão."
+            
+            st.info(f"**Nota Técnica:** {parecer}")
+            
+            st.markdown("<br><hr><p style='text-align: center; font-size: 12px; color: gray;'>Sistema GENUA de Inteligência Clínica (2026)</p>", unsafe_allow_html=True)
+        else:
+            st.error("Paciente não possui registros de check-in ainda.")
+    else:
+        st.error("Link de acesso inválido ou expirado.")
+        
+    st.stop() # PARALISA O CÓDIGO AQUI. O médico nunca verá a sua tela de controle.
+# ==========================================
+
 with st.sidebar:
     try: st.image("NOVO_LOGO_GENUA", width=220)
     except: st.header("GENUA")
