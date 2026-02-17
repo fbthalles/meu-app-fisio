@@ -301,7 +301,6 @@ def create_pdf(p_name, hist, metrics, imgs):
     return bytes(pdf.output())
 
 # --- 2. INTERFACE E CONEXÃO ---
-st.set_page_config(page_title="GENUA Intelligence", layout="wide", page_icon="🏥")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # ==========================================
