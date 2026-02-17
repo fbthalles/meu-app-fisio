@@ -261,37 +261,41 @@ def create_pdf(p_name, hist, metrics, imgs):
     pdf.ln(10)
     y_assinatura = pdf.get_y()
     
+    # Gerador de QR Code Seguro (Via API)
     try:
-        # --- SELETOR TEMPORAL (MÁQUINA DO TEMPO) ---
-        opcoes_sessoes = df_p['Sessão_Num'].tolist()[::-1]
-        
-        c_vazio, c_seletor = st.columns([4, 1])
-        with c_seletor:
-            sessao_escolhida = st.selectbox("📅 Analisar Sessão:", options=opcoes_sessoes, index=0)
-            
-        # A variável 'ultima' agora reflete a sessão escolhida
-        ultima = df_p[df_p['Sessão_Num'] == sessao_escolhida].iloc[0]
-
-        # --- BOTÃO WHATSAPP (EXCLUSIVO DO FISIOTERAPEUTA) ---
-        # A condição abaixo garante que o botão suma no Portal do Médico
-        if not paciente_alvo:
-            st.write("") # Espaçamento
-            token_gerado = base64.b64encode(p_sel.encode('utf-8')).decode('utf-8')
-            url_base = "https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app" # Lembre de trocar depois pela sua URL do Streamlit Cloud!
-            url_medico = f"{url_base}?med=true&token={token_gerado}"
-            
-            texto_whatsapp = f"Olá, Doutor! O prontuário atualizado em tempo real do paciente *{p_sel}* está disponível no Portal GENUA. Acesse o link seguro para ver a evolução completa: {url_medico}"
-            link_wpp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(texto_whatsapp)}"
-            
-            st.link_button("📲 Enviar Resumo para o Cirurgião (WhatsApp)", link_wpp, type="secondary", use_container_width=True)
-            
-        st.write("---")
+        # ATENÇÃO: Substitua o número abaixo pelo WhatsApp da sua clínica
+        link_agendamento = "https://wa.me/5511999999999?text=Olá,%20gostaria%20de%20agendar%20meu%20retorno."
+        url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(link_agendamento)}"
         
         req = urllib.request.Request(url_qr, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             buf_qr = io.BytesIO(response.read())
             
         pdf.image(buf_qr, x=20, y=y_assinatura, w=28)
+    except:
+        pass # Se a internet falhar, o PDF é gerado normalmente sem quebrar o app
+        
+    pdf.set_y(y_assinatura + 4)
+    pdf.set_x(52)
+    pdf.set_font("helvetica", 'B', 11)
+    pdf.set_text_color(*azul_genua)
+    pdf.cell(0, 5, limpar_texto_pdf("DR. THALLES - FISIOTERAPIA ESPORTIVA"), ln=True)
+    
+    pdf.set_x(52)
+    pdf.set_font("helvetica", '', 9)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 5, limpar_texto_pdf("Especialista em Reabilitação e Inteligência Clínica"), ln=True)
+    
+    pdf.set_x(52)
+    pdf.set_font("helvetica", 'I', 8)
+    pdf.cell(0, 5, limpar_texto_pdf("Aponte a câmera do celular para o QR Code ao lado para agendar seu retorno,"), ln=True)
+    pdf.set_x(52)
+    pdf.cell(0, 5, limpar_texto_pdf("acessar sua cartilha de exercícios ou falar diretamente com nossa equipe."), ln=True)
+
+    # Faxina de sistema: Remove o arquivo temporário gerado
+    try:
+        if os.path.exists(logo_pdf_path):
+            os.remove(logo_pdf_path)
     except:
         pass 
         
