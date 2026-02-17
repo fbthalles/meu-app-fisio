@@ -586,27 +586,35 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             insight_dor = f"A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
             cor_dor = "error"
 
-        # 1. Definição do Alerta de Platô
+        # --- MOTOR DE INTELIGÊNCIA MATEMÁTICA (REVISADO) ---
+        
+        # 1. Algoritmo de Detecção de Platô (Janela Móvel de 3 Sessões)
         plato_detectado = False
         if len(df_p) >= 3:
             ultimas_3 = df_p.tail(3)
-            dor_estagnada = ultimas_3['Dor'].nunique() == 1
-            # Critério: Inchaço não cedeu e função não mudou
-            inchaco_estagnado = (ultimas_3['Inchaco_N'].iloc[-1] >= ultimas_3['Inchaco_N'].iloc[-2])
-            funcao_estagnada = ultimas_3['Score_Função'].nunique() == 1
+            # Desvio padrão zero indica estagnação matemática perfeita
+            dor_estagnada = ultimas_3['Dor'].std() == 0 
+            funcao_estagnada = ultimas_3['Score_Função'].std() == 0
+            # Inchaço: Verifica se não houve decréscimo (monotocidade não-decrescente)
+            inchaco_valores = pd.to_numeric(ultimas_3['Inchaco_N'])
+            inchaco_nao_cedeu = inchaco_valores.is_monotonic_increasing or (inchaco_valores.nunique() == 1)
             
-            if dor_estagnada and inchaco_estagnado and funcao_estagnada:
+            if dor_estagnada and inchaco_nao_cedeu and funcao_estagnada:
                 plato_detectado = True
 
-        # 2. Cálculo de LSI Estimado (Limb Symmetry Index)
-        lsi_estimado = (df_p['Score_Função'].iloc[-1] / 10) * 100 
+        # 2. Cálculo de LSI Estimado (Funcionalidade Relativa)
+        # Fórmula: (Score Atual / Score Máximo Teórico) * 100
+        score_maximo_teorico = 10.0
+        lsi_estimado = min((df_p['Score_Função'].iloc[-1] / score_maximo_teorico) * 100, 100.0)
         
-        # 3. Rastreio de Nociplasticidade (Baseado na Pesquisa Vasta 2025)
+        # 3. Rastreio de Nociplasticidade (Discrepância Clínico-Mecânica)
+        # Critério: Dor > 5 (Moderada/Alta) COM Inchaço <= 1 (Fisiológico) E Função > 70%
         descompasso_nociplastico = False
-        if ultima['Dor'] > 5 and ultima['Inchaco_N'] <= 1 and df_p['Score_Função'].iloc[-1] >= 7:
+        if ultima['Dor'] > 5 and ultima['Inchaco_N'] <= 1 and lsi_estimado >= 70:
             descompasso_nociplastico = True
             
         # 4. Alerta de Inibição Muscular Artrogênica (AMI)
+        # Critério: Derrame articular clinicamente relevante (>= Grau 2)
         alerta_ami = False
         if ultima['Inchaco_N'] >= 2:
             alerta_ami = True
