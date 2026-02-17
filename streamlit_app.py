@@ -262,17 +262,30 @@ def create_pdf(p_name, hist, metrics, imgs):
     y_assinatura = pdf.get_y()
     
     try:
-        # --- NOVO: GERADOR DE LINK PARA O CIRURGIÃO (WhatsApp) ---
+        # --- SELETOR TEMPORAL (MÁQUINA DO TEMPO) ---
+        opcoes_sessoes = df_p['Sessão_Num'].tolist()[::-1]
+        
+        c_vazio, c_seletor = st.columns([4, 1])
+        with c_seletor:
+            sessao_escolhida = st.selectbox("📅 Analisar Sessão:", options=opcoes_sessoes, index=0)
+            
+        # A variável 'ultima' agora reflete a sessão escolhida
+        ultima = df_p[df_p['Sessão_Num'] == sessao_escolhida].iloc[0]
+
+        # --- BOTÃO WHATSAPP (EXCLUSIVO DO FISIOTERAPEUTA) ---
+        # A condição abaixo garante que o botão suma no Portal do Médico
         if not paciente_alvo:
+            st.write("") # Espaçamento
             token_gerado = base64.b64encode(p_sel.encode('utf-8')).decode('utf-8')
-            url_base = "https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app" # Use a sua URL de produção depois (ex: https://genua.streamlit.app/)
+            url_base = "https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app" # Lembre de trocar depois pela sua URL do Streamlit Cloud!
             url_medico = f"{url_base}?med=true&token={token_gerado}"
             
-            texto_whatsapp = f"Olá, Doutor! O prontuário atualizado em tempo real do paciente *{p_sel}* está disponível no Portal GENUA. Acesse o link seguro para ver a evolução completa e a Máquina do Tempo Clínica: {url_medico}"
+            texto_whatsapp = f"Olá, Doutor! O prontuário atualizado em tempo real do paciente *{p_sel}* está disponível no Portal GENUA. Acesse o link seguro para ver a evolução completa: {url_medico}"
             link_wpp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(texto_whatsapp)}"
             
-            st.link_button("📲 Enviar Painel 360º para o Cirurgião (WhatsApp)", link_wpp, type="secondary", use_container_width=True)
-            st.write("---")
+            st.link_button("📲 Enviar Resumo para o Cirurgião (WhatsApp)", link_wpp, type="secondary", use_container_width=True)
+            
+        st.write("---")
         
         req = urllib.request.Request(url_qr, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
