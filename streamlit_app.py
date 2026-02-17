@@ -856,43 +856,32 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             else: st.error(f"💡 **Insight Álgico:** {insight_dor}")
             
         with t3: 
-            st.image(buf_inc, use_container_width=True)
-            st.warning(f"💡 **Insight Mecânico:** {insight_mecanico}")
+            st.image(buf_adm, use_container_width=True)
             
-            # --- NOVO: CRUZAMENTO DE ADM VS INCHAÇO ---
+            st.warning(f"💡 **Insight Mecânico Geral:** {insight_mecanico}")
             st.write("---")
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📐 Rastreio Biomecânico (ADM vs Efusão)</h4>", unsafe_allow_html=True)
             
-            # Trava de segurança para pacientes antigos que não têm os dados de ADM
-            if 'Flexao' not in df_p.columns:
-                df_p['Flexao'] = 90
-            if 'Extensao' not in df_p.columns:
-                df_p['Extensao'] = "Sem dados antigos"
-                
-            df_p['Flexao'] = pd.to_numeric(df_p['Flexao'], errors='coerce').fillna(90)
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📐 Rastreio Clínico da Sessão Selecionada</h4>", unsafe_allow_html=True)
             
-            # Gráfico de Flexão
-            c_g1, c_g2 = st.columns([2, 1])
-            with c_g1:
-                st.altair_chart(alt.Chart(df_p).mark_line(point=True, color=CORES_GENUA['secundaria'], strokeWidth=3).encode(
-                    x=alt.X('Sessão_Num', title='Sessão', sort=None),
-                    y=alt.Y('Flexao', title='Graus de Flexão', scale=alt.Scale(domain=[0, 160])),
-                    tooltip=['Sessão_Num', 'Flexao', 'Extensao']
-                ).properties(title='Evolução da Flexão Articular'), use_container_width=True)
-                
-            with c_g2:
-                flex_atual = df_p['Flexao'].iloc[-1]
-                ext_atual = df_p['Extensao'].iloc[-1]
+            c_m1, c_m2 = st.columns(2)
+            # Lê os dados em tempo real da sessão escolhida na Máquina do Tempo!
+            flex_atual = ultima['Flexao']
+            ext_atual = ultima['Extensao']
+            
+            with c_m1:
                 st.metric("Flexão Atual", f"{int(flex_atual)}°")
-                st.info(f"**Extensão:**\n{ext_atual}")
+            with c_m2:
+                st.info(f"**Extensão Terminal:**\n{ext_atual}")
                 
-                # O CÉREBRO CLÍNICO: Cruzando Inchaço com Flexão
-                if ultima['Inchaco_N'] >= 2 and flex_atual < 110:
-                    st.error("🚨 **Bloqueio Capsular:** O inchaço atual (Grau 2+) está limitando fisicamente a flexão.")
-                elif ultima['Dor'] > 5 and "Déficit" in str(ext_atual):
-                    st.warning("⚠️ **Alerta AMI:** Dor moderada/alta gerando inibição de quadríceps e déficit de extensão.")
-                elif "Completa" in str(ext_atual) and flex_atual >= 120:
-                    st.success("✅ **Articulação Livre:** ADM funcional atingida. Foco total em força.")
+            # O CÉREBRO CLÍNICO: Analisando a sessão cruzada
+            if ultima['Inchaco_N'] >= 2 and flex_atual < 110:
+                st.error("🚨 **Bloqueio Capsular:** O inchaço atual (Grau 2+) está limitando fisicamente a flexão.")
+            elif ultima['Dor'] > 5 and "Déficit" in str(ext_atual):
+                st.warning("⚠️ **Alerta AMI (Inibição Artrogênica):** Dor moderada/alta gerando inibição de quadríceps e déficit de extensão.")
+            elif "Completa" in str(ext_atual) and flex_atual >= 120:
+                st.success("✅ **Articulação Livre:** ADM funcional atingida (Extensão Completa e Flexão >120°).")
+            else:
+                st.info("ℹ️ Articulação em processo de ganho de ADM sem alertas mecânicos críticos no momento.")
                     
         with t4: 
             st.image(buf_s, use_container_width=True)
