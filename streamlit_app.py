@@ -371,7 +371,7 @@ if menu == "Check-in Diário 📝":
         with c7:
             postura = st.radio("🧍 Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
             
-     st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
+         st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
         c6, c7 = st.columns(2)
         with c6:
             sono = st.radio("💤 Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
