@@ -264,7 +264,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     # Gerador de QR Code Seguro (Via API)
     try:
         # ATENÇÃO: Substitua o número abaixo pelo WhatsApp da sua clínica
-        link_agendamento = "https://wa.me/5511999999999?text=Olá,%20gostaria%20de%20agendar%20meu%20retorno."
+        link_agendamento = "https://wa.me/+5511933660220?text=Olá,%20gostaria%20de%20agendar%20meu%20retorno."
         url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(link_agendamento)}"
         
         req = urllib.request.Request(url_qr, headers={'User-Agent': 'Mozilla/5.0'})
