@@ -298,33 +298,6 @@ def create_pdf(p_name, hist, metrics, imgs):
             os.remove(logo_pdf_path)
     except:
         pass 
-        
-    # --- NOVO: BLOCO DE ASSINATURA ---
-    pdf.ln(10)
-    y_assinatura = pdf.get_y()
-        
-    pdf.set_y(y_assinatura + 4)
-    pdf.set_x(52)
-    pdf.set_font("helvetica", 'B', 11)
-    pdf.set_text_color(*azul_genua)
-    pdf.cell(0, 5, limpar_texto_pdf("DR. THALLES - FISIOTERAPIA ESPORTIVA"), ln=True)
-    
-    pdf.set_x(52)
-    pdf.set_font("helvetica", '', 9)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 5, limpar_texto_pdf("Especialista em Reabilitação e Inteligência Clínica"), ln=True)
-    
-    pdf.set_x(52)
-    pdf.set_font("helvetica", 'I', 8)
-    pdf.cell(0, 5, limpar_texto_pdf("O Relatório Master GENUA certifica a evolução baseada em Inteligência de Dados."), ln=True)
-
-    # Faxina de sistema: Remove o arquivo temporário gerado para não pesar seu servidor
-    try:
-        if os.path.exists(logo_pdf_path):
-            os.remove(logo_pdf_path)
-    except:
-        pass
-
     return bytes(pdf.output())
 
 # --- 2. INTERFACE E CONEXÃO ---
