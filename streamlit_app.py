@@ -396,12 +396,6 @@ if is_medico == "true" and token_paciente:
         
     st.stop() 
 
-
-with st.sidebar:
-    try:
-        st.image(NOVO_LOGO_GENUA, width=220)
-    except Exception as e:
-        st.header("GENUA")
     
     # Se for o médico, trava a navegação no Painel Analítico
     if paciente_alvo:
