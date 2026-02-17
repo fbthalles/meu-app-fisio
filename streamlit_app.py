@@ -371,12 +371,33 @@ if menu == "Check-in Diário 📝":
         with c7:
             postura = st.radio("🧍 Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
             
+     st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
+        c6, c7 = st.columns(2)
+        with c6:
+            sono = st.radio("💤 Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
+        with c7:
+            postura = st.radio("🧍 Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
+            
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Biomecânica (ADM)</h4>", unsafe_allow_html=True)
+        c8, c9 = st.columns(2)
+        with c8:
+            flexao = st.slider("📐 Flexão (Graus)", 0, 150, 90, help="Qual a flexão máxima atingida hoje?")
+        with c9:
+            extensao = st.selectbox("📏 Extensão Terminal", ["Completa (0° ou Hiperextensão)", "Déficit Leve (-5°)", "Déficit Moderado (-10°)", "Déficit Grave (>-15°)"])
+            
         st.markdown("<br>", unsafe_allow_html=True)
         if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
             df = conn.read(ttl=0).dropna(how="all")
-            nova = pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), "Dor": int(dor), "Inchaço": str(inchaco), "Sono": sono, "Postura": postura, "Agachamento": agac, "Step_Up": sup, "Step_Down": sdn}])
+            
+            # Adicionamos Flexao e Extensao na base de dados
+            nova = pd.DataFrame([{
+                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), 
+                "Dor": int(dor), "Inchaço": str(inchaco), "Sono": sono, "Postura": postura, 
+                "Agachamento": agac, "Step_Up": sup, "Step_Down": sdn,
+                "Flexao": int(flexao), "Extensao": extensao
+            }])
             conn.update(data=pd.concat([df, nova], ignore_index=True))
-            st.success("Dados registrados com sucesso!")
+            st.success("Dados registrados com sucesso! A Inteligência Biomecânica foi alimentada.")
 
             st.write("---")
         with st.expander("⚖️ Conformidade LGPD e Privacidade"):
