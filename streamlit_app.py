@@ -434,7 +434,6 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
                 st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
                 st.stop()
             
-
     
         # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
     
@@ -492,6 +491,13 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         df_p['Sono_N'] = df_p['Sono'].map({"Ruim": 1, "Regular": 5, "Bom": 10})
         col_inc = 'Inchaço' if 'Inchaço' in df_p.columns else 'Inchaco'
         df_p['Inchaco_N'] = pd.to_numeric(df_p[col_inc], errors='coerce').fillna(0)
+        
+        # --- SEGURANÇA DE DADOS (ADM) ANTES DA MÁQUINA DO TEMPO ---
+        if 'Flexao' not in df_p.columns:
+            df_p['Flexao'] = 90
+        if 'Extensao' not in df_p.columns:
+            df_p['Extensao'] = "Sem dados antigos"
+        df_p['Flexao'] = pd.to_numeric(df_p['Flexao'], errors='coerce').fillna(90)
         
         # --- NOVO: SELETOR TEMPORAL (MÁQUINA DO TEMPO CLÍNICA) ---
         opcoes_sessoes = df_p['Sessão_Num'].tolist()[::-1] # Lista invertida (S15, S14, S13...)
