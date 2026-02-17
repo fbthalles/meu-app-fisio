@@ -379,34 +379,49 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             
         # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
         try:
+        # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
+        try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
+            # Filtra pelo paciente e pega a primeira ocorrência
             registro_p = df_cad[df_cad['Nome'].str.strip() == p_sel].iloc[0]
             hist_clinica = registro_p['Historia']
-            # Correção: Forçando inteiro para remover casas decimais
-            idade_p = int(registro_p['Idade']) if pd.notna(registro_p['Idade']) else "N/A"
-        except: 
-            hist_clinica = "Anamnese não cadastrada no sistema."
-            idade_p = "N/A"
+            # Correção Robusta: Garante inteiro mesmo se vier "72.0" da planilha
+            idade_p = int(float(registro_p['Idade'])) if pd.notna(registro_p['Idade']) else "N/A"
+        except Exception as e:
+            # Fallback seguro em caso de erro na busca ou conversão
+            hist_clinica = "Histórico não disponível para este paciente."
+            idade_p = "-"
 
-        # INTERFACE: Cabeçalho Estético de Prontuário GENUA
+        # INTERFACE: Cabeçalho Clean & Soft (Padrão GENUA)
         st.markdown(f"""
             <div style='
-                background: linear-gradient(90deg, {CORES_GENUA['primaria']} 0%, {CORES_GENUA['secundaria']} 100%);
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                margin-bottom: 25px;
-                color: white;
+                background-color: #ffffff;
+                border: 1px solid #e9ecef;
+                border-left: 5px solid {CORES_GENUA['primaria']};
+                padding: 20px 25px;
+                border-radius: 8px;
+                margin-bottom: 30px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Sombra muito suave */
             '>
-                <h3 style='margin: 0; color: white; font-family: sans-serif; letter-spacing: 1px;'>
-                    👤 {p_sel.upper()}
-                </h3>
-                <p style='margin: 5px 0 15px 0; font-size: 1.1rem; opacity: 0.9;'>
-                    <b>Idade:</b> {idade_p} anos
-                </p>
-                <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; border-left: 4px solid white;'>
-                    <p style='margin: 0; font-size: 0.95rem; line-height: 1.5;'>
-                        <b>HMA:</b> {hist_clinica}
+                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;'>
+                    <h3 style='margin: 0; color: {CORES_GENUA['primaria']}; font-weight: 700; font-family: sans-serif;'>
+                        👤 {p_sel}
+                    </h3>
+                    <span style='
+                        background-color: #f1f3f5; 
+                        color: {CORES_GENUA['primaria']}; 
+                        padding: 6px 15px; 
+                        border-radius: 20px; 
+                        font-size: 0.95rem; 
+                        font-weight: 600;
+                        border: 1px solid #e9ecef;
+                    '>
+                        {idade_p} anos
+                    </span>
+                </div>
+                <div style='background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #e9ecef;'>
+                    <p style='margin: 0; color: #495057; line-height: 1.6; font-family: sans-serif;'>
+                        <strong style='color: {CORES_GENUA['primaria']};'>HMA:</strong> {hist_clinica}
                     </p>
                 </div>
             </div>
