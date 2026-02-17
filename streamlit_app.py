@@ -295,6 +295,10 @@ def create_pdf(p_name, hist, metrics, imgs):
     except:
         pass 
         
+    # --- NOVO: BLOCO DE ASSINATURA ---
+    pdf.ln(10)
+    y_assinatura = pdf.get_y()
+        
     pdf.set_y(y_assinatura + 4)
     pdf.set_x(52)
     pdf.set_font("helvetica", 'B', 11)
@@ -308,9 +312,7 @@ def create_pdf(p_name, hist, metrics, imgs):
     
     pdf.set_x(52)
     pdf.set_font("helvetica", 'I', 8)
-    pdf.cell(0, 5, limpar_texto_pdf("Aponte a câmera do celular para o QR Code ao lado para agendar seu retorno,"), ln=True)
-    pdf.set_x(52)
-    pdf.cell(0, 5, limpar_texto_pdf("acessar sua cartilha de exercícios ou falar diretamente com nossa equipe."), ln=True)
+    pdf.cell(0, 5, limpar_texto_pdf("O Relatório Master GENUA certifica a evolução baseada em Inteligência de Dados."), ln=True)
 
     # Faxina de sistema: Remove o arquivo temporário gerado para não pesar seu servidor
     try:
