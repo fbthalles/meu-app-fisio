@@ -543,7 +543,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
                     data_alta = df_p['Data_DT'].min() + pd.to_timedelta(dia_estimado_alta, unit='d')
                     prev_txt = data_alta.strftime("%d/%m/%Y")
                 else:
-                    prev_txt = "Estabilizado (Sem inclinação de melhora)"
+                    prev_txt = "Estabilizado"
             else:
                 trend_line = []
                 prev_txt = "Aguardando 2ª sessão"
