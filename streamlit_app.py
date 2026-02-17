@@ -377,8 +377,27 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
             st.stop()
             
+        # --- BUSCA DA HISTÓRIA CLÍNICA (HMA) ---
+        try:
+            # Tenta ler a aba Cadastro para buscar a HMA
+            df_cad = conn.read(worksheet="Cadastro", ttl=0)
+            hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
+            idade_p = df_cad[df_cad['Nome'].str.strip() == p_sel]['Idade'].values[0]
+        except: 
+            hist_clinica = "Anamnese não cadastrada no sistema."
+            idade_p = "N/A"
+
+        # EXIBIÇÃO DA HMA NO TOPO DO DASHBOARD
+        st.markdown(f"""
+            <div style='background-color: #e9ecef; padding: 15px; border-left: 5px solid {CORES_GENUA['primaria']}; border-radius: 5px; margin-bottom: 20px;'>
+                <h4 style='margin: 0; color: {CORES_GENUA['primaria']};'>📋 Prontuário: {p_sel} ({idade_p} anos)</h4>
+                <p style='margin: 10px 0 0 0; color: #495057; font-style: italic;'><b>HMA:</b> {hist_clinica}</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
         df_p = df[df['Paciente'] == p_sel].copy()
-        
+
+    
         # 1. PROCESSAMENTO DE DADOS E EIXO X (DE 5 EM 5 SESSÕES)
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
         mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
