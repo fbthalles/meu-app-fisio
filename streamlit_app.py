@@ -1043,31 +1043,53 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             
         with t3: 
             st.image(buf_adm, use_container_width=True)
-            
             st.warning(f"💡 **Insight Mecânico Geral:** {insight_mecanico}")
             st.write("---")
             
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📐 Rastreio Clínico da Sessão Selecionada</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📐 Rastreio Clínico: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
             
             c_m1, c_m2 = st.columns(2)
-            # Lê os dados em tempo real da sessão escolhida na Máquina do Tempo!
-            flex_atual = ultima['Flexao']
-            ext_atual = ultima['Extensao']
             
-            with c_m1:
-                st.metric("Flexão Atual", f"{int(flex_atual)}°")
-            with c_m2:
-                st.info(f"**Extensão Terminal:**\n{ext_atual}")
+            # --- INTELIGÊNCIA CLÍNICA DIRECIONADA ---
+            if st.session_state.membro_ativo == "Joelho":
+                flex_atual = ultima['Flexao']
+                ext_atual = ultima['Extensao']
+                with c_m1: st.metric("Flexão Atual", f"{int(flex_atual)}°")
+                with c_m2: st.info(f"**Extensão Terminal:**\n{ext_atual}")
                 
-            # O CÉREBRO CLÍNICO: Analisando a sessão cruzada
-            if ultima['Inchaco_N'] >= 2 and flex_atual < 110:
-                st.error("🚨 **Bloqueio Capsular:** O inchaço atual (Grau 2+) está limitando fisicamente a flexão.")
-            elif ultima['Dor'] > 5 and "Déficit" in str(ext_atual):
-                st.warning("⚠️ **Alerta AMI (Inibição Artrogênica):** Dor moderada/alta gerando inibição de quadríceps e déficit de extensão.")
-            elif "Completa" in str(ext_atual) and flex_atual >= 120:
-                st.success("✅ **Articulação Livre:** ADM funcional atingida (Extensão Completa e Flexão >120°).")
-            else:
-                st.info("ℹ️ Articulação em processo de ganho de ADM sem alertas mecânicos críticos no momento.")
+                if ultima['Inchaco_N'] >= 2 and int(flex_atual) < 110:
+                    st.error("🚨 **Bloqueio Capsular:** Inchaço atual limitando fisicamente a flexão.")
+                elif ultima['Dor'] > 5 and "Déficit" in str(ext_atual):
+                    st.warning("⚠️ **Alerta AMI:** Dor gerando inibição de quadríceps e déficit de extensão.")
+                elif "Completa" in str(ext_atual) and int(flex_atual) >= 120:
+                    st.success("✅ **Articulação Livre:** ADM funcional atingida.")
+                else:
+                    st.info("ℹ️ Articulação em processo de ganho de ADM.")
+                    
+            elif "Coluna" in st.session_state.membro_ativo:
+                mob_atual = ultima['Mobilidade_Coluna']
+                irr_atual = ultima['Irradiacao']
+                with c_m1: st.metric("Mobilidade", mob_atual)
+                with c_m2: st.info(f"**Irradiação (Nervo):**\n{irr_atual}")
+                
+                if "Até a Extremidade" in str(irr_atual):
+                    st.error("🚨 **Alerta Neurológico:** Irradiação distal ativa. Focar em exercícios de centralização.")
+                elif mob_atual == "Bloqueada":
+                    st.warning("⚠️ **Bloqueio Articular:** Mobilidade severamente restrita. Indicada terapia manual.")
+                else:
+                    st.success("✅ **Quadro Estável:** Sem sinais neurológicos graves ativos.")
+
+            elif st.session_state.membro_ativo == "Ombro":
+                elev_atual = ultima['Elevacao_Ombro']
+                rot_atual = ultima['Rotacao_Ombro']
+                with c_m1: st.metric("Elevação Atual", f"{int(elev_atual)}°")
+                with c_m2: st.info(f"**Rotação:**\n{rot_atual}")
+
+            else: # Extremidades (Tornozelo, Quadril)
+                marcha_atual = ultima['Marcha']
+                carga_atual = ultima['Carga']
+                with c_m1: st.metric("Padrão de Marcha", marcha_atual)
+                with c_m2: st.info(f"**Tolerância à Carga:**\n{carga_atual}")
                     
         with t4: 
             st.image(buf_s, use_container_width=True)
