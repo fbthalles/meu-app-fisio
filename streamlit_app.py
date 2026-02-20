@@ -552,9 +552,6 @@ if menu == "Check-in Diário 📝":
     with st.expander("⚖️ Conformidade LGPD e Privacidade"):
         st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
             
-    st.write("---")
-    with st.expander("⚖️ Conformidade LGPD e Privacidade"):
-        st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
 
 elif menu == "Avaliação IKDC 📋":
     st.header("Score Científico IKDC")
