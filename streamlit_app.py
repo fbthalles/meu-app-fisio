@@ -1058,27 +1058,44 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             ), use_container_width=True)
 
         # 5. PREPARAÇÃO E DOWNLOAD DO PDF
-        try:
-            df_cad = conn.read(worksheet="Cadastro", ttl=0)
-            hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
-        except: 
-            hist_clinica = "Anamnese não cadastrada no sistema."
+        st.markdown("---")
+        if st.button("📄 Gerar Relatório PDF para o Médico", use_container_width=True):
+            try:
+                # O p_sel agora é o paciente da sessão
+                p_sel = st.session_state.paciente
+                
+                try:
+                    df_cad = conn.read(worksheet="Cadastro", ttl=0)
+                    hist_clinica = df_cad[df_cad['Nome'].str.strip() == p_sel]['Historia'].values[0]
+                except: 
+                    hist_clinica = "Anamnese não cadastrada no sistema."
 
-        pdf_metrics = {
-            'ikdc': u_ikdc, 'ikdc_status': status_clinico, 
-            'dor': ultima['Dor'], 'media_dor': media_dor,
-            'inchaco': ultima[col_inc], 'alta': prev_txt,
-            'insight_ouro': insight_ouro,
-            'insight_mecanico': insight_mecanico,
-            'insight_postura': insight_postura,
-            'insight_evolucao': insight_evolucao
-        }
-        
-        pdf_bytes = create_pdf(p_sel, hist_clinica, pdf_metrics, {
-            'ev': buf_ev, 'dor': buf_dor, 'sono': buf_s, 'inchaco': buf_inc, 'adm': buf_adm # 
-        })
-        
-        st.download_button("📥 BAIXAR RELATÓRIO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf")
-        st.info(f"📝 ZenFisio: {p_sel} - Dor {ultima['Dor']}, IKDC {int(u_ikdc)}, Alta est. {prev_txt}.")
-else:
-        st.info("Aguardando entrada de dados na planilha.")
+                pdf_metrics = {
+                    'ikdc': u_ikdc, 'ikdc_status': status_clinico, 
+                    'dor': ultima['Dor'], 'media_dor': media_dor,
+                    'inchaco': ultima[col_inc] if col_inc in ultima else "N/A", 
+                    'alta': prev_txt,
+                    'insight_ouro': insight_ouro,
+                    'insight_mecanico': insight_mecanico,
+                    'insight_postura': insight_postura,
+                    'insight_evolucao': insight_evolucao
+                }
+                
+                # Chamada da função de criação do PDF (mantendo os nomes de buffers originais)
+                pdf_output = create_pdf(p_sel, hist_clinica, pdf_metrics, {
+                    'ev': buf_ev, 'dor': buf_dor, 'sono': buf_s, 'inchaco': buf_inc, 'adm': buf_adm
+                })
+                
+                st.success("✅ Relatório consolidado com sucesso!")
+                st.download_button(
+                    label="⬇️ Baixar Relatório Clínico",
+                    data=pdf_output,
+                    file_name=f"Relatorio_GENUA_{p_sel}_{st.session_state.membro_ativo}.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(f"Erro ao gerar PDF: {e}")
+        else:
+            st.info("Clique no botão acima para gerar o documento oficial em PDF.")
+
+# --- FIM DO BLOCO DA PAGINA 4 ---
