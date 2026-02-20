@@ -476,55 +476,81 @@ elif st.session_state.pagina == 'painel_clinico':
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
 if menu == "Check-in Diário 📝":
-    st.header("📝 Check-in Diário de Evolução")
-    st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Preencha os dados da sessão atual para alimentar a Inteligência Artificial.</p>", unsafe_allow_html=True)
+    st.header(f"📝 Check-in Diário: {st.session_state.membro_ativo}")
+    st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Paciente Ativo: <b>{st.session_state.paciente}</b></p>", unsafe_allow_html=True)
     
     with st.form("checkin", clear_on_submit=True):
-        paciente = st.text_input("👤 Nome do Paciente", placeholder="Ex: Thiago Rocha")
         
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Sintomas e Quadro Clínico</h4>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            dor = st.slider("💥 Dor atual (EVA 0-10)", 0, 10, 0)
-        with c2:
-            inchaco = st.select_slider("💧 Inchaço (Stroke Test)", options=["0", "1", "2", "3"])
+        # --- 1. CAMPOS PADRÃO (Comuns a todos os membros) ---
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Sintomas e Quadro Sistêmico</h4>", unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: dor = st.slider("💥 Dor atual (EVA 0-10)", 0, 10, 0)
+        with c2: inchaco = st.select_slider("💧 Inchaço", options=["0", "1", "2", "3"])
+        with c3: sono = st.radio("💤 Sono", ["Ruim", "Regular", "Bom"])
+        with c4: postura = st.radio("🧍 Postura", ["Sentado", "Equilibrado", "Em pé"])
             
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Função Biomecânica</h4>", unsafe_allow_html=True)
-        c3, c4, c5 = st.columns(3)
-        with c3:
-            agac = st.selectbox("🏋️ Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-        with c4:
-            sup = st.selectbox("🪜 Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-        with c5:
-            sdn = st.selectbox("📉 Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+        # Dicionário base para salvar no banco de dados
+        dados_sessao = {
+            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Paciente": st.session_state.paciente,
+            "Membro": st.session_state.membro_ativo,
+            "Dor": int(dor), "Inchaço": str(inchaco), "Sono": sono, "Postura": postura
+        }
+
+        # --- 2. CAMPOS ESPECÍFICOS (Renderização Condicional) ---
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Biomecânica Específica: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
+        
+        # JOELHO (Mantendo as variáveis originais para não quebrar seus gráficos atuais)
+        if st.session_state.membro_ativo == "Joelho":
+            c5, c6, c7 = st.columns(3)
+            with c5: agac = st.selectbox("🏋️ Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+            with c6: sup = st.selectbox("🪜 Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+            with c7: sdn = st.selectbox("📉 Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+            c8, c9 = st.columns(2)
+            with c8: flexao = st.slider("📐 Flexão (Graus)", 0, 150, 90)
+            with c9: extensao = st.selectbox("📏 Extensão Terminal", ["Completa (0°)", "Déficit Leve (-5°)", "Déficit Grave (>-15°)"])
             
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
-        c6, c7 = st.columns(2)
-        with c6:
-            sono = st.radio("💤 Qualidade do Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
-        with c7:
-            postura = st.radio("🧍 Postura Predominante", ["Sentado", "Equilibrado", "Em pé"], horizontal=True)
+            # Atualiza o dicionário com os dados do Joelho
+            dados_sessao.update({"Agachamento": agac, "Step_Up": sup, "Step_Down": sdn, "Flexao": int(flexao), "Extensao": extensao})
             
-        # --- NOVO: MÓDULO DE AMPLITUDE DE MOVIMENTO (ADM) ---
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Biomecânica (ADM)</h4>", unsafe_allow_html=True)
-        c8, c9 = st.columns(2)
-        with c8:
-            flexao = st.slider("📐 Flexão (Graus)", 0, 150, 90, help="Qual a flexão máxima atingida hoje?")
-        with c9:
-            extensao = st.selectbox("📏 Extensão Terminal", ["Completa (0° ou Hiperextensão)", "Déficit Leve (-5°)", "Déficit Moderado (-10°)", "Déficit Grave (>-15°)"])
+        # COLUNA (Cervical ou Lombar)
+        elif "Coluna" in st.session_state.membro_ativo:
+            c5, c6, c7 = st.columns(3)
+            with c5: irradiacao = st.selectbox("⚡ Irradiação (Nervo)", ["Ausente", "Apenas Proximal", "Até a Extremidade"])
+            with c6: mobilidade = st.selectbox("🔄 Mobilidade", ["Livre", "Limitada no Final", "Bloqueada"])
+            with c7: parestesia = st.radio("🐜 Parestesia (Formigamento)", ["Não", "Sim"], horizontal=True)
             
+            # Atualiza o dicionário com os dados da Coluna
+            dados_sessao.update({"Irradiacao": irradiacao, "Mobilidade_Coluna": mobilidade, "Parestesia": parestesia})
+
+        # OMBRO
+        elif st.session_state.membro_ativo == "Ombro":
+            c5, c6 = st.columns(2)
+            with c5: elevacao = st.slider("📐 Elevação (Graus)", 0, 180, 90)
+            with c6: rotacao = st.selectbox("🔄 Rotação", ["Livre", "Déficit Interna", "Déficit Externa", "Bloqueio Global"])
+            
+            dados_sessao.update({"Elevacao_Ombro": int(elevacao), "Rotacao_Ombro": rotacao})
+            
+        # TORNOZELO/PÉ ou QUADRIL (MVP Genérico para Extremidades Inferiores)
+        elif st.session_state.membro_ativo in ["Tornozelo/Pé", "Quadril"]:
+            c5, c6 = st.columns(2)
+            with c5: marcha = st.selectbox("🚶 Marcha", ["Sem claudicação", "Claudicação Leve", "Uso de muleta"])
+            with c6: carga = st.selectbox("⚖️ Tolerância a Carga", ["Incapaz", "Parcial", "Total sem Dor"])
+            
+            dados_sessao.update({"Marcha": marcha, "Carga": carga})
+
         st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- 3. MOTOR DE SALVAMENTO ---
         if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
             df = conn.read(ttl=0).dropna(how="all")
-            # Adicionamos Flexao e Extensao na base de dados
-            nova = pd.DataFrame([{
-                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": paciente.strip(), 
-                "Dor": int(dor), "Inchaço": str(inchaco), "Sono": sono, "Postura": postura, 
-                "Agachamento": agac, "Step_Up": sup, "Step_Down": sdn,
-                "Flexao": int(flexao), "Extensao": extensao
-            }])
-            conn.update(data=pd.concat([df, nova], ignore_index=True))
-            st.success("Dados registrados com sucesso! A Inteligência Biomecânica foi alimentada.")
+            nova_linha = pd.DataFrame([dados_sessao])
+            conn.update(data=pd.concat([df, nova_linha], ignore_index=True))
+            st.success(f"Dados de {st.session_state.membro_ativo} registrados com sucesso na inteligência clínica!")
+            
+    st.write("---")
+    with st.expander("⚖️ Conformidade LGPD e Privacidade"):
+        st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
             
     st.write("---")
     with st.expander("⚖️ Conformidade LGPD e Privacidade"):
