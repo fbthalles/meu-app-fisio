@@ -570,17 +570,6 @@ if menu == "Check-in Diário 📝":
     st.write("---")
     with st.expander("⚖️ Conformidade LGPD e Privacidade"):
         st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
-            
-
-elif menu == "Avaliação IKDC 📋":
-    st.header("Score Científico IKDC")
-    with st.form("ikdc"):
-        p_ikdc = st.text_input("Nome do Paciente")
-        nota = st.slider("Nota Global de Função (0-100)", 0, 100, 50)
-        if st.form_submit_button("SALVAR SCORE"):
-            df_i = conn.read(worksheet="IKDC", ttl=0).dropna(how="all")
-            conn.update(worksheet="IKDC", data=pd.concat([df_i, pd.DataFrame([{"Data": datetime.now().strftime("%d/%m/%Y"), "Paciente": p_ikdc.strip(), "Score_IKDC": nota}])], ignore_index=True))
-            st.success("Score IKDC registrado!")
 
 
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
