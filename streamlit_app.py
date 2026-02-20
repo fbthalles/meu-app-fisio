@@ -466,12 +466,14 @@ elif st.session_state.pagina == 'painel_clinico':
             if st.button("⬅️ Trocar Paciente/Membro", use_container_width=True):
                 mudar_pagina('dados_paciente')
             st.markdown("---")
-            menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
+            # Correção 1: IKDC removido da lista de navegação
+            menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Painel Analítico 📊"])
         else:
             menu = "Painel Analítico 📊" # Cirurgião só vê o painel
             
     # TAG visual mostrando o membro ativo no topo da tela
     st.markdown(f"<span style='background-color: {CORES_GENUA['secundaria']}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold;'>📍 Tratamento: {st.session_state.membro_ativo}</span><br><br>", unsafe_allow_html=True)
+
 
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
