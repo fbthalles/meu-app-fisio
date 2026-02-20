@@ -784,36 +784,66 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         lgd_s = ax_s.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False)
         buf_s = io.BytesIO(); fig_s.savefig(buf_s, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_s,), dpi=150); buf_s.seek(0); plt.close(fig_s)
 
-        # E) Cruzamento Biomecânico (ADM x Dor x Inchaço)
+        # --- SEGURANÇA PARA COLUNAS DINÂMICAS (Evita erro se a planilha for nova) ---
+        colunas_padrao = [('Flexao', 90), ('Extensao', 'Sem dados'), ('Mobilidade_Coluna', 'Livre'), 
+                          ('Irradiacao', 'Ausente'), ('Elevacao_Ombro', 90), ('Rotacao_Ombro', 'Livre'), 
+                          ('Marcha', 'Sem claudicação'), ('Carga', 'Total sem Dor')]
+        for col, default in colunas_padrao:
+            if col not in df_p.columns:
+                df_p[col] = default
+
+        # E) Gráfico Biomecânico Específico por Membro
         fig_adm, ax1_adm = plt.subplots(figsize=(10, 4.5))
         
-        # Linha da Flexão (Eixo Principal - Esquerda)
-        ax1_adm.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'], label='Graus de Flexão', marker='s', linewidth=3)
-        ax1_adm.set_ylim(0, 160)
-        ax1_adm.set_ylabel("Amplitude de Movimento (Graus)", color=CORES_GENUA['secundaria'], fontweight='bold')
+        # --- LÓGICA CONDICIONAL DE EIXO X ---
+        if st.session_state.membro_ativo == "Joelho":
+            df_p['Flexao'] = pd.to_numeric(df_p['Flexao'], errors='coerce').fillna(90)
+            ax1_adm.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'], label='Graus de Flexão', marker='s', linewidth=3)
+            ax1_adm.set_ylim(0, 160)
+            ax1_adm.set_ylabel("Amplitude (Graus)", color=CORES_GENUA['secundaria'], fontweight='bold')
+            titulo_grafico = "Evolução Biomecânica: ADM (Joelho)"
+            
+        elif "Coluna" in st.session_state.membro_ativo:
+            mapa_mob = {"Bloqueada": 1, "Limitada no Final": 5, "Livre": 10}
+            df_p['Mob_Num'] = df_p['Mobilidade_Coluna'].map(mapa_mob).fillna(10)
+            ax1_adm.plot(df_p['Sessão_Num'], df_p['Mob_Num'], color=CORES_GENUA['secundaria'], label='Mobilidade (Score)', marker='s', linewidth=3)
+            ax1_adm.set_ylim(0, 11)
+            ax1_adm.set_ylabel("Score de Mobilidade", color=CORES_GENUA['secundaria'], fontweight='bold')
+            titulo_grafico = f"Evolução Biomecânica: Mobilidade ({st.session_state.membro_ativo})"
+            
+        elif st.session_state.membro_ativo == "Ombro":
+            df_p['Elevacao_Ombro'] = pd.to_numeric(df_p['Elevacao_Ombro'], errors='coerce').fillna(90)
+            ax1_adm.plot(df_p['Sessão_Num'], df_p['Elevacao_Ombro'], color=CORES_GENUA['secundaria'], label='Elevação (Graus)', marker='s', linewidth=3)
+            ax1_adm.set_ylim(0, 180)
+            ax1_adm.set_ylabel("Amplitude (Graus)", color=CORES_GENUA['secundaria'], fontweight='bold')
+            titulo_grafico = "Evolução Biomecânica: ADM (Ombro)"
+            
+        else: # Tornozelo/Pé, Quadril
+            mapa_carga = {"Incapaz": 0, "Parcial": 5, "Total sem Dor": 10}
+            df_p['Carga_Num'] = df_p['Carga'].map(mapa_carga).fillna(10)
+            ax1_adm.plot(df_p['Sessão_Num'], df_p['Carga_Num'], color=CORES_GENUA['secundaria'], label='Tolerância à Carga', marker='s', linewidth=3)
+            ax1_adm.set_ylim(0, 11)
+            ax1_adm.set_ylabel("Score de Carga", color=CORES_GENUA['secundaria'], fontweight='bold')
+            titulo_grafico = f"Evolução Biomecânica: Carga ({st.session_state.membro_ativo})"
+
         ax1_adm.tick_params(axis='y', labelcolor=CORES_GENUA['secundaria'])
         
-        # Eixo Secundário - Direita (Dor e Inchaço)
+        # Eixo Secundário - Direita (Dor e Inchaço - Padrão Ouro para todos os membros)
         ax2_adm = ax1_adm.twinx()
-        
-        # Barras de Inchaço ao fundo
         cores_inc_adm = [CORES_GENUA['alerta_erro'] if x == 3 else CORES_GENUA['alerta_aviso'] if x == 2 else CORES_GENUA['texto_suave'] for x in df_p['Inchaco_N']]
         ax2_adm.bar(df_p['Sessão_Num'], df_p['Inchaco_N'], color=cores_inc_adm, alpha=0.25, label='Inchaço (Grau)', width=0.6)
-        
-        # Linha de Dor por cima das barras
         ax2_adm.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], label='Nível de Dor (EVA)', marker='o', linewidth=2)
         
         ax2_adm.set_ylim(-0.5, 11)
         ax2_adm.set_ylabel("Dor (0-10) / Inchaço (0-3)", color=CORES_GENUA['alerta_erro'], fontweight='bold')
         ax2_adm.tick_params(axis='y', labelcolor=CORES_GENUA['alerta_erro'])
         
-        ax1_adm.set_title("Evolução Biomecânica: ADM vs Dor vs Inchaço", fontweight='bold', color=cor_prim_grafico)
+        ax1_adm.set_title(f"{titulo_grafico} vs Dor e Inchaço", fontweight='bold', color=cor_prim_grafico)
         ax1_adm.set_xticks(indices_5)
         ax1_adm.set_xticklabels(labels_5)
         ax1_adm.spines['top'].set_visible(False)
         ax2_adm.spines['top'].set_visible(False)
         
-        # Juntando as legendas dos dois eixos para o design premium
         lines_1, labels_1 = ax1_adm.get_legend_handles_labels()
         lines_2, labels_2 = ax2_adm.get_legend_handles_labels()
         lgd_adm = ax1_adm.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
