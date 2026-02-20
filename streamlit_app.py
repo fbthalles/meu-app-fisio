@@ -1080,5 +1080,5 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         
         st.download_button("📥 BAIXAR RELATÓRIO MASTER (PDF)", data=pdf_bytes, file_name=f"Relatorio_GENUA_{p_sel}.pdf")
         st.info(f"📝 ZenFisio: {p_sel} - Dor {ultima['Dor']}, IKDC {int(u_ikdc)}, Alta est. {prev_txt}.")
-    else:
+else:
         st.info("Aguardando entrada de dados na planilha.")
