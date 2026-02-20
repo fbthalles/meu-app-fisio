@@ -477,20 +477,25 @@ elif st.session_state.pagina == 'selecao_membro':
 
 # PAGINA 4: PAINEL CLÍNICO (A CARROCERIA PRINCIPAL)
 elif st.session_state.pagina == 'painel_clinico':
-    # O menu lateral agora só aparece depois que o membro foi escolhido
+    # O menu lateral agora tem botões avançados de navegação
     with st.sidebar:
         if not paciente_alvo:
-            if st.button("⬅️ Trocar Paciente/Membro", use_container_width=True):
-                mudar_pagina('dados_paciente')
+            st.markdown("### 🧭 Navegação")
+            c_voltar1, c_voltar2 = st.columns(2)
+            with c_voltar1:
+                if st.button("⬅️ Membro", use_container_width=True, help="Voltar para a seleção de outro tratamento"):
+                    mudar_pagina('selecao_membro')
+            with c_voltar2:
+                if st.button("🏠 Início", use_container_width=True, help="Voltar para a escolha de pacientes"):
+                    mudar_pagina('dados_paciente')
+                    
             st.markdown("---")
-            # Correção 1: IKDC removido da lista de navegação
-            menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Painel Analítico 📊"])
+            menu = st.radio("MÓDULOS", ["Check-in Diário 📝", "Painel Analítico 📊"])
         else:
             menu = "Painel Analítico 📊" # Cirurgião só vê o painel
             
     # TAG visual mostrando o membro ativo no topo da tela
     st.markdown(f"<span style='background-color: {CORES_GENUA['secundaria']}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold;'>📍 Tratamento: {st.session_state.membro_ativo}</span><br><br>", unsafe_allow_html=True)
-
 
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
