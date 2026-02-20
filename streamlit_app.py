@@ -567,14 +567,20 @@ elif menu == "Avaliação IKDC 📋":
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     df = conn.read(ttl=0).dropna(how="all")
     
-    if not df.empty:
-        if paciente_alvo:
-            # VISÃO DO MÉDICO: Título personalizado e bloqueio no paciente alvo
-            st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center; margin-bottom: 25px;'>🏥 Portal do Cirurgião | Visão 360º</h2>", unsafe_allow_html=True)
-            p_sel = paciente_alvo
-            if p_sel not in df['Paciente'].values:
-                st.error("Paciente não encontrado na base de dados.")
-                st.stop()
+    # Filtra os dados: Apenas o paciente ativo E apenas o membro selecionado no login
+    df_p = df[(df['Paciente'] == st.session_state.paciente) & 
+              (df['Membro'] == st.session_state.membro_ativo)].copy()
+
+    if df_p.empty:
+        st.warning(f"⚠️ Ainda não existem dados registrados para {st.session_state.paciente} na região: {st.session_state.membro_ativo}. Faça o primeiro Check-in para gerar os gráficos.")
+        st.stop()
+
+    # Conversão de data para ordenação correta
+    df_p['Data_dt'] = pd.to_datetime(df_p['Data'], dayfirst=True)
+    df_p = df_p.sort_values('Data_dt')
+
+    st.header(f"📊 Evolução: {st.session_state.membro_ativo}")
+    st.subheader(f"Paciente: {st.session_state.paciente}")
         else:
             # VISÃO DO FISIOTERAPEUTA: Título normal e barra de busca
             st.header("📊 Painel Analítico & Clinical Intelligence")
