@@ -378,9 +378,9 @@ if st.session_state.pagina == 'login':
                 st.error("Credenciais inválidas")
     st.stop() # Bloqueia a renderização do resto do app
 
-# PAGINA 2: SELEÇÃO DE PACIENTE
+# PAGINA 2: SELEÇÃO E CADASTRO DE PACIENTE
 elif st.session_state.pagina == 'dados_paciente':
-    st.title("👤 Seleção de Paciente")
+    st.title("👤 Seleção ou Cadastro de Paciente")
     
     # Inteligência: Puxa a lista de pacientes que já estão na planilha
     try:
@@ -389,14 +389,58 @@ elif st.session_state.pagina == 'dados_paciente':
     except:
         lista_pacientes = []
         
-    nome = st.selectbox("Selecione o paciente ou cadastre um novo:", ["+ Cadastrar Novo"] + lista_pacientes)
+    opcao_paciente = st.selectbox("Selecione um paciente existente ou cadastre um novo:", ["+ Cadastrar Novo"] + lista_pacientes)
     
-    if nome == "+ Cadastrar Novo":
-        nome = st.text_input("Digite o nome completo do novo paciente:")
+    # --- FLUXO 1: FORMULÁRIO COMPLETO DE NOVO PACIENTE ---
+    if opcao_paciente == "+ Cadastrar Novo":
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📋 Nova Ficha de Cadastro</h4>", unsafe_allow_html=True)
         
-    if st.button("Próximo: Selecionar Membro ➡️", use_container_width=True) and nome and nome != "+ Cadastrar Novo":
-        st.session_state.paciente = nome
-        mudar_pagina('selecao_membro')
+        with st.form("form_novo_paciente"):
+            c1, c2 = st.columns(2)
+            with c1:
+                novo_nome = st.text_input("Nome Completo *", placeholder="Ex: João da Silva")
+                novo_cpf = st.text_input("CPF")
+                nova_idade = st.number_input("Idade", min_value=0, max_value=120, step=1)
+            with c2:
+                novo_telefone = st.text_input("WhatsApp / Telefone")
+                novo_email = st.text_input("E-mail")
+                nova_hma = st.text_area("HMA (História Clínica / Cirurgia)", height=68, placeholder="Ex: Pós-operatório de LCA...")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit_cadastro = st.form_submit_button("💾 Salvar Cadastro e Avançar", use_container_width=True)
+            
+            if submit_cadastro:
+                if novo_nome.strip() == "":
+                    st.error("⚠️ O Nome Completo é obrigatório para criar o prontuário.")
+                else:
+                    # Tenta salvar os dados na aba "Cadastro" da sua planilha
+                    try:
+                        df_cad = conn.read(worksheet="Cadastro", ttl=0).dropna(how="all")
+                        novo_registro = pd.DataFrame([{
+                            "Nome": novo_nome.strip(),
+                            "CPF": novo_cpf,
+                            "Idade": nova_idade,
+                            "Telefone": novo_telefone,
+                            "Email": novo_email,
+                            "Historia": nova_hma,
+                            "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")
+                        }])
+                        conn.update(worksheet="Cadastro", data=pd.concat([df_cad, novo_registro], ignore_index=True))
+                        st.success("Cadastro realizado com sucesso!")
+                    except Exception as e:
+                        st.warning("⚠️ Atenção: Certifique-se de que existe uma aba chamada 'Cadastro' na sua planilha com as colunas Nome, CPF, Idade, Telefone, Email e Historia.")
+                        
+                    # Define o paciente ativo e avança o fluxo
+                    st.session_state.paciente = novo_nome.strip()
+                    mudar_pagina('selecao_membro')
+
+    # --- FLUXO 2: PACIENTE JÁ EXISTENTE ---
+    else:
+        st.success(f"Paciente selecionado: **{opcao_paciente}**")
+        if st.button("Próximo: Selecionar Membro ➡️", use_container_width=True):
+            st.session_state.paciente = opcao_paciente
+            mudar_pagina('selecao_membro')
+            
     st.stop()
 
 # PAGINA 3: SELEÇÃO DE MEMBRO
