@@ -567,7 +567,7 @@ elif menu == "Avaliação IKDC 📋":
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     df = conn.read(ttl=0).dropna(how="all")
     
-    # Filtra os dados: Apenas o paciente ativo E apenas o membro selecionado no login
+    # 1. Filtra os dados: Apenas o paciente ativo E apenas o membro selecionado
     df_p = df[(df['Paciente'] == st.session_state.paciente) & 
               (df['Membro'] == st.session_state.membro_ativo)].copy()
 
@@ -575,27 +575,20 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         st.warning(f"⚠️ Ainda não existem dados registrados para {st.session_state.paciente} na região: {st.session_state.membro_ativo}. Faça o primeiro Check-in para gerar os gráficos.")
         st.stop()
 
-    # Conversão de data para ordenação correta
+    # 2. Conversão de data para ordenação correta
     df_p['Data_dt'] = pd.to_datetime(df_p['Data'], dayfirst=True)
     df_p = df_p.sort_values('Data_dt')
 
-    st.header(f"📊 Evolução: {st.session_state.membro_ativo}")
-    st.subheader(f"Paciente: {st.session_state.paciente}")
-        else:
-            # VISÃO DO FISIOTERAPEUTA: Título normal e barra de busca
-            st.header("📊 Painel Analítico & Clinical Intelligence")
-            lista_pacientes = df['Paciente'].dropna().unique()
-            
-            p_sel = st.selectbox(
-                "🔍 Buscar Paciente:", 
-                options=lista_pacientes,
-                index=None, 
-                placeholder="Digite 3 letras do nome..."
-            )
-            
-            if p_sel is None:
-                st.info("👆 Por favor, digite o nome ou selecione um paciente acima para carregar a inteligência.")
-                st.stop()
+    # 3. Define a variável global do paciente para não quebrar o resto do código
+    p_sel = st.session_state.paciente
+
+    # 4. Interface Dinâmica do Painel
+    if paciente_alvo:
+        st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center; margin-bottom: 25px;'>🏥 Portal do Cirurgião | Visão 360º</h2>", unsafe_allow_html=True)
+    else:
+        st.header(f"📊 Painel Analítico: {st.session_state.membro_ativo}")
+
+ 
             
     
         # --- BUSCA E TRATAMENTO DA HISTÓRIA CLÍNICA (HMA) ---
