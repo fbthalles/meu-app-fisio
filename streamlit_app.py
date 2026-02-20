@@ -378,14 +378,14 @@ if st.session_state.pagina == 'login':
                 st.error("Credenciais inválidas")
     st.stop() # Bloqueia a renderização do resto do app
 
-# PAGINA 2: SELEÇÃO E CADASTRO DE PACIENTE
+## PAGINA 2: SELEÇÃO E CADASTRO DE PACIENTE
 elif st.session_state.pagina == 'dados_paciente':
     st.title("👤 Seleção ou Cadastro de Paciente")
     
-    # Inteligência: Puxa a lista de pacientes que já estão na planilha
+    # INTELIGÊNCIA: Puxa a lista de pacientes diretamente da aba "Cadastro"
     try:
-        df_temp = conn.read(ttl=0).dropna(how="all")
-        lista_pacientes = df_temp['Paciente'].dropna().unique().tolist()
+        df_cad = conn.read(worksheet="Cadastro", ttl=0).dropna(how="all")
+        lista_pacientes = df_cad['Nome'].dropna().unique().tolist()
     except:
         lista_pacientes = []
         
@@ -411,33 +411,26 @@ elif st.session_state.pagina == 'dados_paciente':
             
             if submit_cadastro:
                 if novo_nome.strip() == "":
-                    st.error("⚠️ O Nome Completo é obrigatório para criar o prontuário.")
+                    st.error("⚠️ O Nome Completo é obrigatório.")
                 else:
-                    # Tenta salvar os dados na aba "Cadastro" da sua planilha
                     try:
-                        df_cad = conn.read(worksheet="Cadastro", ttl=0).dropna(how="all")
+                        df_cad_atual = conn.read(worksheet="Cadastro", ttl=0).dropna(how="all")
                         novo_registro = pd.DataFrame([{
-                            "Nome": novo_nome.strip(),
-                            "CPF": novo_cpf,
-                            "Idade": nova_idade,
-                            "Telefone": novo_telefone,
-                            "Email": novo_email,
-                            "Historia": nova_hma,
+                            "Nome": novo_nome.strip(), "CPF": novo_cpf, "Idade": nova_idade,
+                            "Telefone": novo_telefone, "Email": novo_email, "Historia": nova_hma,
                             "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")
                         }])
-                        conn.update(worksheet="Cadastro", data=pd.concat([df_cad, novo_registro], ignore_index=True))
+                        conn.update(worksheet="Cadastro", data=pd.concat([df_cad_atual, novo_registro], ignore_index=True))
                         st.success("Cadastro realizado com sucesso!")
+                        st.session_state.paciente = novo_nome.strip()
+                        mudar_pagina('selecao_membro')
                     except Exception as e:
-                        st.warning("⚠️ Atenção: Certifique-se de que existe uma aba chamada 'Cadastro' na sua planilha com as colunas Nome, CPF, Idade, Telefone, Email e Historia.")
-                        
-                    # Define o paciente ativo e avança o fluxo
-                    st.session_state.paciente = novo_nome.strip()
-                    mudar_pagina('selecao_membro')
+                        st.error("⚠️ Erro: Certifique-se de que existe a aba 'Cadastro' com as colunas corretas.")
 
     # --- FLUXO 2: PACIENTE JÁ EXISTENTE ---
     else:
         st.success(f"Paciente selecionado: **{opcao_paciente}**")
-        if st.button("Próximo: Selecionar Membro ➡️", use_container_width=True):
+        if st.button("Próximo: Selecionar Tratamento ➡️", use_container_width=True):
             st.session_state.paciente = opcao_paciente
             mudar_pagina('selecao_membro')
             
