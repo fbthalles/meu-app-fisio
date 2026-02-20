@@ -340,16 +340,94 @@ if is_medico == "true" and token_paciente:
         """, unsafe_allow_html=True)
     except:
         pass
-# ==========================================
 
-with st.sidebar:
-    # O logo já foi injetado globalmente no topo do arquivo.
+# ==========================================
+# --- NOVA LÓGICA DE NAVEGAÇÃO (ESTADO DO APP) ---
+# ==========================================
+if 'pagina' not in st.session_state:
+    st.session_state.pagina = 'login'
+if 'autenticado' not in st.session_state:
+    st.session_state.autenticado = False
+
+def mudar_pagina(nome_pagina):
+    st.session_state.pagina = nome_pagina
+    st.rerun()
+
+# TRAVA DE SEGURANÇA: Se o cirurgião acessar via link, pula o login e vai direto para o painel
+if paciente_alvo:
+    st.session_state.autenticado = True
+    st.session_state.paciente = paciente_alvo
+    st.session_state.membro_ativo = "Acesso Médico"
+    st.session_state.pagina = 'painel_clinico'
+    menu = "Painel Analítico 📊"
+
+# --- TELAS DO SISTEMA MVP ---
+
+# PAGINA 1: LOGIN
+if st.session_state.pagina == 'login':
+    st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center;'>🔐 Acesso Restrito - GENUA</h2>", unsafe_allow_html=True)
+    c_vazio1, c_login, c_vazio2 = st.columns([1, 2, 1])
+    with c_login:
+        user = st.text_input("Usuário")
+        password = st.text_input("Senha", type="password")
+        if st.button("Entrar", use_container_width=True):
+            if user == "admin" and password == "1234":
+                st.session_state.autenticado = True
+                mudar_pagina('dados_paciente')
+            else:
+                st.error("Credenciais inválidas")
+    st.stop() # Bloqueia a renderização do resto do app
+
+# PAGINA 2: SELEÇÃO DE PACIENTE
+elif st.session_state.pagina == 'dados_paciente':
+    st.title("👤 Seleção de Paciente")
     
-    # Roteamento seguro: garante a criação da variável 'menu' sem duplicações
-    if paciente_alvo:
-        menu = "Painel Analítico 📊"
-    else:
-        menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
+    # Inteligência: Puxa a lista de pacientes que já estão na planilha
+    try:
+        df_temp = conn.read(ttl=0).dropna(how="all")
+        lista_pacientes = df_temp['Paciente'].dropna().unique().tolist()
+    except:
+        lista_pacientes = []
+        
+    nome = st.selectbox("Selecione o paciente ou cadastre um novo:", ["+ Cadastrar Novo"] + lista_pacientes)
+    
+    if nome == "+ Cadastrar Novo":
+        nome = st.text_input("Digite o nome completo do novo paciente:")
+        
+    if st.button("Próximo: Selecionar Membro ➡️", use_container_width=True) and nome and nome != "+ Cadastrar Novo":
+        st.session_state.paciente = nome
+        mudar_pagina('selecao_membro')
+    st.stop()
+
+# PAGINA 3: SELEÇÃO DE MEMBRO
+elif st.session_state.pagina == 'selecao_membro':
+    st.title("🎯 Área de Reabilitação")
+    st.markdown(f"Paciente Ativo: **{st.session_state.paciente}**")
+    
+    membro = st.selectbox("Selecione a região anatômica do tratamento:", 
+                         ["Joelho", "Coluna Cervical", "Coluna Lombar", "Ombro", "Tornozelo/Pé", "Quadril"])
+    
+    st.info(f"O GENUA irá carregar os protocolos biomecânicos específicos para: {membro}")
+    
+    if st.button(f"Abrir Prontuário 📊", use_container_width=True):
+        st.session_state.membro_ativo = membro
+        mudar_pagina('painel_clinico')
+    st.stop()
+
+# PAGINA 4: PAINEL CLÍNICO (A CARROCERIA PRINCIPAL)
+elif st.session_state.pagina == 'painel_clinico':
+    # O menu lateral agora só aparece depois que o membro foi escolhido
+    with st.sidebar:
+        if not paciente_alvo:
+            if st.button("⬅️ Trocar Paciente/Membro", use_container_width=True):
+                mudar_pagina('dados_paciente')
+            st.markdown("---")
+            menu = st.radio("NAVEGAÇÃO", ["Check-in Diário 📝", "Avaliação IKDC 📋", "Painel Analítico 📊"])
+        else:
+            menu = "Painel Analítico 📊" # Cirurgião só vê o painel
+            
+    # TAG visual mostrando o membro ativo no topo da tela
+    st.markdown(f"<span style='background-color: {CORES_GENUA['secundaria']}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold;'>📍 Tratamento: {st.session_state.membro_ativo}</span><br><br>", unsafe_allow_html=True)
 
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
