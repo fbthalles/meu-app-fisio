@@ -567,6 +567,14 @@ elif menu == "Avaliação IKDC 📋":
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     df = conn.read(ttl=0).dropna(how="all")
     
+    # --- BLINDAGEM DE LEGADO (Evita o KeyError: 'Membro') ---
+    if 'Membro' not in df.columns:
+        # Se a coluna não existir na planilha, cria ela agora e define o histórico antigo como "Joelho"
+        df['Membro'] = "Joelho"
+        
+    # Se a coluna existir, mas tiver linhas em branco nos dados antigos, preenche com "Joelho"
+    df['Membro'] = df['Membro'].fillna("Joelho")
+    
     # 1. Filtra os dados: Apenas o paciente ativo E apenas o membro selecionado
     df_p = df[(df['Paciente'] == st.session_state.paciente) & 
               (df['Membro'] == st.session_state.membro_ativo)].copy()
