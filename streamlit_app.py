@@ -436,19 +436,43 @@ elif st.session_state.pagina == 'dados_paciente':
             
     st.stop()
 
-# PAGINA 3: SELEÇÃO DE MEMBRO
+# PAGINA 3: SELEÇÃO DE MEMBRO INTELIGENTE
 elif st.session_state.pagina == 'selecao_membro':
     st.title("🎯 Área de Reabilitação")
     st.markdown(f"Paciente Ativo: **{st.session_state.paciente}**")
     
-    membro = st.selectbox("Selecione a região anatômica do tratamento:", 
+    # INTELIGÊNCIA: Verifica quais membros este paciente já tratou no passado
+    try:
+        df_ev = conn.read(ttl=0).dropna(how="all")
+        if 'Membro' not in df_ev.columns: df_ev['Membro'] = "Joelho" # Blindagem de legado
+        df_ev['Membro'] = df_ev['Membro'].fillna("Joelho")
+        
+        membros_existentes = df_ev[df_ev['Paciente'] == st.session_state.paciente]['Membro'].unique().tolist()
+    except:
+        membros_existentes = []
+
+    st.markdown("### 🔄 Continuar Tratamento Existente")
+    if membros_existentes:
+        for m in membros_existentes:
+            if st.button(f"Abrir Prontuário: {m} 📊", use_container_width=True):
+                st.session_state.membro_ativo = m
+                mudar_pagina('painel_clinico')
+    else:
+        st.info("Nenhum tratamento anterior encontrado para este paciente. Inicie um abaixo.")
+
+    st.markdown("---")
+    st.markdown("### ➕ Iniciar Novo Tratamento")
+    novo_membro = st.selectbox("Selecione a nova região anatômica:", 
                          ["Joelho", "Coluna Cervical", "Coluna Lombar", "Ombro", "Tornozelo/Pé", "Quadril"])
     
-    st.info(f"O GENUA irá carregar os protocolos biomecânicos específicos para: {membro}")
-    
-    if st.button(f"Abrir Prontuário 📊", use_container_width=True):
-        st.session_state.membro_ativo = membro
+    if st.button(f"Iniciar Prontuário para {novo_membro} 🆕", use_container_width=True, type="primary"):
+        st.session_state.membro_ativo = novo_membro
         mudar_pagina('painel_clinico')
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("⬅️ Voltar", type="secondary"):
+        mudar_pagina('dados_paciente')
+        
     st.stop()
 
 # PAGINA 4: PAINEL CLÍNICO (A CARROCERIA PRINCIPAL)
