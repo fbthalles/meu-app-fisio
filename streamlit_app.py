@@ -578,7 +578,7 @@ if menu == "Check-in Diário 📝":
 
 
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
-    df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
+    df = conn.read(ttl=15).dropna(how="all")
     
     # --- BLINDAGEM DE LEGADO (Evita o KeyError: 'Membro') ---
     if 'Membro' not in df.columns:
