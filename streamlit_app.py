@@ -565,11 +565,11 @@ if menu == "Check-in Diário 📝":
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- 3. MOTOR DE SALVAMENTO ---
+        # --- 3. MOTOR DE SALVAMENTO --
         if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
-            df = conn.read(ttl=0).dropna(how="all")
+            df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
             nova_linha = pd.DataFrame([dados_sessao])
-            conn.update(data=pd.concat([df, nova_linha], ignore_index=True))
+            conn.update(worksheet="Evolucao", data=pd.concat([df, nova_linha], ignore_index=True))
             st.success(f"Dados de {st.session_state.membro_ativo} registrados com sucesso na inteligência clínica!")
             
     st.write("---")
@@ -578,7 +578,7 @@ if menu == "Check-in Diário 📝":
 
 
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
-    df = conn.read(ttl=0).dropna(how="all")
+    df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
     
     # --- BLINDAGEM DE LEGADO (Evita o KeyError: 'Membro') ---
     if 'Membro' not in df.columns:
