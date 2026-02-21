@@ -30,7 +30,7 @@ st.set_page_config(
     page_title="GENUA | Inteligência Clínica",
     page_icon=NOVO_LOGO_GENUA, 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto" # Correção Mobile: recolhe sozinho em telas pequenas
 )
 
 # 4. APLICAÇÃO DO TEMA GLOBAL (CSS INJETADO)
