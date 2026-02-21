@@ -443,7 +443,7 @@ elif st.session_state.pagina == 'selecao_membro':
     
     # INTELIGÊNCIA: Verifica quais membros este paciente já tratou no passado
     try:
-        df_ev = conn.read(ttl=0).dropna(how="all")
+        df_ev = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
         if 'Membro' not in df_ev.columns: df_ev['Membro'] = "Joelho" # Blindagem de legado
         df_ev['Membro'] = df_ev['Membro'].fillna("Joelho")
         
