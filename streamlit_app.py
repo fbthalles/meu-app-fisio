@@ -959,29 +959,41 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         plato_detectado = False
         if len(df_p) >= 3:
             ultimas_3 = df_p.tail(3)
-            # Desvio padrão zero indica estagnação matemática perfeita
             dor_estagnada = ultimas_3['Dor'].std() == 0 
-            funcao_estagnada = ultimas_3['Score_Função'].std() == 0
-            # Inchaço: Verifica se não houve decréscimo (monotocidade não-decrescente)
             inchaco_valores = pd.to_numeric(ultimas_3['Inchaco_N'])
             inchaco_nao_cedeu = inchaco_valores.is_monotonic_increasing or (inchaco_valores.nunique() == 1)
             
-            if dor_estagnada and inchaco_nao_cedeu and funcao_estagnada:
+            if dor_estagnada and inchaco_nao_cedeu:
                 plato_detectado = True
 
-        # 2. Cálculo de LSI Estimado (Funcionalidade Relativa)
-        # Fórmula: (Score Atual / Score Máximo Teórico) * 100
-        score_maximo_teorico = 10.0
-        lsi_estimado = min((df_p['Score_Função'].iloc[-1] / score_maximo_teorico) * 100, 100.0)
+        # 2. Cálculo de LSI Estimado (Correção Definitiva do Erro 'nan%')
+        try:
+            if st.session_state.membro_ativo == "Joelho":
+                val = ultima['Score_Função']
+                lsi_estimado = (val / 10.0) * 100 if pd.notna(val) else 0.0
+            elif "Coluna" in st.session_state.membro_ativo:
+                mapa_mob = {"Bloqueada": 1, "Limitada no Final": 5, "Livre": 10}
+                val = mapa_mob.get(ultima.get('Mobilidade_Coluna', 'Livre'), 10)
+                lsi_estimado = (val / 10.0) * 100
+            elif st.session_state.membro_ativo == "Ombro":
+                val = pd.to_numeric(ultima.get('Elevacao_Ombro', 90), errors='coerce')
+                lsi_estimado = (val / 180.0) * 100 if pd.notna(val) else 0.0
+            else: # Extremidades
+                mapa_carga = {"Incapaz": 0, "Parcial": 5, "Total sem Dor": 10}
+                val = mapa_carga.get(ultima.get('Carga', 'Total sem Dor'), 10)
+                lsi_estimado = (val / 10.0) * 100
+                
+            if pd.isna(lsi_estimado): lsi_estimado = 0.0
+            lsi_estimado = min(lsi_estimado, 100.0)
+        except:
+            lsi_estimado = 0.0
         
         # 3. Rastreio de Nociplasticidade (Discrepância Clínico-Mecânica)
-        # Critério: Dor > 5 (Moderada/Alta) COM Inchaço <= 1 (Fisiológico) E Função > 70%
         descompasso_nociplastico = False
         if ultima['Dor'] > 5 and ultima['Inchaco_N'] <= 1 and lsi_estimado >= 70:
             descompasso_nociplastico = True
             
         # 4. Alerta de Inibição Muscular Artrogênica (AMI)
-        # Critério: Derrame articular clinicamente relevante (>= Grau 2)
         alerta_ami = False
         if ultima['Inchaco_N'] >= 2:
             alerta_ami = True
