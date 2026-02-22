@@ -871,12 +871,14 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         buf_adm = io.BytesIO()
         fig_adm.savefig(buf_adm, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_adm,), dpi=150)
         buf_adm.seek(0); plt.close(fig_adm)
-
-# --- 3. MOTOR CIENTÍFICO AVANÇADO (GUIDELINES 2026) ---
         
-        # A) Inicialização de Segurança (Evita o NameError)
+        # --- 3. MOTOR CIENTÍFICO AVANÇADO (GUIDELINES 2026) ---
+        
+        # A) Inicialização de Segurança (A Morte do NameError)
         lsi_estimado = 0.0
         insight_ia = "Análise clínica em processamento..."
+        descompasso_nociplastico = False
+        alerta_ami = False
 
         # B) Cálculo de Eficiência Clínica (Slope of Recovery)
         if len(df_p) > 2:
@@ -914,7 +916,15 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
                 lsi_estimado = (ultima['Score_Função'] / 10.0) * 100
                 insight_ia = "Monitoramento de tolerância à carga e padrão de marcha em evolução."
 
-            lsi_estimado = min(max(float(lsi_estimado), 0.0), 100.0) # Garante que fique entre 0 e 100
+            lsi_estimado = min(max(float(lsi_estimado), 0.0), 100.0) # Garante LSI entre 0 e 100
+            
+            # --- RASTREIO DE DISCREPÂNCIA NOCIPLÁSTICA E AMI (Restaurado) ---
+            if ultima['Dor'] > 5 and ultima.get('Inchaco_N', 0) <= 1 and lsi_estimado >= 70:
+                descompasso_nociplastico = True
+                
+            if ultima.get('Inchaco_N', 0) >= 2:
+                alerta_ami = True
+                
         except:
             lsi_estimado = 0.0
 
@@ -923,6 +933,7 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         x_dor = df_p['Dor'].values
         y_func = df_p['Score_Função'].values
         ax_corr.scatter(x_dor, y_func, color=CORES_GENUA['secundaria'], alpha=0.5, s=100)
+        
         if len(df_p) > 1:
             try:
                 z_c = np.polyfit(x_dor, y_func, 1)
@@ -930,10 +941,18 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
                 x_r = np.linspace(x_dor.min(), x_dor.max(), 100)
                 ax_corr.plot(x_r, p_c(x_r), color=CORES_GENUA['primaria'], lw=2)
             except: pass
+            
         ax_corr.set_title("Correlação Mecânica: Nível de Dor vs. Entrega Funcional", fontweight='bold', color=CORES_GENUA['primaria'])
-        ax_corr.set_xlabel("Escala Visual Analógica (EVA)"); ax_corr.set_ylabel("Score Funcional (0-10)")
-        ax_corr.spines['top'].set_visible(False); ax_corr.spines['right'].set_visible(False)
-        buf_corr = io.BytesIO(); fig_corr.savefig(buf_corr, format='png', bbox_inches='tight'); buf_corr.seek(0); plt.close(fig_corr)
+        ax_corr.set_xlabel("Escala Visual Analógica (EVA)")
+        ax_corr.set_ylabel("Score Funcional (0-10)")
+        ax_corr.set_ylim(-0.5, 11)
+        ax_corr.set_xlim(-0.5, 11)
+        ax_corr.spines['top'].set_visible(False)
+        ax_corr.spines['right'].set_visible(False)
+        buf_corr = io.BytesIO()
+        fig_corr.savefig(buf_corr, format='png', bbox_inches='tight')
+        buf_corr.seek(0)
+        plt.close(fig_corr)
 
         # 4. DASHBOARD TELA REFORMULADO
         m1, m2, m3, m4 = st.columns(4)
