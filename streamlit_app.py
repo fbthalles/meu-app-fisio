@@ -873,205 +873,65 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         buf_adm.seek(0); plt.close(fig_adm)
 
         # 3. MOTORES MATEMÁTICOS DE CRUZAMENTO E INSIGHTS (BASEADO EM GUIDELINES)
-        media_dor = df_p['Dor'].mean()
-        delta_dor_pct = ((ultima['Dor'] - media_dor) / media_dor * 100) if media_dor > 0 else (100 if ultima['Dor'] > 0 else 0)
+
+        # --- 3. MOTOR CIENTÍFICO AVANÇADO (GUIDELINES 2026) ---
         
-        media_inc = df_p['Inchaco_N'].mean()
-        delta_inc_pct = ((ultima['Inchaco_N'] - media_inc) / media_inc * 100) if media_inc > 0 else (100 if ultima['Inchaco_N'] > 0 else 0)
+        # A) Cálculo de Eficiência Clínica (Slope of Recovery)
+        if len(df_p) > 2:
+            try:
+                # Regressão linear para entender a velocidade da cura
+                x_days = (df_p['Data_dt'] - df_p['Data_dt'].min()).dt.days.values
+                y_func = df_p['Score_Função'].values
+                slope, intercept = np.polyfit(x_days, y_func, 1)
+                recup_speed = slope * 7 # Ganho funcional por semana
+            except: recup_speed = 0
+        else: recup_speed = 0
 
-        # --- INSIGHT 1: BIOPSICOSSOCIAL (Sono vs Dor - Universal) ---
-        try:
-            media_sono = df_p['Sono_N'].mean()
-            dor_sono_bom = df_p[df_p['Sono_N'] >= media_sono]['Dor'].mean()
-            dor_sono_ruim = df_p[df_p['Sono_N'] < media_sono]['Dor'].mean()
-            if pd.notna(dor_sono_bom) and pd.notna(dor_sono_ruim) and dor_sono_ruim > 0 and dor_sono_bom < dor_sono_ruim:
-                queda_pct = ((dor_sono_ruim - dor_sono_bom) / dor_sono_ruim) * 100
-                insight_ouro = f"Parecer Biopsicossocial: Quando o paciente relata um sono superior à sua média, o nível de dor cai em {queda_pct:.0f}%. O manejo do sono atua como forte inibidor analgésico (Sensibilização Central)."
-            else:
-                insight_ouro = "Parecer Biopsicossocial: A correlação entre qualidade do sono e percepção de dor mantém-se dentro do desvio padrão esperado, sem flutuações agudas de sensibilização."
-        except:
-            insight_ouro = "Monitoramento contínuo em andamento para estabelecer correlação álgica com o sono."
-
-        # --- INSIGHT 2: MECÂNICO ESPECÍFICO (GUIDELINES INTERNACIONAIS) ---
-        try:
-            if st.session_state.membro_ativo == "Joelho":
-                # Guideline: JOSPT (Inibição Artrogênica e Déficit de Extensão)
-                if ultima['Inchaco_N'] >= 2 and "Déficit" in str(ultima.get('Extensao', '')):
-                    insight_mecanico = "🚨 Padrão AMI (Arthrogenic Muscle Inhibition): Derrame articular (Grau 2+) está inibindo o quadríceps e gerando déficit de extensão. Priorizar modulação inflamatória antes de ganho de força."
-                elif ultima['Flexao'] < 90 and ultima['Dor'] < 4:
-                    insight_mecanico = "⚠️ Rigidez Capsular Pura: Baixa flexão sem correspondência álgica grave. O bloqueio é predominantemente mecânico/estrutural, indicando necessidade de mobilização articular acessória."
-                else:
-                    insight_mecanico = "✅ Proporção Mecânica preservada: A relação entre derrame articular e ADM de joelho está dentro do comportamento fisiológico esperado."
-
-            elif "Coluna" in st.session_state.membro_ativo:
-                # Guideline: McKenzie / Triage Neuromecânica
-                if "Até a Extremidade" in str(ultima.get('Irradiacao', '')) and ultima['Dor'] >= 6:
-                    insight_mecanico = "🚨 Padrão Radicular Ativo (Peripheralization): Irradiação distal severa. Diretrizes indicam suspensão de exercícios isotônicos de extremidade e foco imediato em testes de preferência direcional (Centralização)."
-                elif "Ausente" in str(ultima.get('Irradiacao', '')) and ultima.get('Mobilidade_Coluna') == "Bloqueada":
-                    insight_mecanico = "⚠️ Bloqueio Articular Isolado: Rigidez severa sem sintomas neurológicos ativos. Indicativo clássico para terapia manual, manipulação e mobilidade."
-                else:
-                    insight_mecanico = "✅ Sinais neurológicos distais controlados. Quadro mecânico estável para progressão de carga axial graduada."
-
-            elif st.session_state.membro_ativo == "Ombro":
-                # Guideline: JOSPT / SPADI (Capsulite vs Impacto)
-                elev_atual = pd.to_numeric(ultima.get('Elevacao_Ombro', 90), errors='coerce')
-                if ultima['Sono'] == "Ruim" and elev_atual < 100:
-                    insight_mecanico = "🚨 Padrão Capsular/Reativo: Restrição severa de elevação associada à dor noturna. Indica fase altamente inflamatória (ex: Capsulite Aguda). Evitar alongamentos agressivos."
-                elif "Déficit" in str(ultima.get('Rotacao_Ombro', '')) and elev_atual >= 120:
-                    insight_mecanico = "⚠️ Discinesia / Retração Capsular Posterior: Boa elevação global, mas com déficit rotacional. Atenção para potencial impacto subacromial nos graus finais de ADM."
-                else:
-                    insight_mecanico = "✅ Ritmo escapuloumeral e tolerância inflamatória dentro de parâmetros seguros para protocolo de fortalecimento."
-
-            else: # Tornozelo, Pé, Quadril
-                # Guideline: LEFS / FAAM (Tolerância de Carga)
-                if ultima.get('Carga') == "Incapaz" and ultima['Inchaco_N'] <= 1:
-                    insight_mecanico = "🚨 Intolerância à Carga Limpa: Incapacidade de descarga de peso sem presença de edema significativo. Avaliar cinesiofobia severa, sensibilização central ou microlesão óssea."
-                elif "Claudicação" in str(ultima.get('Marcha', '')) and ultima['Dor'] <= 3:
-                    insight_mecanico = "⚠️ Marcha Antálgica Residual: Paciente apresenta claudicação por déficit motor ou fraqueza estrutural (dor é baixa). Necessário intensificar reeducação de marcha e propriocepção."
-                else:
-                    insight_mecanico = "✅ Tolerância de carga e padrão de marcha evoluindo de forma condizente com a curva álgica."
-        except Exception as e:
-            insight_mecanico = "Análise mecânica em processamento. Aguardando estabilização dos dados da sessão."
-
-        # --- INSIGHT 3: POSTURA (Mapeamento de Gatilho) ---
-        try:
-            if 'Postura' in df_p.columns and not df_p['Postura'].empty:
-                pior_postura = df_p.groupby('Postura')['Dor'].mean().idxmax()
-                dor_pior = df_p.groupby('Postura')['Dor'].mean().max()
-                dor_outras = df_p[df_p['Postura'] != pior_postura]['Dor'].mean()
-                if pd.notna(dor_pior) and pd.notna(dor_outras) and dor_outras > 0 and dor_pior > dor_outras:
-                    aumento_pct = ((dor_pior - dor_outras) / dor_outras) * 100
-                    insight_postura = f"Gatilho Postural: A posição '{pior_postura}' exacerba o quadro álgico em {aumento_pct:.0f}% em relação às demais rotinas. Foco em educação ergonômica."
-                else:
-                    insight_postura = "Não há evidências de um gatilho postural mecânico que exacerbe drasticamente os sintomas isoladamente."
-            else:
-                insight_postura = "Dados posturais insuficientes para análise de gatilhos."
-        except:
-            insight_postura = "Aguardando volume de dados para mapeamento de gatilho postural."
-
-        # --- INSIGHT 4: EVOLUÇÃO CLÍNICA (Função vs Dor) ---
-        try:
-            dor_ini = df_p['Dor'].iloc[0]
-            dor_atu = ultima['Dor']
-            func_ini = df_p['Score_Função'].iloc[0] if 'Score_Função' in df_p.columns else 5
-            func_atu = ultima['Score_Função'] if 'Score_Função' in ultima else 5
-            
-            if func_atu > func_ini and dor_atu < dor_ini:
-                insight_evolucao = "Evolução Ideal: Aumento da capacidade de tolerância mecânica (Função ⬆️) com regressão do quadro sintomático (Dor ⬇️)."
-            elif func_atu > func_ini and dor_atu >= dor_ini:
-                insight_evolucao = "Atenção (Overload): Ganho funcional obtido com custo álgico. O paciente pode estar operando no limite teto de sua janela de tolerância tecidual."
-            elif func_atu <= func_ini and dor_atu < dor_ini:
-                insight_evolucao = "Fase Analgésica: Sucesso na modulação de dor (Dor ⬇️), porém sem ganhos expressivos de mobilidade ou força até o momento."
-            else:
-                insight_evolucao = "Alerta de Regressão: Sem progressão mecânica e manutenção do quadro álgico. Indicada reavaliação de diagnósticos diferenciais."
-        except:
-            insight_evolucao = "Curva de evolução em construção. Necessárias mais métricas longitudinais."
-
-        # Insight 5: Comportamento Isolado da Dor (Inteligência de Cores para o Painel)
-        dor_atual = ultima['Dor']
-        if dor_atual < media_dor:
-            insight_dor = f"A dor atual ({int(dor_atual)}) está abaixo da média histórica ({media_dor:.1f}), indicando dessensibilização efetiva."
-            cor_dor = "success"
-        elif dor_atual == media_dor:
-            insight_dor = f"O quadro álgico encontra-se estabilizado na média ({media_dor:.1f}). Foco em romper o platô de sintomas."
-            cor_dor = "warning"
-        else:
-            insight_dor = f"A dor atual ({int(dor_atual)}) encontra-se acima da média ({media_dor:.1f}). Recomenda-se reforço analgésico."
-            cor_dor = "error"
-
-        # --- MOTOR DE INTELIGÊNCIA MATEMÁTICA (REVISADO) ---
+        # B) INSIGHTS PADRÃO-OURO POR ARTICULAÇÃO
+        if st.session_state.membro_ativo == "Joelho":
+            # Guideline JOSPT: Criterio de Alta LCA/Menisco
+            lsi_estimado = (ultima['Score_Função'] / 10) * 100
+            insight_ia = f"Análise JOSPT: Prontidão Funcional (LSI) em {lsi_estimado:.1f}%. Alvo de Alta Esportiva: >90%."
+            if lsi_estimado < 70 and ultima['Inchaco_N'] < 1:
+                insight_ia += " ⚠️ Déficit funcional sem edema: provável inibição cortical ou fraqueza estrutural."
         
-        # 1. Algoritmo de Detecção de Platô (Janela Móvel de 3 Sessões)
-        plato_detectado = False
-        if len(df_p) >= 3:
-            ultimas_3 = df_p.tail(3)
-            dor_estagnada = ultimas_3['Dor'].std() == 0 
-            inchaco_valores = pd.to_numeric(ultimas_3['Inchaco_N'])
-            inchaco_nao_cedeu = inchaco_valores.is_monotonic_increasing or (inchaco_valores.nunique() == 1)
-            
-            if dor_estagnada and inchaco_nao_cedeu:
-                plato_detectado = True
+        elif "Coluna" in st.session_state.membro_ativo:
+            # Guideline McKenzie: Centralização vs Peripheralization
+            mapa_centraliza = {"Ausente": 10, "Apenas Proximal": 5, "Até a Extremidade": 0}
+            score_neuro = mapa_centraliza.get(ultima.get('Irradiacao', 'Ausente'), 10)
+            insight_ia = f"Protocolo MDT: Fenômeno de Centralização em {score_neuro*10}%. Focar em preferência direcional."
 
-        # 2. Cálculo de LSI Estimado (Correção Definitiva do Erro 'nan%')
-        try:
-            if st.session_state.membro_ativo == "Joelho":
-                val = ultima['Score_Função']
-                lsi_estimado = (val / 10.0) * 100 if pd.notna(val) else 0.0
-            elif "Coluna" in st.session_state.membro_ativo:
-                mapa_mob = {"Bloqueada": 1, "Limitada no Final": 5, "Livre": 10}
-                val = mapa_mob.get(ultima.get('Mobilidade_Coluna', 'Livre'), 10)
-                lsi_estimado = (val / 10.0) * 100
-            elif st.session_state.membro_ativo == "Ombro":
-                val = pd.to_numeric(ultima.get('Elevacao_Ombro', 90), errors='coerce')
-                lsi_estimado = (val / 180.0) * 100 if pd.notna(val) else 0.0
-            else: # Extremidades
-                mapa_carga = {"Incapaz": 0, "Parcial": 5, "Total sem Dor": 10}
-                val = mapa_carga.get(ultima.get('Carga', 'Total sem Dor'), 10)
-                lsi_estimado = (val / 10.0) * 100
-                
-            if pd.isna(lsi_estimado): lsi_estimado = 0.0
-            lsi_estimado = min(lsi_estimado, 100.0)
-        except:
-            lsi_estimado = 0.0
-        
-        # 3. Rastreio de Nociplasticidade (Discrepância Clínico-Mecânica)
-        descompasso_nociplastico = False
-        if ultima['Dor'] > 5 and ultima['Inchaco_N'] <= 1 and lsi_estimado >= 70:
-            descompasso_nociplastico = True
-            
-        # 4. Alerta de Inibição Muscular Artrogênica (AMI)
-        alerta_ami = False
-        if ultima['Inchaco_N'] >= 2:
-            alerta_ami = True
-            
-    
-        # --- NOVO: GERADOR DE LINK PARA O CIRURGIÃO (WhatsApp) ---
-        if not paciente_alvo: # <-- ESTA É A TRAVA DE INVISIBILIDADE PARA O MÉDICO
-            # Codifica o nome do paciente para segurança
-            token_gerado = base64.b64encode(p_sel.encode('utf-8')).decode('utf-8')
-            
-            # ATENÇÃO THALLES: URL de produção já configurada!
-            url_base = "https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app/" 
-            url_medico = f"{url_base}?med=true&token={token_gerado}"
-            
-            texto_whatsapp = f"Olá, Doutor! O prontuário atualizado em tempo real do paciente *{p_sel}* está disponível no Portal GENUA. Acesse o link seguro para ver a evolução de dor, inchaço e minha conduta: {url_medico}"
-            link_wpp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(texto_whatsapp)}"
-            
-            st.link_button("📲 Enviar Resumo para o Cirurgião (WhatsApp)", link_wpp, type="secondary", use_container_width=True)
-            st.write("---")
-       
+        elif st.session_state.membro_ativo == "Ombro":
+            # Guideline ASSET: Padrão Reativo
+            if ultima['Sono'] == "Ruim" and ultima['Dor'] > 6:
+                insight_ia = "🚨 Fase de Alta Irritabilidade Tecidual. Priorizar modulação de sintomas, evitar exercícios excêntricos."
+            else:
+                insight_ia = "✅ Fase de Baixa Irritabilidade. Seguro para progressão de carga e fortalecimento de manguito."
 
-        # 4. DASHBOARD TELA (INTERFACE MUTANTE)
+        # C) NOVO GRÁFICO: CORRELAÇÃO DOR VS FUNÇÃO (Padrão Científico)
+        fig_corr, ax_corr = plt.subplots(figsize=(10, 4))
+        import seaborn as sns
+        sns.regplot(x=df_p['Dor'], y=df_p['Score_Função'], ax=ax_corr, color=CORES_GENUA['secundaria'], 
+                    scatter_kws={'s':100, 'alpha':0.5}, line_kws={'color':CORES_GENUA['primaria'], 'lw':2})
+        ax_corr.set_title("Correlação Mecânica: Nível de Dor vs. Entrega Funcional", fontweight='bold')
+        ax_corr.set_xlabel("Escala Visual Analógica (EVA)"); ax_corr.set_ylabel("Score Funcional (0-10)")
+        ax_corr.spines['top'].set_visible(False); ax_corr.spines['right'].set_visible(False)
+        buf_corr = io.BytesIO(); fig_corr.savefig(buf_corr, format='png', bbox_inches='tight'); buf_corr.seek(0); plt.close(fig_corr)
+
+        # 4. DASHBOARD TELA REFORMULADO
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
-        
-        # Pente Fino: Troca a métrica de Inchaço por Irradiação Neural se for Coluna
-        if "Coluna" in st.session_state.membro_ativo:
-            m2.metric("Irradiação Atual", f"{ultima.get('Irradiacao', 'Ausente')}")
-        else:
-            m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc_pct:.0f}%", delta_color="inverse")
-            
-        m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
-        m4.metric("Previsão Alta", prev_txt)
+        m1.metric("Velocidade de Recuperação", f"{recup_speed:.1f}/semana", delta=None)
+        m2.metric("Estabilidade Clínica", "ALTA" if recup_speed > 0.2 else "ESTÁVEL")
+        m3.metric("LSI / Funcionalidade", f"{lsi_estimado if 'lsi_estimado' in locals() else ultima['Score_Função']*10:.0f}%")
+        m4.metric("Previsão de Alta", prev_txt)
 
         st.write("---")
+        t1, t2, t3 = st.tabs(["🔬 Inteligência de Dados", "📈 Curvas de Evolução", "📐 Análise Mecânica"])
         
-        # --- ABAS DINÂMICAS (POLIMORFISMO DE TELA) ---
-        if "Coluna" in st.session_state.membro_ativo:
-            t1, t2, t3, t4 = st.tabs(["📈 Progresso Funcional", "🩸 Quadro Álgico", "⚡ Neuromecânica", "🎯 Fatores Modificáveis"])
-        else:
-            t1, t2, t3, t4 = st.tabs(["📈 Progresso Funcional", "🩸 Quadro Álgico", "🌊 Inchaço e Mecânica", "🎯 Fatores Modificáveis"])
-        
-        with t1: 
-            # 1. Alerta de Platô (Caso exista)
-            if plato_detectado:
-                st.error("🚨 **ALERTA DE PLATÔ TERAPÊUTICO DETECTADO**")
-                st.markdown(f"""
-                    <div style='background-color: #f8d7da; padding: 10px; border-left: 5px solid #dc3545; border-radius: 5px;'>
-                        <p style='color: #721c24; margin: 0;'><b>Parecer da Inteligência:</b> O paciente não apresenta progressão há 3 sessões. 
-                        A curva de adaptação estabilizou.</p>
-                    </div>
-                """, unsafe_allow_html=True)
+        with t1:
+            st.image(buf_corr, use_container_width=True)
+            st.info(f"💡 **Parecer Técnico Sênior:** {insight_ia}")
+            st.success(f"🔍 **Análise de Tendência:** Com base na inclinação da curva, o paciente apresenta melhora consistente de {recup_speed:.2f} pontos funcionais a cada 7 dias.")
 
             # 2. QUADRO DE DECISÃO CLÍNICA (Diretrizes 2025/2026)
             st.markdown(f"### 🧠 Inteligência Clínica GENUA")
