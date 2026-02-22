@@ -505,28 +505,28 @@ if menu == "Check-in Diário 📝":
     
     with st.form("checkin", clear_on_submit=True):
         
-        # --- 1. CAMPOS PADRÃO (Comuns a todos os membros) ---
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Sintomas e Quadro Sistêmico</h4>", unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
+        # --- 1. CAMPOS PADRÃO (Sistêmicos) ---
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Quadro Sistêmico Universal</h4>", unsafe_allow_html=True)
+        # O Inchaço foi removido daqui! Apenas Dor, Sono e Postura importam para todos.
+        c1, c2, c3 = st.columns(3)
         with c1: dor = st.slider("💥 Dor atual (EVA 0-10)", 0, 10, 0)
-        with c2: inchaco = st.select_slider("💧 Inchaço", options=["0", "1", "2", "3"])
-        with c3: sono = st.radio("💤 Sono", ["Ruim", "Regular", "Bom"])
-        with c4: postura = st.radio("🧍 Postura", ["Sentado", "Equilibrado", "Em pé"])
+        with c2: sono = st.radio("💤 Sono", ["Ruim", "Regular", "Bom"])
+        with c3: postura = st.radio("🧍 Postura", ["Sentado", "Equilibrado", "Em pé"])
             
-        # Dicionário base para salvar no banco de dados
         dados_sessao = {
             "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "Paciente": st.session_state.paciente,
             "Membro": st.session_state.membro_ativo,
-            "Dor": int(dor), "Inchaço": str(inchaco), "Sono": sono, "Postura": postura
+            "Dor": int(dor), "Sono": sono, "Postura": postura
         }
 
-        # --- 2. CAMPOS ESPECÍFICOS (Renderização Condicional) ---
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Biomecânica Específica: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
+        # --- 2. CAMPOS ESPECÍFICOS (O Pente Fino Clínico) ---
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Avaliação Específica: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
         
-        # JOELHO (Mantendo as variáveis originais para não quebrar seus gráficos atuais)
         if st.session_state.membro_ativo == "Joelho":
-            c5, c6, c7 = st.columns(3)
+            # Inchaço desce apenas para as articulações apendiculares
+            c_inc, c5, c6, c7 = st.columns(4)
+            with c_inc: inchaco = st.select_slider("💧 Inchaço", options=["0", "1", "2", "3"])
             with c5: agac = st.selectbox("🏋️ Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
             with c6: sup = st.selectbox("🪜 Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
             with c7: sdn = st.selectbox("📉 Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
@@ -534,38 +534,37 @@ if menu == "Check-in Diário 📝":
             with c8: flexao = st.slider("📐 Flexão (Graus)", 0, 150, 90)
             with c9: extensao = st.selectbox("📏 Extensão Terminal", ["Completa (0°)", "Déficit Leve (-5°)", "Déficit Grave (>-15°)"])
             
-            # Atualiza o dicionário com os dados do Joelho
-            dados_sessao.update({"Agachamento": agac, "Step_Up": sup, "Step_Down": sdn, "Flexao": int(flexao), "Extensao": extensao})
+            dados_sessao.update({"Inchaço": str(inchaco), "Agachamento": agac, "Step_Up": sup, "Step_Down": sdn, "Flexao": int(flexao), "Extensao": extensao})
             
-        # COLUNA (Cervical ou Lombar)
         elif "Coluna" in st.session_state.membro_ativo:
+            # Coluna NÃO possui campo de inchaço na tela
             c5, c6, c7 = st.columns(3)
             with c5: irradiacao = st.selectbox("⚡ Irradiação (Nervo)", ["Ausente", "Apenas Proximal", "Até a Extremidade"])
             with c6: mobilidade = st.selectbox("🔄 Mobilidade", ["Livre", "Limitada no Final", "Bloqueada"])
             with c7: parestesia = st.radio("🐜 Parestesia (Formigamento)", ["Não", "Sim"], horizontal=True)
             
-            # Atualiza o dicionário com os dados da Coluna
-            dados_sessao.update({"Irradiacao": irradiacao, "Mobilidade_Coluna": mobilidade, "Parestesia": parestesia})
+            # O código salva o inchaço oculto como "0" apenas para o banco de dados não quebrar e os gráficos não darem erro
+            dados_sessao.update({"Inchaço": "0", "Irradiacao": irradiacao, "Mobilidade_Coluna": mobilidade, "Parestesia": parestesia})
 
-        # OMBRO
         elif st.session_state.membro_ativo == "Ombro":
-            c5, c6 = st.columns(2)
+            c_inc, c5, c6 = st.columns(3)
+            with c_inc: inchaco = st.select_slider("💧 Edema Agudo", options=["0", "1", "2", "3"]) 
             with c5: elevacao = st.slider("📐 Elevação (Graus)", 0, 180, 90)
             with c6: rotacao = st.selectbox("🔄 Rotação", ["Livre", "Déficit Interna", "Déficit Externa", "Bloqueio Global"])
             
-            dados_sessao.update({"Elevacao_Ombro": int(elevacao), "Rotacao_Ombro": rotacao})
+            dados_sessao.update({"Inchaço": str(inchaco), "Elevacao_Ombro": int(elevacao), "Rotacao_Ombro": rotacao})
             
-        # TORNOZELO/PÉ ou QUADRIL (MVP Genérico para Extremidades Inferiores)
-        elif st.session_state.membro_ativo in ["Tornozelo/Pé", "Quadril"]:
-            c5, c6 = st.columns(2)
+        else: # Tornozelo/Pé, Quadril
+            c_inc, c5, c6 = st.columns(3)
+            with c_inc: inchaco = st.select_slider("💧 Inchaço Articular", options=["0", "1", "2", "3"])
             with c5: marcha = st.selectbox("🚶 Marcha", ["Sem claudicação", "Claudicação Leve", "Uso de muleta"])
             with c6: carga = st.selectbox("⚖️ Tolerância a Carga", ["Incapaz", "Parcial", "Total sem Dor"])
             
-            dados_sessao.update({"Marcha": marcha, "Carga": carga})
+            dados_sessao.update({"Inchaço": str(inchaco), "Marcha": marcha, "Carga": carga})
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- 3. MOTOR DE SALVAMENTO --
+        # --- 3. MOTOR DE SALVAMENTO ---
         if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
             df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
             nova_linha = pd.DataFrame([dados_sessao])
