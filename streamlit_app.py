@@ -1041,15 +1041,26 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             st.write("---")
        
 
-        # 4. DASHBOARD TELA
+        # 4. DASHBOARD TELA (INTERFACE MUTANTE)
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
-        m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc_pct:.0f}%", delta_color="inverse")
+        
+        # Pente Fino: Troca a métrica de Inchaço por Irradiação Neural se for Coluna
+        if "Coluna" in st.session_state.membro_ativo:
+            m2.metric("Irradiação Atual", f"{ultima.get('Irradiacao', 'Ausente')}")
+        else:
+            m2.metric("Inchaço (vs Média)", f"Grau {ultima[col_inc]}", f"{delta_inc_pct:.0f}%", delta_color="inverse")
+            
         m3.metric("IKDC", f"{int(u_ikdc)}/100", status_clinico)
         m4.metric("Previsão Alta", prev_txt)
 
         st.write("---")
-        t1, t2, t3, t4 = st.tabs(["📈 Progresso Funcional", "🩸 Quadro Álgico", "🌊 Inchaço", "🎯 Fatores Modificáveis"])
+        
+        # --- ABAS DINÂMICAS (POLIMORFISMO DE TELA) ---
+        if "Coluna" in st.session_state.membro_ativo:
+            t1, t2, t3, t4 = st.tabs(["📈 Progresso Funcional", "🩸 Quadro Álgico", "⚡ Neuromecânica", "🎯 Fatores Modificáveis"])
+        else:
+            t1, t2, t3, t4 = st.tabs(["📈 Progresso Funcional", "🩸 Quadro Álgico", "🌊 Inchaço e Mecânica", "🎯 Fatores Modificáveis"])
         
         with t1: 
             # 1. Alerta de Platô (Caso exista)
@@ -1088,21 +1099,27 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
 
             st.write("---")
             
-            # 3. Visualização Gráfica e Insights (O que já funcionava)
+            # 3. Visualização Gráfica e Insights
             st.image(buf_ev, use_container_width=True)
             st.success(f"🔮 **Inteligência GENUA:** Alta estimada para **{prev_txt}**.")
             st.info(f"💡 **Insight Evolutivo:** {insight_evolucao}")
             
         with t2:
             st.image(buf_dor, use_container_width=True)
-            # Injeção dinâmica do alerta com base na cor/gravidade calculada
             if cor_dor == "success": st.success(f"💡 **Insight Álgico:** {insight_dor}")
             elif cor_dor == "warning": st.warning(f"💡 **Insight Álgico:** {insight_dor}")
             else: st.error(f"💡 **Insight Álgico:** {insight_dor}")
             
         with t3: 
+            # Pente Fino: Gráfico isolado de inchaço só aparece se NÃO for coluna
+            if "Coluna" not in st.session_state.membro_ativo:
+                st.image(buf_inc, use_container_width=True)
+                st.write("---")
+                
+            # Gráfico Biomecânico (ADM / Carga / Mobilidade)
             st.image(buf_adm, use_container_width=True)
-            st.warning(f"💡 **Insight Mecânico Geral:** {insight_mecanico}")
+            
+            st.warning(f"💡 **Insight Mecânico:** {insight_mecanico}")
             st.write("---")
             
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📐 Rastreio Clínico: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
