@@ -908,15 +908,39 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             else:
                 insight_ia = "✅ Fase de Baixa Irritabilidade. Seguro para progressão de carga e fortalecimento de manguito."
 
-        # C) NOVO GRÁFICO: CORRELAÇÃO DOR VS FUNÇÃO (Padrão Científico)
+        # C) NOVO GRÁFICO: CORRELAÇÃO DOR VS FUNÇÃO (Padrão Científico - Nativo)
         fig_corr, ax_corr = plt.subplots(figsize=(10, 4))
-        import seaborn as sns
-        sns.regplot(x=df_p['Dor'], y=df_p['Score_Função'], ax=ax_corr, color=CORES_GENUA['secundaria'], 
-                    scatter_kws={'s':100, 'alpha':0.5}, line_kws={'color':CORES_GENUA['primaria'], 'lw':2})
-        ax_corr.set_title("Correlação Mecânica: Nível de Dor vs. Entrega Funcional", fontweight='bold')
-        ax_corr.set_xlabel("Escala Visual Analógica (EVA)"); ax_corr.set_ylabel("Score Funcional (0-10)")
-        ax_corr.spines['top'].set_visible(False); ax_corr.spines['right'].set_visible(False)
-        buf_corr = io.BytesIO(); fig_corr.savefig(buf_corr, format='png', bbox_inches='tight'); buf_corr.seek(0); plt.close(fig_corr)
+        
+        x_dor = df_p['Dor'].values
+        y_func = df_p['Score_Função'].values
+        
+        # Gráfico de Dispersão (Scatter)
+        ax_corr.scatter(x_dor, y_func, color=CORES_GENUA['secundaria'], alpha=0.5, s=100, label='Sessões')
+        
+        # Linha de Tendência (Regressão Linear via Numpy - Sem Seaborn)
+        if len(df_p) > 1:
+            try:
+                z_corr = np.polyfit(x_dor, y_func, 1)
+                p_corr = np.poly1d(z_corr)
+                # Ordenar para a linha não ficar "quebrada"
+                x_range = np.linspace(x_dor.min(), x_dor.max(), 100)
+                ax_corr.plot(x_range, p_corr(x_range), color=CORES_GENUA['primaria'], lw=2, label='Tendência de Resposta')
+            except:
+                pass
+        
+        ax_corr.set_title("Correlação Mecânica: Nível de Dor vs. Entrega Funcional", fontweight='bold', color=CORES_GENUA['primaria'])
+        ax_corr.set_xlabel("Escala Visual Analógica (EVA)")
+        ax_corr.set_ylabel("Score Funcional (0-10)")
+        ax_corr.set_ylim(-0.5, 11)
+        ax_corr.set_xlim(-0.5, 11)
+        ax_corr.spines['top'].set_visible(False)
+        ax_corr.spines['right'].set_visible(False)
+        ax_corr.legend(frameon=False, loc='upper right')
+        
+        buf_corr = io.BytesIO()
+        fig_corr.savefig(buf_corr, format='png', bbox_inches='tight')
+        buf_corr.seek(0)
+        plt.close(fig_corr)
 
         # 4. DASHBOARD TELA REFORMULADO
         m1, m2, m3, m4 = st.columns(4)
