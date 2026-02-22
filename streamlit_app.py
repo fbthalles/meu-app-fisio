@@ -188,14 +188,21 @@ def create_pdf(p_name, hist, metrics, imgs):
     w_col = 47.5 
     pdf.cell(w_col, 7, limpar_texto_pdf("DOR ATUAL"), border=1, fill=True, align='C')
     pdf.cell(w_col, 7, limpar_texto_pdf("INCHAÇO"), border=1, fill=True, align='C')
-    pdf.cell(w_col, 7, limpar_texto_pdf("IKDC (FUNÇÃO)"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 7, limpar_texto_pdf("PRONTIDÃO (LSI)"), border=1, fill=True, align='C')
     pdf.cell(w_col, 7, limpar_texto_pdf("PREVISÃO ALTA"), border=1, fill=True, align='C')
     pdf.ln()
     pdf.set_fill_color(*cinza_bg); pdf.set_text_color(0, 0, 0); pdf.set_font("helvetica", 'B', 10)
     pdf.cell(w_col, 8, limpar_texto_pdf(f"{int(dor_atual)}/10"), border=1, fill=True, align='C')
     pdf.cell(w_col, 8, limpar_texto_pdf(f"Grau {grau_inc}"), border=1, fill=True, align='C')
-    pdf.cell(w_col, 8, limpar_texto_pdf(f"{int(float(metrics['ikdc']))}/100"), border=1, fill=True, align='C')
-    pdf.cell(w_col, 8, limpar_texto_pdf(f"{metrics['alta']}"), border=1, fill=True, align='C')
+    
+    # Extrai o valor do LSI (que agora transita na variável ikdc internamente) e formata com %
+    try:
+        valor_lsi = float(metrics.get('ikdc', 0))
+    except:
+        valor_lsi = 0.0
+        
+    pdf.cell(w_col, 8, limpar_texto_pdf(f"{valor_lsi:.0f}%"), border=1, fill=True, align='C')
+    pdf.cell(w_col, 8, limpar_texto_pdf(f"{metrics.get('alta', 'Em análise')}"), border=1, fill=True, align='C')
     pdf.ln(10)
 
     # 1. EVOLUÇÃO CLÍNICA
