@@ -872,14 +872,15 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         fig_adm.savefig(buf_adm, format='png', bbox_inches='tight', bbox_extra_artists=(lgd_adm,), dpi=150)
         buf_adm.seek(0); plt.close(fig_adm)
 
-        # 3. MOTORES MATEMÁTICOS DE CRUZAMENTO E INSIGHTS (BASEADO EM GUIDELINES)
-
-        # --- 3. MOTOR CIENTÍFICO AVANÇADO (GUIDELINES 2026) ---
+# --- 3. MOTOR CIENTÍFICO AVANÇADO (GUIDELINES 2026) ---
         
-        # A) Cálculo de Eficiência Clínica (Slope of Recovery)
+        # A) Inicialização de Segurança (Evita o NameError)
+        lsi_estimado = 0.0
+        insight_ia = "Análise clínica em processamento..."
+
+        # B) Cálculo de Eficiência Clínica (Slope of Recovery)
         if len(df_p) > 2:
             try:
-                # Regressão linear para entender a velocidade da cura
                 x_days = (df_p['Data_dt'] - df_p['Data_dt'].min()).dt.days.values
                 y_func = df_p['Score_Função'].values
                 slope, intercept = np.polyfit(x_days, y_func, 1)
@@ -887,66 +888,58 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             except: recup_speed = 0
         else: recup_speed = 0
 
-        # B) INSIGHTS PADRÃO-OURO POR ARTICULAÇÃO
-        if st.session_state.membro_ativo == "Joelho":
-            # Guideline JOSPT: Criterio de Alta LCA/Menisco
-            lsi_estimado = (ultima['Score_Função'] / 10) * 100
-            insight_ia = f"Análise JOSPT: Prontidão Funcional (LSI) em {lsi_estimado:.1f}%. Alvo de Alta Esportiva: >90%."
-            if lsi_estimado < 70 and ultima['Inchaco_N'] < 1:
-                insight_ia += " ⚠️ Déficit funcional sem edema: provável inibição cortical ou fraqueza estrutural."
-        
-        elif "Coluna" in st.session_state.membro_ativo:
-            # Guideline McKenzie: Centralização vs Peripheralization
-            mapa_centraliza = {"Ausente": 10, "Apenas Proximal": 5, "Até a Extremidade": 0}
-            score_neuro = mapa_centraliza.get(ultima.get('Irradiacao', 'Ausente'), 10)
-            insight_ia = f"Protocolo MDT: Fenômeno de Centralização em {score_neuro*10}%. Focar em preferência direcional."
+        # C) INSIGHTS PADRÃO-OURO E CÁLCULO DE LSI POR ARTICULAÇÃO
+        try:
+            if st.session_state.membro_ativo == "Joelho":
+                lsi_estimado = (ultima['Score_Função'] / 10.0) * 100
+                insight_ia = f"Análise JOSPT: Prontidão Funcional (LSI) em {lsi_estimado:.1f}%. Alvo de Alta Esportiva: >90%."
+                if lsi_estimado < 70 and ultima['Inchaco_N'] < 1:
+                    insight_ia += " ⚠️ Déficit funcional sem edema: provável inibição cortical ou fraqueza estrutural."
+            
+            elif "Coluna" in st.session_state.membro_ativo:
+                mapa_centraliza = {"Ausente": 10, "Apenas Proximal": 5, "Até a Extremidade": 0}
+                score_neuro = mapa_centraliza.get(ultima.get('Irradiacao', 'Ausente'), 10)
+                lsi_estimado = score_neuro * 10.0
+                insight_ia = f"Protocolo MDT: Fenômeno de Centralização em {lsi_estimado:.0f}%. Focar em preferência direcional."
 
-        elif st.session_state.membro_ativo == "Ombro":
-            # Guideline ASSET: Padrão Reativo
-            if ultima['Sono'] == "Ruim" and ultima['Dor'] > 6:
-                insight_ia = "🚨 Fase de Alta Irritabilidade Tecidual. Priorizar modulação de sintomas, evitar exercícios excêntricos."
-            else:
-                insight_ia = "✅ Fase de Baixa Irritabilidade. Seguro para progressão de carga e fortalecimento de manguito."
+            elif st.session_state.membro_ativo == "Ombro":
+                elev_atual = pd.to_numeric(ultima.get('Elevacao_Ombro', 90), errors='coerce')
+                lsi_estimado = (elev_atual / 180.0) * 100
+                if ultima['Sono'] == "Ruim" and ultima['Dor'] > 6:
+                    insight_ia = "🚨 Fase de Alta Irritabilidade Tecidual. Priorizar modulação de sintomas, evitar exercícios excêntricos."
+                else:
+                    insight_ia = "✅ Fase de Baixa Irritabilidade. Seguro para progressão de carga e fortalecimento de manguito."
+            
+            else: # Tornozelo, Pé, Quadril
+                lsi_estimado = (ultima['Score_Função'] / 10.0) * 100
+                insight_ia = "Monitoramento de tolerância à carga e padrão de marcha em evolução."
 
-        # C) NOVO GRÁFICO: CORRELAÇÃO DOR VS FUNÇÃO (Padrão Científico - Nativo)
+            lsi_estimado = min(max(float(lsi_estimado), 0.0), 100.0) # Garante que fique entre 0 e 100
+        except:
+            lsi_estimado = 0.0
+
+        # D) GRÁFICO DE CORRELAÇÃO (DOR VS FUNÇÃO)
         fig_corr, ax_corr = plt.subplots(figsize=(10, 4))
-        
         x_dor = df_p['Dor'].values
         y_func = df_p['Score_Função'].values
-        
-        # Gráfico de Dispersão (Scatter)
-        ax_corr.scatter(x_dor, y_func, color=CORES_GENUA['secundaria'], alpha=0.5, s=100, label='Sessões')
-        
-        # Linha de Tendência (Regressão Linear via Numpy - Sem Seaborn)
+        ax_corr.scatter(x_dor, y_func, color=CORES_GENUA['secundaria'], alpha=0.5, s=100)
         if len(df_p) > 1:
             try:
-                z_corr = np.polyfit(x_dor, y_func, 1)
-                p_corr = np.poly1d(z_corr)
-                # Ordenar para a linha não ficar "quebrada"
-                x_range = np.linspace(x_dor.min(), x_dor.max(), 100)
-                ax_corr.plot(x_range, p_corr(x_range), color=CORES_GENUA['primaria'], lw=2, label='Tendência de Resposta')
-            except:
-                pass
-        
+                z_c = np.polyfit(x_dor, y_func, 1)
+                p_c = np.poly1d(z_c)
+                x_r = np.linspace(x_dor.min(), x_dor.max(), 100)
+                ax_corr.plot(x_r, p_c(x_r), color=CORES_GENUA['primaria'], lw=2)
+            except: pass
         ax_corr.set_title("Correlação Mecânica: Nível de Dor vs. Entrega Funcional", fontweight='bold', color=CORES_GENUA['primaria'])
-        ax_corr.set_xlabel("Escala Visual Analógica (EVA)")
-        ax_corr.set_ylabel("Score Funcional (0-10)")
-        ax_corr.set_ylim(-0.5, 11)
-        ax_corr.set_xlim(-0.5, 11)
-        ax_corr.spines['top'].set_visible(False)
-        ax_corr.spines['right'].set_visible(False)
-        ax_corr.legend(frameon=False, loc='upper right')
-        
-        buf_corr = io.BytesIO()
-        fig_corr.savefig(buf_corr, format='png', bbox_inches='tight')
-        buf_corr.seek(0)
-        plt.close(fig_corr)
+        ax_corr.set_xlabel("Escala Visual Analógica (EVA)"); ax_corr.set_ylabel("Score Funcional (0-10)")
+        ax_corr.spines['top'].set_visible(False); ax_corr.spines['right'].set_visible(False)
+        buf_corr = io.BytesIO(); fig_corr.savefig(buf_corr, format='png', bbox_inches='tight'); buf_corr.seek(0); plt.close(fig_corr)
 
         # 4. DASHBOARD TELA REFORMULADO
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Velocidade de Recuperação", f"{recup_speed:.1f}/semana", delta=None)
+        m1.metric("Velocidade de Recuperação", f"{recup_speed:.2f}/semana")
         m2.metric("Estabilidade Clínica", "ALTA" if recup_speed > 0.2 else "ESTÁVEL")
-        m3.metric("LSI / Funcionalidade", f"{lsi_estimado if 'lsi_estimado' in locals() else ultima['Score_Função']*10:.0f}%")
+        m3.metric("Prontidão para Alta (LSI)", f"{lsi_estimado:.0f}%", help="Alvo para alta esportiva: >90%")
         m4.metric("Previsão de Alta", prev_txt)
 
         st.write("---")
@@ -956,7 +949,6 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
             st.image(buf_corr, use_container_width=True)
             st.info(f"💡 **Parecer Técnico Sênior:** {insight_ia}")
             st.success(f"🔍 **Análise de Tendência:** Com base na inclinação da curva, o paciente apresenta melhora consistente de {recup_speed:.2f} pontos funcionais a cada 7 dias.")
-
             # 2. QUADRO DE DECISÃO CLÍNICA (Diretrizes 2025/2026)
             st.markdown(f"### 🧠 Inteligência Clínica GENUA")
             col_ia1, col_ia2, col_ia3 = st.columns(3)
