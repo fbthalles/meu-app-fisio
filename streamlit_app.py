@@ -39,6 +39,14 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
+
+    /* Estilo para parecer app de celular */
+    .stApp {
+        max-width: 500px; /* Centraliza o conteúdo como um celular */
+        margin: 0 auto;
+        border-right: 1px solid #ddd;
+        border-left: 1px solid #ddd;
+    }
     
     /* 2. Fundo geral do app mais limpo */
     .stApp {
