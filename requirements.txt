@@ -5,3 +5,4 @@ numpy
 fpdf2
 matplotlib
 Pillow
+firebase-admin==6.4.0
