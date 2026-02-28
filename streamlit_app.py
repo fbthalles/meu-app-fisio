@@ -581,27 +581,53 @@ elif st.session_state.pagina == 'selecao_membro':
         
     st.stop()
 
-# PAGINA 4: PAINEL CLÍNICO (A CARROCERIA PRINCIPAL)
+# PAGINA 4: PAINEL CLÍNICO (ARQUITETURA DE NAVEGAÇÃO CORRIGIDA)
 elif st.session_state.pagina == 'painel_clinico':
-    # O menu lateral agora tem botões avançados de navegação
+    # 1. Configuração do Menu Lateral
     with st.sidebar:
         if not paciente_alvo:
             st.markdown("### 🧭 Navegação")
             c_voltar1, c_voltar2 = st.columns(2)
             with c_voltar1:
-                if st.button("⬅️ Membro", use_container_width=True, help="Voltar para a seleção de outro tratamento"):
+                if st.button("⬅️ Membro", use_container_width=True):
                     mudar_pagina('selecao_membro')
             with c_voltar2:
-                if st.button("🏠 Início", use_container_width=True, help="Voltar para a escolha de pacientes"):
+                if st.button("🏠 Início", use_container_width=True):
                     mudar_pagina('dados_paciente')
                     
             st.markdown("---")
             menu = st.radio("MÓDULOS", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
         else:
-            menu = "Painel Analítico 📊" # Cirurgião só vê o painel
+            menu = "Painel Analítico 📊"
             
-    # TAG visual mostrando o membro ativo no topo da tela
     st.markdown(f"<span style='background-color: {CORES_GENUA['secundaria']}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold;'>📍 Tratamento: {st.session_state.membro_ativo}</span><br><br>", unsafe_allow_html=True)
+
+    # --- ROTEAMENTO DOS MÓDULOS (Onde estava o erro da tela em branco) ---
+    
+    if menu == "Avaliação Inicial 🔎":
+        # Inserir aqui TODO o bloco de código do formulário de Avaliação Inicial que construímos
+        st.header(f"🔎 Avaliação Base: {st.session_state.membro_ativo}")
+        # ... (restante do código da Avaliação Inicial enviado anteriormente) ...
+        # [Nota: Certifique-se de manter o bloco da Avaliação Inicial aqui dentro]
+        pass # Remova este pass ao colar o código completo
+
+    elif menu == "Check-in Diário 📝":
+        # Bloco do Check-in Diário
+        st.header(f"📝 Check-in Diário: {st.session_state.membro_ativo}")
+        # ... (restante do código do Check-in Diário) ...
+        pass # Remova este pass ao colar o código completo
+
+    elif menu == "Painel Analítico 📊":
+        # Bloco do Painel Analítico (O Cérebro Clínico)
+        # 1. Leitura forçada do Firebase
+        df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
+        
+        if df.empty or 'Paciente' not in df.columns:
+            st.warning("⚠️ Base de dados vazia. Realize o primeiro Check-in.")
+        else:
+            # ... (Toda a lógica de gráficos e insights que já tínhamos) ...
+            pass # Remova este pass ao colar o código completo
+
 
 # --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
 elif menu == "Avaliação Inicial 🔎":
@@ -1100,4 +1126,4 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         else:
             st.info("Clique no botão acima para gerar o documento oficial em PDF.")
 
-# --- FIM DO BLOCO DA PAGINA 4 ---
+
