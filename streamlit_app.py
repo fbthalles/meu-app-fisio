@@ -778,25 +778,56 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     inchaco_atual = ultima.get('Inchaco_N', 0)
     sono_atual = ultima.get('Sono', 'Regular')
 
-    # 2.3. TRIAGEM DE FENÓTIPO CLÍNICO (A IA COMO RADAR)
-    # Aqui a máquina cruza o mecânico com o biopsicossocial
-    if inchaco_atual >= 2 and dor_atual >= 5:
-        fenotipo_clinico = "🔴 Inflamatório / Nociceptivo Agudo"
-        diretriz_ia = "Cascata inflamatória ativa (Dano Tecidual). Priorizar modulação agressiva e repouso articular relativo. Cargas tensionais contraindicadas agora."
-    elif dor_atual >= 6 and inchaco_atual <= 1 and sono_atual == "Ruim":
-        fenotipo_clinico = "🟡 Nociplástico / Sensibilização Central"
-        diretriz_ia = "Descompasso Clínico: Dor desproporcional à lesão tecidual (inchaço baixo). O déficit de sono atua como catalisador. O foco deve ser a educação em dor e dessensibilização."
-    elif dor_atual < 4 and lsi_global < 60:
-        fenotipo_clinico = "🟠 Inibição Muscular Artrogênica (AMI)"
-        diretriz_ia = "O quadro não é puramente álgico, mas funcional. O córtex motor está inibindo a musculatura. Sugestão: Ferramentas de biofeedback ou eletroestimulação (FES/NMES)."
-    elif dor_atual <= 3 and inchaco_atual <= 1 and lsi_global >= 70:
-        fenotipo_clinico = "🟢 Mecânico / Fase de Remodelamento"
-        diretriz_ia = "Padrão Ouro. Janela de oportunidade metabólica aberta. Seguro para progressão de carga, pliometria e protocolos de retorno ao esporte (RTS)."
-    else:
-        fenotipo_clinico = "🔵 Misto / Transição"
-        diretriz_ia = "Paciente em fase de acomodação de carga. Monitorizar a resposta inflamatória 24h pós-treino."
+    # 2.3. TRIAGEM BAYESIANA E FENÓTIPO CLÍNICO (MOTOR GENUA AVANÇADO)
+    if st.session_state.membro_ativo == "Joelho":
+        # 1. TRIAGEM DE BANDEIRAS VERMELHAS (Regras de Ottawa Simuladas)
+        if ultima.get('Agachamento') == 'Incapaz' and inchaco_atual >= 2 and dor_atual >= 8:
+            fenotipo_clinico = "🚨 Red Flag / Risco Estrutural Agudo"
+            diretriz_ia = "Critérios de Ottawa/Pittsburgh: Incapacidade de descarga de peso (Agachamento Incapaz) + Dor Severa + Edema Agudo. Indicação de imagem (Raio-X/RM) para descartar fratura ou ruptura maciça antes da progressão funcional."
+        
+        # 2. RACIOCÍNIO CLÍNICO: SÍNDROME FEMOROPATELAR (SFP)
+        # LR+ Alto: Dor maior no Step Down (excêntrico) do que no Step Up, com baixo inchaço.
+        elif ultima.get('Step_Down') in ['Incapaz', 'Dor Moderada'] and inchaco_atual <= 1:
+            fenotipo_clinico = "🟣 Provável Síndrome Femoropatelar (SFP)"
+            diretriz_ia = "Cinemática: Exacerbação na desaceleração excêntrica (Step Down). Baixo inchaço reduz LR para lesão intra-articular. Conduta: Modulação com isometria em ângulos de proteção (0-45°) e fortalecimento do complexo póstero-lateral do quadril. Reavaliar com Escala AKPS."
+            
+        # 3. RACIOCÍNIO CLÍNICO: SOFRIMENTO INTRA-ARTICULAR (Menisco/Condral)
+        # LR+ Alto: Edema + Déficit de Extensão Terminal.
+        elif ultima.get('Extensao') in ['Déficit Grave (>-15°)', 'Déficit Leve (-5°)'] and inchaco_atual >= 2:
+            fenotipo_clinico = "🟤 Bloqueio Articular / Derangement"
+            diretriz_ia = "Mecânica: Déficit de extensão terminal associado a derrame articular (Grau 2+). Alto LR+ para bloqueio meniscal ou condral. Conduta: Crioterapia, mobilização passiva acessória e restrição absoluta de carga axial. Cluster sugerido: Teste de Thessaly e McMurray."
+            
+        # 4. RACIOCÍNIO CLÍNICO: TENDINOPATIA PATELAR
+        # LR+ Alto: Dor no Step Up/Agachamento (carga elástica) sem déficit de ADM passiva.
+        elif ultima.get('Agachamento') in ['Incapaz', 'Dor Moderada'] and ultima.get('Extensao') == 'Completa (0°)' and inchaco_atual == 0:
+            fenotipo_clinico = "🟠 Provável Tendinopatia (Sobrecarga de Energia)"
+            diretriz_ia = "Padrão de carga: Dor em armazenamento/liberação de energia sem restrição articular. Conduta: Isometria pesada (Protocolo Rio, 5x45s) para analgesia aguda. Evitar alongamento passivo do quadríceps."
 
-    status_clinico = "Excelente" if lsi_global >= 85 else "Regular" if lsi_global >= 60 else "Atenção"
+        # 5. FENÓTIPO NOCIPLÁSTICO (Descompasso)
+        elif dor_atual >= 6 and inchaco_atual == 0 and sono_atual == "Ruim":
+            fenotipo_clinico = "🟡 Sensibilização Central / Nociplástico"
+            diretriz_ia = "Descompasso Clínico: Dor desproporcional à lesão (inchaço nulo). O déficit de sono atua como catalisador algógeno. Foco: Educação em dor (PNE), higiene do sono e exposição gradual à carga."
+            
+        # 6. FASE DE REMODELAMENTO (Padrão Ouro)
+        elif dor_atual <= 3 and inchaco_atual <= 1 and lsi_global >= 80:
+            fenotipo_clinico = "🟢 Mecânico / Fase de Remodelamento"
+            diretriz_ia = "Janela metabólica aberta. Seguro para progressão para pliometria (fase de aterrissagem) e drils de mudança de direção. Monitorar inchaço 24h pós-treino."
+            
+        else:
+            fenotipo_clinico = "🔵 Misto / Acomodação de Carga"
+            diretriz_ia = "Paciente apresenta sinais mistos. Focar no controle do sintoma mais limitante (Dor vs. ADM) e reavaliar resposta em 48h."
+
+    # Fallback para outras articulações (Ombro, Coluna, etc) mantendo a lógica de Irritabilidade Tecidual
+    else:
+        if inchaco_atual >= 2 and dor_atual >= 6:
+            fenotipo_clinico = "🔴 Inflamatório Agudo / Alta Irritabilidade"
+            diretriz_ia = "Cascata inflamatória ativa. Priorizar modulação agressiva e repouso articular relativo. Cargas tensionais altas contraindicadas agora."
+        elif dor_atual <= 3 and lsi_global >= 70:
+            fenotipo_clinico = "🟢 Fase de Remodelamento / Baixa Irritabilidade"
+            diretriz_ia = "Estável. Progressão de carga estrutural e treinos de função específicos liberados."
+        else:
+            fenotipo_clinico = "🔵 Misto / Transição"
+            diretriz_ia = "Fase de acomodação mecânica. Progressão guiada por tolerância aos sintomas (Regra da Dor < 4/10 durante o exercício)."
 
     # 2.4. CÁLCULO DE VELOCIDADE DE RECUPERAÇÃO E PREVISÃO REALISTA
     recup_speed = 0.0; prev_txt = "Aguardando dados (Min. 3 sessões)"
