@@ -1,5 +1,4 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 import altair as alt
@@ -388,8 +387,31 @@ def create_pdf(p_name, hist, metrics, imgs):
         pass 
     return bytes(pdf.output())
 
-# --- 2. INTERFACE E CONEXÃO ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- 2. INTERFACE E CONEXÃO (ARQUITETURA FIREBASE) ---
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+if not firebase_admin._apps:
+    cred_dict = json.loads(st.secrets["FIREBASE_JSON"])
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
+    
+db = firestore.client()
+
+class FirebaseAdapter:
+    def read(self, worksheet="Evolucao", ttl=0):
+        # Lê os documentos do banco NoSQL e os converte instantaneamente para o formato Pandas
+        docs = db.collection(worksheet).stream()
+        dados = [d.to_dict() for d in docs]
+        return pd.DataFrame(dados) if dados else pd.DataFrame()
+
+    def update(self, worksheet="Evolucao", data=None):
+        # Engenharia de performance: Captura apenas o último registro do DataFrame e injeta no banco
+        novo_registro = data.iloc[-1].dropna().to_dict()
+        db.collection(worksheet).add(novo_registro)
+
+conn = FirebaseAdapter()
 
 # ==========================================
 # --- ROTEAMENTO SEGURANÇA (PORTAL DO CIRURGIÃO) ---
