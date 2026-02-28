@@ -596,7 +596,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     mudar_pagina('dados_paciente')
                     
             st.markdown("---")
-            menu = st.radio("MÓDULOS", ["Check-in Diário 📝", "Painel Analítico 📊"])
+            menu = st.radio("MÓDULOS", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
         else:
             menu = "Painel Analítico 📊" # Cirurgião só vê o painel
             
