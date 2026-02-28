@@ -603,6 +603,83 @@ elif st.session_state.pagina == 'painel_clinico':
     # TAG visual mostrando o membro ativo no topo da tela
     st.markdown(f"<span style='background-color: {CORES_GENUA['secundaria']}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold;'>📍 Tratamento: {st.session_state.membro_ativo}</span><br><br>", unsafe_allow_html=True)
 
+# --- MÓDULO 1: AVALIAÇÃO INICIAL ---
+if menu == "Avaliação Inicial 🔎":
+    st.header(f"🔎 Avaliação Base: {st.session_state.membro_ativo}")
+    st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Paciente Ativo: <b>{st.session_state.paciente}</b> | Primeira Consulta</p>", unsafe_allow_html=True)
+
+    with st.form(key="form_avaliacao_inicial_firebase"):
+        a1, a2, a3, a4 = st.tabs(["🗣️ Anamnese", "🚨 Red Flags", "📐 Físico & Testes", "📝 Questionários"])
+
+        with a1:
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Histórico e Contexto</h4>", unsafe_allow_html=True)
+            hma = st.text_area("HMA (História da Moléstia Atual) *", placeholder="Mecanismo de lesão, tempo de dor, comportamento dos sintomas...")
+            hmp = st.text_area("HMP (Histórico Médico Pregresso)", placeholder="Cirurgias anteriores, comorbidades, medicações em uso...")
+            c_a1, c_a2 = st.columns(2)
+            with c_a1: ocupacao = st.text_input("Profissão / Esporte")
+            with c_a2: objetivo = st.text_input("Objetivo Principal do Paciente", placeholder="Ex: Voltar a correr 5km sem dor")
+
+        with a2:
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Rastreio de Risco (Joelho)</h4>", unsafe_allow_html=True)
+            c_r1, c_r2 = st.columns(2)
+            with c_r1:
+                trauma = st.radio("Trauma Direto Recente?", ["Não", "Sim"])
+                falseio = st.radio("Falseios Francos / Falha da Articulação?", ["Não", "Sim, frequentes", "Apenas sensação de insegurança"])
+            with c_r2:
+                rigidez_matinal = st.radio("Rigidez Matinal Articular", ["Ausente", "Menos de 30 min", "Mais de 30 min (Sinal Inflamatório)"])
+                travamento = st.radio("Bloqueio/Travamento Articular Verdadeiro?", ["Não", "Sim (Possível lesão meniscal/corpo livre)"])
+
+        with a3:
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exame Físico e Cluster Ortopédico</h4>", unsafe_allow_html=True)
+            
+            st.markdown("**Interdependência Regional:**")
+            c_f1, c_f2 = st.columns(2)
+            with c_f1: quadril_forca = st.selectbox("Força Glúteo Médio (Rotadores Ext)", ["Preservada (Grau 5)", "Déficit Leve (Grau 4)", "Fraqueza Importante (< Grau 3)"])
+            with c_f2: tornozelo_adm = st.selectbox("Dorsiflexão Tornozelo (Lunge Test)", ["Normal (>10cm)", "Restrita (<10cm)"])
+            
+            st.markdown("<br>**Filtro de Testes Especiais (Positivos):**", unsafe_allow_html=True)
+            # Filtro inteligente de testes para o joelho
+            testes_ligamentares = st.multiselect("Testes Ligamentares (Instabilidade)", ["Lachman", "Gaveta Anterior", "Gaveta Posterior", "Pivot Shift", "Estresse Valgo", "Estresse Varo"])
+            testes_meniscais = st.multiselect("Testes Meniscais / Articulares", ["McMurray", "Apley Compressão", "Thessaly (20°)", "Sinal de Clarke", "Rabot"])
+
+        with a4:
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>PROMs (Métricas de Desfecho)</h4>", unsafe_allow_html=True)
+            st.info("Insira o score inicial do paciente para balizar a alta futura.")
+            c_q1, c_q2 = st.columns(2)
+            with c_q1: ikdc_score = st.number_input("Score IKDC (0-100)", min_value=0.0, max_value=100.0, step=1.0, value=0.0)
+            with c_q2: lefs_score = st.number_input("Score LEFS (0-80)", min_value=0, max_value=80, step=1, value=0)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- MOTOR DE GRAVAÇÃO (COLEÇÃO SEPARADA) ---
+        if st.form_submit_button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True):
+            if hma.strip() == "":
+                st.error("A HMA é obrigatória para registrar a avaliação.")
+            else:
+                dados_avaliacao = {
+                    "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
+                    "Paciente": st.session_state.paciente,
+                    "Membro": st.session_state.membro_ativo,
+                    "HMA": hma, "HMP": hmp, "Ocupacao": ocupacao, "Objetivo": objetivo,
+                    "Trauma": trauma, "Falseio": falseio, "Rigidez": rigidez_matinal, "Travamento": travamento,
+                    "Quadril_Forca": quadril_forca, "Tornozelo_ADM": tornozelo_adm,
+                    "Testes_Ligamentares": ", ".join(testes_ligamentares),
+                    "Testes_Meniscais": ", ".join(testes_meniscais),
+                    "IKDC_Inicial": ikdc_score, "LEFS_Inicial": lefs_score,
+                    "Profissional_ID": st.session_state.get("user_email", "admin")
+                }
+                
+                # Salva em uma nova "aba/coleção" do banco de dados específica para o Marco Zero
+                df_av = conn.read(worksheet="Avaliacao_Inicial", ttl=0)
+                nova_linha_av = pd.DataFrame([dados_avaliacao])
+                if df_av.empty:
+                    df_av = nova_linha_av
+                else:
+                    df_av = pd.concat([df_av, nova_linha_av], ignore_index=True)
+                    
+                conn.update(worksheet="Avaliacao_Inicial", data=df_av)
+                st.success("✅ Avaliação Inicial registrada com sucesso! A base de dados do paciente foi estabelecida.")
+
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
 if menu == "Check-in Diário 📝":
