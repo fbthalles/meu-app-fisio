@@ -57,13 +57,29 @@ st.markdown(f"""
         color: {CORES_GENUA['primaria']} !important;
     }}
 
-    /* 4. Inputs e Áreas de Texto (Neumorfismo Suave) */
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stTextArea>div>div>textarea {{
+    /* 4. Inputs, Áreas de Texto e Sliders (Corrigido o corte de letras) */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
         border-radius: 12px !important;
         border: 1px solid #E2E8F0 !important;
         background-color: #FFFFFF !important;
         box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
         padding: 12px 16px !important;
+        line-height: 1.5 !important;
+    }}
+    
+    /* Selectbox (Menu suspenso) com espaço para respirar */
+    .stSelectbox [data-baseweb="select"] {{
+        border-radius: 12px !important;
+        border: 1px solid #E2E8F0 !important;
+        background-color: #FFFFFF !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
+        padding: 4px 8px !important; /* Espaçamento ajustado para não esmagar a fonte */
+    }}
+    
+    /* Sliders (Barras de Dor/Inchaço/Flexão) ajustados */
+    .stSlider > div {{
+        padding-top: 15px !important;
+        padding-bottom: 15px !important;
     }}
 
     /* 5. Botões Premium (Ação de Interface Nativa) */
