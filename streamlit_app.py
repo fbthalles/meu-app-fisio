@@ -32,70 +32,109 @@ st.set_page_config(
     initial_sidebar_state="auto"
 ) # <-- Era este parêntese que estava faltando!
 
-# --- 3.1. INJEÇÃO DE CSS (INTERFACE DE APP PROFISSIONAL) ---
+# --- 3.1. INJEÇÃO DE CSS (DOSE CAVALAR DE UX) ---
 st.markdown("""
     <style>
-    /* 1. Esconder o cabeçalho, menu do Streamlit e rodapé */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
+    /* 1. Reset Global e Importação de Tipografia Clínica (Google Fonts) */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
     
-    /* 2. Fundo geral do app mais limpo */
-    .stApp {
-        background-color: #F4F7F9;
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif !important;
     }
-    
-    /* 3. Estilização dos Botões (Efeito Nativo iOS/Android) */
-    .stButton > button {
-        background-color: #103E55 !important;
-        color: white !important;
+
+    /* 2. Remoção Agressiva do Streamlit Branding */
+    #MainMenu, header, footer, .stDeployButton, .stStatusWidget {
+        display: none !important;
+    }
+
+    /* 3. Fundo Clínico e Container Mobile-First */
+    .stApp {
+        background: linear-gradient(180deg, #F4F7F9 0%, #FFFFFF 100%);
+        max-width: 550px; /* Mantém a proporção de um tablet/smartphone grande */
+        margin: 0 auto;
+        box-shadow: 0px 0px 25px rgba(0,0,0,0.04);
+    }
+
+    /* 4. Inputs e Áreas de Texto (Neumorfismo Suave) */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stTextArea>div>div>textarea {
         border-radius: 12px !important;
-        border: none !important;
-        padding: 10px 24px !important;
-        font-weight: 600 !important;
+        border: 1px solid #E2E8F0 !important;
+        background-color: #FFFFFF !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
+        padding: 12px 16px !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 4px 6px rgba(16, 62, 85, 0.2) !important;
+    }
+    .stTextInput>div>div>input:focus, .stSelectbox>div>div>div:focus, .stTextArea>div>div>textarea:focus {
+        border-color: #398E9B !important;
+        box-shadow: 0 0 0 4px rgba(57, 142, 155, 0.1) !important;
+    }
+
+    /* 5. Botões Premium (Ação de Interface Nativa) */
+    .stButton > button {
+        background: linear-gradient(135deg, #103E55 0%, #1A5473 100%) !important;
+        color: white !important;
+        border-radius: 14px !important;
+        border: none !important;
+        padding: 14px 24px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.5px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 6px 16px rgba(16, 62, 85, 0.2) !important;
         width: 100% !important;
+        font-size: 0.95rem !important;
     }
     .stButton > button:hover {
-        background-color: #398E9B !important;
-        box-shadow: 0 6px 12px rgba(57, 142, 155, 0.3) !important;
         transform: translateY(-2px) !important;
+        box-shadow: 0 8px 20px rgba(16, 62, 85, 0.3) !important;
+        background: linear-gradient(135deg, #1A5473 0%, #103E55 100%) !important;
     }
-    
-    /* 4. Estilização dos Cards (Métricas flutuantes) */
+
+    /* 6. Cards de Métricas (Elevação e Destaque) */
     [data-testid="metric-container"] {
-        background-color: white;
-        border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        border-left: 5px solid #398E9B;
+        background-color: #FFFFFF;
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+        border: 1px solid #F0F4F8;
+        border-left: 6px solid #398E9B;
+        transition: transform 0.2s ease;
     }
-    
-    /* 5. Abas (Tabs) com visual moderno e pílulas */
+    [data-testid="metric-container"]:hover {
+        transform: translateY(-3px);
+    }
+    [data-testid="stMetricValue"] {
+        font-weight: 700 !important;
+        color: #103E55 !important;
+        font-size: 2rem !important;
+    }
+
+    /* 7. Abas de Navegação (Pílulas Deslizantes) */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 12px;
         background-color: transparent;
-        padding: 5px 0px;
+        padding: 15px 0px;
+        border-bottom: none !important;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 20px !important;
-        padding: 8px 16px !important;
-        background-color: white !important;
-        border: 1px solid #e0e0e0 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        border-radius: 30px !important;
+        padding: 10px 22px !important;
+        background-color: #F4F7F9 !important;
+        border: 1px solid transparent !important;
+        color: #6C757D !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #103E55 !important;
         color: white !important;
-        border: 1px solid #103E55 !important;
+        box-shadow: 0 4px 12px rgba(16, 62, 85, 0.2) !important;
     }
-    
-    /* 6. Caixas de Input e Selectbox mais suaves */
-    .stTextInput>div>div>input, .stSelectbox>div>div>div {
-        border-radius: 8px !important;
-        border: 1px solid #ced4da !important;
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.02) !important;
+
+    /* 8. Alertas Clínicos e Notificações */
+    .stAlert {
+        border-radius: 14px !important;
+        border: none !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
     }
     </style>
 """, unsafe_allow_html=True)
