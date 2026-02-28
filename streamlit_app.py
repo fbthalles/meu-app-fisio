@@ -27,11 +27,74 @@ NOVO_LOGO_GENUA = "logo_genua_novo_v2.png"
 
 # 3. CONFIGURAÇÃO INICIAL DA PÁGINA 
 st.set_page_config(
-    page_title="GENUA | Inteligência Clínica",
-    page_icon=NOVO_LOGO_GENUA, 
-    layout="wide",
-    initial_sidebar_state="auto" # Correção Mobile: recolhe sozinho em telas pequenas
-)
+    
+    # --- 3.1. INJEÇÃO DE CSS (INTERFACE DE APP PROFISSIONAL) ---
+st.markdown("""
+    <style>
+    /* 1. Esconder o cabeçalho, menu do Streamlit e rodapé */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* 2. Fundo geral do app mais limpo */
+    .stApp {
+        background-color: #F4F7F9;
+    }
+    
+    /* 3. Estilização dos Botões (Efeito Nativo iOS/Android) */
+    .stButton > button {
+        background-color: #103E55 !important;
+        color: white !important;
+        border-radius: 12px !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 6px rgba(16, 62, 85, 0.2) !important;
+        width: 100% !important;
+    }
+    .stButton > button:hover {
+        background-color: #398E9B !important;
+        box-shadow: 0 6px 12px rgba(57, 142, 155, 0.3) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    /* 4. Estilização dos Cards (Métricas flutuantes) */
+    [data-testid="metric-container"] {
+        background-color: white;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        border-left: 5px solid #398E9B;
+    }
+    
+    /* 5. Abas (Tabs) com visual moderno e pílulas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+        padding: 5px 0px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 20px !important;
+        padding: 8px 16px !important;
+        background-color: white !important;
+        border: 1px solid #e0e0e0 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #103E55 !important;
+        color: white !important;
+        border: 1px solid #103E55 !important;
+    }
+    
+    /* 6. Caixas de Input e Selectbox mais suaves */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {
+        border-radius: 8px !important;
+        border: 1px solid #ced4da !important;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.02) !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # 4. APLICAÇÃO DO TEMA GLOBAL (CSS INJETADO)
 st.markdown(f"""
