@@ -682,7 +682,7 @@ if menu == "Avaliação Inicial 🔎":
 
 # --- 3. MÓDULOS DE NAVEGAÇÃO ---
 
-if menu == "Check-in Diário 📝":
+elif menu == "Check-in Diário 📝":
     st.header(f"📝 Check-in Diário: {st.session_state.membro_ativo}")
     st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Paciente Ativo: <b>{st.session_state.paciente}</b></p>", unsafe_allow_html=True)
     
