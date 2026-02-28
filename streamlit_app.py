@@ -691,12 +691,19 @@ if menu == "Check-in Diário 📝":
         st.caption("O Sistema GENUA utiliza Segurança por Obscuridade e processamento anonimizado de dados. As informações geradas têm finalidade exclusiva de Inteligência Clínica e Continuidade Assistencial, podendo ser revogadas a qualquer momento pelo paciente.")
 
 else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
-    df = conn.read(ttl=15).dropna(how="all")
+    # 1. Leitura forçada apontando para a coleção correta no Firebase
+    df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
+    
+    # 2. BLINDAGEM NOSQL: Verifica se o banco está totalmente vazio
+    if df.empty or 'Paciente' not in df.columns:
+        st.warning(f"⚠️ A base de dados clínica ainda está vazia ou o paciente **{st.session_state.paciente}** não possui evoluções. Por favor, acesse o módulo 'Check-in Diário 📝' e registre a primeira sessão.")
+        st.stop() # Para a execução aqui para não gerar o KeyError
     
     # --- BLINDAGEM DE LEGADO ---
     if 'Membro' not in df.columns: df['Membro'] = "Joelho"
     df['Membro'] = df['Membro'].fillna("Joelho")
     
+    # 3. Cruzamento seguro de dados (agora sabemos que a coluna Paciente existe)
     df_p = df[(df['Paciente'] == st.session_state.paciente) & (df['Membro'] == st.session_state.membro_ativo)].copy()
 
     if df_p.empty:
