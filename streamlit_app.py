@@ -819,44 +819,47 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
         insight_postura = f"A posição '{pior}' exacerba o quadro álgico (Gatilho Mecânico)."
     except: pass
 
-    # --- 3. GERAÇÃO DE GRÁFICOS MATPLOTLIB (CLEAN) ---
+    # --- 3. GERAÇÃO DE GRÁFICOS MATPLOTLIB (CLEAN & TABLET-READY) ---
     indices_5 = np.arange(0, len(df_p), max(1, len(df_p)//5))
     labels_5 = [df_p['Sessão_Num'].iloc[i] for i in indices_5]
     
     # A) Dispersão Científica (Dor vs Tempo)
     fig_ev, ax_ev = plt.subplots(figsize=(10, 4.5))
-    ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], label='Nível de Dor', marker='o', lw=2)
-    ax_ev.set_title("Comportamento Longitudinal do Quadro Álgico", fontweight='bold', color=CORES_GENUA['primaria'])
+    ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], label='Nível de Dor', marker='o', lw=2.5, markersize=8)
+    ax_ev.set_title("Comportamento Longitudinal do Quadro Álgico", fontweight='bold', color=CORES_GENUA['primaria'], pad=15)
     ax_ev.set_ylim(-0.5, 11)
     ax_ev.spines['top'].set_visible(False); ax_ev.spines['right'].set_visible(False)
-    buf_ev = io.BytesIO(); fig_ev.savefig(buf_ev, format='png', bbox_inches='tight'); buf_ev.seek(0); plt.close(fig_ev)
+    ax_ev.legend(loc="upper right", frameon=False)
+    buf_ev = io.BytesIO(); fig_ev.savefig(buf_ev, format='png', bbox_inches='tight', bbox_extra_artists=(ax_ev.legend(),)); buf_ev.seek(0); plt.close(fig_ev)
 
-    # B) Correlação LSI vs Dor (O Gráfico Científico Solicitado)
-    fig_corr, ax_corr = plt.subplots(figsize=(10, 4))
-    ax_corr.scatter(df_p['Dor'], [lsi_global]*len(df_p), color=CORES_GENUA['secundaria'], alpha=0.6, s=100)
-    ax_corr.set_title("Correlação Clínica: Dor vs. Prontidão Funcional (LSI)", fontweight='bold', color=CORES_GENUA['primaria'])
-    ax_corr.set_xlabel("Dor (EVA)"); ax_corr.set_ylabel("LSI (%)")
+    # B) Correlação LSI vs Dor
+    fig_corr, ax_corr = plt.subplots(figsize=(10, 4.5))
+    scatter = ax_corr.scatter(df_p['Dor'], [lsi_global]*len(df_p), color=CORES_GENUA['secundaria'], alpha=0.7, s=120, edgecolors='white', linewidth=1.5)
+    ax_corr.set_title("Correlação Clínica: Dor vs. Prontidão (LSI)", fontweight='bold', color=CORES_GENUA['primaria'], pad=15)
+    ax_corr.set_xlabel("Dor (EVA)", fontweight='bold', color=CORES_GENUA['texto_suave'])
+    ax_corr.set_ylabel("LSI (%)", fontweight='bold', color=CORES_GENUA['texto_suave'])
     ax_corr.set_xlim(-0.5, 11); ax_corr.set_ylim(0, 110)
     ax_corr.spines['top'].set_visible(False); ax_corr.spines['right'].set_visible(False)
     buf_corr = io.BytesIO(); fig_corr.savefig(buf_corr, format='png', bbox_inches='tight'); buf_corr.seek(0); plt.close(fig_corr)
 
     # C) Biomecânica / Inchaço Específico
-    fig_adm, ax1_adm = plt.subplots(figsize=(10, 4))
+    fig_adm, ax1_adm = plt.subplots(figsize=(10, 4.5))
     if st.session_state.membro_ativo == "Joelho":
-        ax1_adm.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'], label='Flexão (°)', lw=3)
+        ax1_adm.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'], label='Flexão (°)', lw=3, marker='s')
         ax1_adm.set_ylim(0, 160)
     elif st.session_state.membro_ativo == "Ombro":
-        ax1_adm.plot(df_p['Sessão_Num'], pd.to_numeric(df_p['Elevacao_Ombro'], errors='coerce').fillna(90), color=CORES_GENUA['secundaria'], label='Elevação (°)', lw=3)
+        ax1_adm.plot(df_p['Sessão_Num'], pd.to_numeric(df_p['Elevacao_Ombro'], errors='coerce').fillna(90), color=CORES_GENUA['secundaria'], label='Elevação (°)', lw=3, marker='s')
         ax1_adm.set_ylim(0, 180)
     else:
-        ax1_adm.plot(df_p['Sessão_Num'], [lsi_global]*len(df_p), color=CORES_GENUA['secundaria'], label='Score Mecânico', lw=3)
+        ax1_adm.plot(df_p['Sessão_Num'], [lsi_global]*len(df_p), color=CORES_GENUA['secundaria'], label='Score Mecânico', lw=3, marker='s')
         ax1_adm.set_ylim(0, 110)
     
-    ax1_adm.set_title(f"Evolução Biomecânica: {st.session_state.membro_ativo}", fontweight='bold', color=CORES_GENUA['primaria'])
+    ax1_adm.set_title(f"Evolução Biomecânica: {st.session_state.membro_ativo}", fontweight='bold', color=CORES_GENUA['primaria'], pad=15)
     ax1_adm.spines['top'].set_visible(False); ax1_adm.spines['right'].set_visible(False)
-    buf_adm = io.BytesIO(); fig_adm.savefig(buf_adm, format='png', bbox_inches='tight'); buf_adm.seek(0); plt.close(fig_adm)
+    ax1_adm.legend(loc="upper left", frameon=False)
+    buf_adm = io.BytesIO(); fig_adm.savefig(buf_adm, format='png', bbox_inches='tight', bbox_extra_artists=(ax1_adm.legend(),)); buf_adm.seek(0); plt.close(fig_adm)
 
-    buf_inc = buf_adm # Fallback para o PDF não quebrar
+    buf_inc = buf_adm 
     buf_s = buf_corr
 
     # --- 4. TELA DASHBOARD (INTERFACE UI) ---
