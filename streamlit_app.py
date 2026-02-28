@@ -27,8 +27,13 @@ NOVO_LOGO_GENUA = "logo_genua_novo_v2.png"
 
 # 3. CONFIGURAÇÃO INICIAL DA PÁGINA 
 st.set_page_config(
-    
-    # --- 3.1. INJEÇÃO DE CSS (INTERFACE DE APP PROFISSIONAL) ---
+    page_title="GENUA | Inteligência Clínica",
+    page_icon=NOVO_LOGO_GENUA, 
+    layout="wide",
+    initial_sidebar_state="auto"
+) # <-- Era este parêntese que estava faltando!
+
+# --- 3.1. INJEÇÃO DE CSS (INTERFACE DE APP PROFISSIONAL) ---
 st.markdown("""
     <style>
     /* 1. Esconder o cabeçalho, menu do Streamlit e rodapé */
