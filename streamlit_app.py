@@ -32,57 +32,48 @@ st.set_page_config(
     initial_sidebar_state="auto"
 ) # <-- Era este parêntese que estava faltando!
 
-# --- 3.1 E 4. INJEÇÃO DE CSS UNIFICADA (UX PREMIUM E CORES GENUA) ---
+# --- 3.1 E 4. INJEÇÃO DE CSS UNIFICADA (UX PREMIUM TABLET/MOBILE) ---
 st.markdown(f"""
     <style>
-    /* 1. Importação de Tipografia Clínica (Google Fonts) */
+    /* 1. Tipografia e Reset */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-    
-    html, body, [class*="css"] {{
-        font-family: 'Inter', sans-serif !important;
-    }}
+    html, body, [class*="css"] {{ font-family: 'Inter', sans-serif !important; }}
+    #MainMenu, header, footer, .stDeployButton, .stStatusWidget {{ display: none !important; }}
 
-    /* 2. Remoção do Streamlit Branding */
-    #MainMenu, header, footer, .stDeployButton, .stStatusWidget {{
-        display: none !important;
-    }}
-
-    /* 3. Fundo Clínico */
+    /* 2. Container Principal (Respirabilidade para Tablets/iPads) */
     .stApp {{
         background: linear-gradient(180deg, {CORES_GENUA['fundo_claro']} 0%, #FFFFFF 100%);
         color: {CORES_GENUA['texto_escuro']};
     }}
-    
-    h1, h2, h3, h4 {{
-        color: {CORES_GENUA['primaria']} !important;
+    [data-testid="block-container"] {{
+        padding-top: 2rem !important;
+        padding-bottom: 3rem !important;
+        padding-left: 5% !important;
+        padding-right: 5% !important;
+        max-width: 1200px !important; /* Evita que o layout wide estique infinitamente em monitores ultrawide */
     }}
+    
+    h1, h2, h3, h4 {{ color: {CORES_GENUA['primaria']} !important; }}
 
-    /* 4. Inputs, Áreas de Texto e Sliders (Corrigido o corte de letras) */
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
+    /* 3. Correção de Cortes em Inputs, TextAreas e Selectboxes */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox [data-baseweb="select"] {{
         border-radius: 12px !important;
         border: 1px solid #E2E8F0 !important;
         background-color: #FFFFFF !important;
         box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
-        padding: 12px 16px !important;
+        padding: 10px 14px !important;
         line-height: 1.5 !important;
+        min-height: 48px !important; /* Garante altura mínima para toques no tablet */
     }}
     
-    /* Selectbox (Menu suspenso) com espaço para respirar */
-    .stSelectbox [data-baseweb="select"] {{
-        border-radius: 12px !important;
-        border: 1px solid #E2E8F0 !important;
-        background-color: #FFFFFF !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
-        padding: 4px 8px !important; /* Espaçamento ajustado para não esmagar a fonte */
-    }}
-    
-    /* Sliders (Barras de Dor/Inchaço/Flexão) ajustados */
+    /* 4. Correção do Esmagamento dos Sliders */
     .stSlider > div {{
-        padding-top: 15px !important;
-        padding-bottom: 15px !important;
+        padding-top: 18px !important;
+        padding-bottom: 18px !important;
     }}
+    [data-testid="stTickBar"] {{ fill: {CORES_GENUA['texto_suave']} !important; }}
 
-    /* 5. Botões Premium (Ação de Interface Nativa) */
+    /* 5. Botões Nativos */
     .stButton > button {{
         background: linear-gradient(135deg, {CORES_GENUA['primaria']} 0%, #1A5473 100%) !important;
         color: white !important;
@@ -92,6 +83,8 @@ st.markdown(f"""
         font-weight: 600 !important;
         box-shadow: 0 4px 10px rgba(16, 62, 85, 0.2) !important;
         width: 100% !important;
+        min-height: 50px !important;
+        transition: all 0.2s ease-in-out !important;
     }}
     .stButton > button:hover {{
         transform: translateY(-2px) !important;
@@ -99,55 +92,37 @@ st.markdown(f"""
         background: linear-gradient(135deg, #1A5473 0%, {CORES_GENUA['primaria']} 100%) !important;
     }}
 
-    /* 6. Cards de Métricas (Elevação e Destaque) */
+    /* 6. Cards de Métricas e Dashboards */
     [data-testid="metric-container"] {{
         background-color: #FFFFFF;
         border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        padding: 24px 20px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.05);
         border: 1px solid #F0F4F8;
         border-left: 6px solid {CORES_GENUA['secundaria']};
+        margin-bottom: 10px;
     }}
+    [data-testid="stMetricValue"] {{ font-size: 2.2rem !important; }}
 
-    /* 7. Abas de Navegação (Pílulas Deslizantes) */
+    /* 7. Abas (Tabs) com Design de Pílulas Modernas */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 12px;
-        background-color: transparent;
-        padding: 15px 0px;
+        gap: 15px;
+        padding: 10px 0px 20px 0px;
         border-bottom: none !important;
     }}
     .stTabs [data-baseweb="tab"] {{
         border-radius: 30px !important;
-        padding: 10px 22px !important;
+        padding: 12px 24px !important;
         background-color: #F4F7F9 !important;
         color: #6C757D !important;
         font-weight: 600 !important;
+        border: 1px solid transparent !important;
     }}
     .stTabs [aria-selected="true"] {{
         background-color: {CORES_GENUA['primaria']} !important;
         color: white !important;
         box-shadow: 0 4px 12px rgba(16, 62, 85, 0.2) !important;
     }}
-    </style>
-""", unsafe_allow_html=True)
-
-# 4. APLICAÇÃO DO TEMA GLOBAL (CSS INJETADO)
-st.markdown(f"""
-    <style>
-        .stApp {{
-            background-color: {CORES_GENUA['fundo_claro']};
-            color: {CORES_GENUA['texto_escuro']};
-        }}
-        h1, h2, h3 {{
-            color: {CORES_GENUA['primaria']} !important;
-        }}
-        .stButton>button {{
-            background-color: {CORES_GENUA['primaria']} !important;
-            color: white !important;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-        }}
     </style>
 """, unsafe_allow_html=True)
 
