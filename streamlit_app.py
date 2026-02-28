@@ -39,14 +39,6 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
-
-    /* Estilo para parecer app de celular */
-    .stApp {
-        max-width: 500px; /* Centraliza o conteúdo como um celular */
-        margin: 0 auto;
-        border-right: 1px solid #ddd;
-        border-left: 1px solid #ddd;
-    }
     
     /* 2. Fundo geral do app mais limpo */
     .stApp {
@@ -502,42 +494,12 @@ elif st.session_state.pagina == 'dados_paciente':
         
     opcao_paciente = st.selectbox("Selecione um paciente ou cadastre novo:", ["+ Cadastrar Novo"] + lista_pacientes)
     
-    if opcao_paciente == "+ Cadastrar Novo":
-        with st.form("form_novo_paciente"):
-            c1, c2 = st.columns(2)
-            with c1:
-                novo_nome = st.text_input("Nome Completo *")
-                novo_cpf = st.text_input("CPF")
-                nova_idade = st.number_input("Idade", min_value=0, max_value=120)
-            with c2:
-                novo_tel = st.text_input("WhatsApp")
-                novo_email = st.text_input("E-mail")
-                nova_hma = st.text_area("HMA (História Clínica)")
-            
-            if st.form_submit_button("💾 Salvar no Google Cloud"):
-                if novo_nome:
-                    novo_reg = pd.DataFrame([{
-                        "Nome": novo_nome, "CPF": novo_cpf, "Idade": nova_idade,
-                        "Telefone": novo_tel, "Email": novo_email, "Historia": nova_hma,
-                        "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")
-                    }])
-                    conn.update(worksheet="Cadastro", data=novo_reg)
-                    st.success("Paciente salvo com sucesso!")
-                    st.session_state.paciente = novo_nome
-                    mudar_pagina('selecao_membro')
-                else:
-                    st.error("Nome é obrigatório.")
-    else:
-        st.info(f"Paciente ativo: **{opcao_paciente}**")
-        if st.button("Abrir Prontuário ➡️"):
-            st.session_state.paciente = opcao_paciente
-            mudar_pagina('selecao_membro')
-    
     # --- FLUXO 1: FORMULÁRIO COMPLETO DE NOVO PACIENTE ---
     if opcao_paciente == "+ Cadastrar Novo":
         st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📋 Nova Ficha de Cadastro</h4>", unsafe_allow_html=True)
         
-        with st.form("form_novo_paciente"):
+        # Chave única adicionada para evitar o StreamlitAPIException
+        with st.form(key="form_cadastro_firebase"):
             c1, c2 = st.columns(2)
             with c1:
                 novo_nome = st.text_input("Nome Completo *", placeholder="Ex: João da Silva")
@@ -549,25 +511,21 @@ elif st.session_state.pagina == 'dados_paciente':
                 nova_hma = st.text_area("HMA (História Clínica / Cirurgia)", height=68, placeholder="Ex: Pós-operatório de LCA...")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            submit_cadastro = st.form_submit_button("💾 Salvar Cadastro e Avançar", use_container_width=True)
+            submit_cadastro = st.form_submit_button("💾 Salvar no Google Cloud", use_container_width=True)
             
             if submit_cadastro:
                 if novo_nome.strip() == "":
                     st.error("⚠️ O Nome Completo é obrigatório.")
                 else:
-                    try:
-                        df_cad_atual = conn.read(worksheet="Cadastro", ttl=0).dropna(how="all")
-                        novo_registro = pd.DataFrame([{
-                            "Nome": novo_nome.strip(), "CPF": novo_cpf, "Idade": nova_idade,
-                            "Telefone": novo_telefone, "Email": novo_email, "Historia": nova_hma,
-                            "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")
-                        }])
-                        conn.update(worksheet="Cadastro", data=pd.concat([df_cad_atual, novo_registro], ignore_index=True))
-                        st.success("Cadastro realizado com sucesso!")
-                        st.session_state.paciente = novo_nome.strip()
-                        mudar_pagina('selecao_membro')
-                    except Exception as e:
-                        st.error("⚠️ Erro: Certifique-se de que existe a aba 'Cadastro' com as colunas corretas.")
+                    novo_registro = pd.DataFrame([{
+                        "Nome": novo_nome.strip(), "CPF": novo_cpf, "Idade": nova_idade,
+                        "Telefone": novo_telefone, "Email": novo_email, "Historia": nova_hma,
+                        "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")
+                    }])
+                    conn.update(worksheet="Cadastro", data=novo_registro)
+                    st.success("Cadastro realizado com sucesso!")
+                    st.session_state.paciente = novo_nome.strip()
+                    mudar_pagina('selecao_membro')
 
     # --- FLUXO 2: PACIENTE JÁ EXISTENTE ---
     else:
