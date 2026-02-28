@@ -613,19 +613,20 @@ if menu == "Check-in Diário 📝":
         
         # --- 1. CAMPOS PADRÃO (Sistêmicos) ---
         st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Quadro Sistêmico Universal</h4>", unsafe_allow_html=True)
-        # O Inchaço foi removido daqui! Apenas Dor, Sono e Postura importam para todos.
-        c1, c2, c3 = st.columns(3)
+        
+        # Reduzimos para 2 colunas e removemos a interface visual da Postura
+        c1, c2 = st.columns(2)
         with c1: dor = st.slider("💥 Dor atual (EVA 0-10)", 0, 10, 0)
-        with c2: sono = st.radio("💤 Sono", ["Ruim", "Regular", "Bom"])
-        with c3: postura = st.radio("🧍 Postura", ["Sentado", "Equilibrado", "Em pé"])
+        with c2: sono = st.radio("💤 Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
             
         dados_sessao = {
             "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "Paciente": st.session_state.paciente,
             "Membro": st.session_state.membro_ativo,
-            "Dor": int(dor), "Sono": sono, "Postura": postura
+            "Dor": int(dor), "Sono": sono,
+            "Postura": "Não avaliada", # Mantido de forma invisível apenas para não quebrar o banco de dados e gráficos antigos
+            "Profissional_ID": st.session_state.get("user_email", "admin")
         }
-
         # --- 2. CAMPOS ESPECÍFICOS (O Pente Fino Clínico) ---
         st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Avaliação Específica: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
         
