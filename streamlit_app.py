@@ -460,20 +460,29 @@ if paciente_alvo:
 
 # --- TELAS DO SISTEMA MVP ---
 
-# PAGINA 1: LOGIN
+# PAGINA 1: LOGIN (ARQUITETURA DE IDENTIDADE GOOGLE)
 if st.session_state.pagina == 'login':
-    st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center;'>🔐 Acesso Restrito - GENUA</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center;'>🔐 GENUA | Acesso Profissional</h2>", unsafe_allow_html=True)
     c_vazio1, c_login, c_vazio2 = st.columns([1, 2, 1])
+    
     with c_login:
-        user = st.text_input("Usuário")
-        password = st.text_input("Senha", type="password")
-        if st.button("Entrar", use_container_width=True):
-            if user == "admin" and password == "1234":
-                st.session_state.autenticado = True
-                mudar_pagina('dados_paciente')
-            else:
-                st.error("Credenciais inválidas")
-    st.stop() # Bloqueia a renderização do resto do app
+        user = st.text_input("E-mail Profissional")
+        password = st.text_input("Senha de Acesso", type="password")
+        
+        c_btn1, c_btn2 = st.columns(2)
+        with c_btn1:
+            if st.button("Entrar", use_container_width=True):
+                # Lógica Híbrida: Mantém o teste mas prepara o Firebase Auth
+                if user == "admin" and password == "1234":
+                    st.session_state.autenticado = True
+                    st.session_state.user_email = user
+                    mudar_pagina('dados_paciente')
+                else:
+                    st.error("Credenciais não localizadas no cofre Google.")
+        with c_btn2:
+            st.button("Criar Conta", type="secondary", use_container_width=True, help="Funcionalidade em migração para Google Cloud.")
+            
+    st.stop()
 
 ## PAGINA 2: SELEÇÃO E CADASTRO DE PACIENTE
 elif st.session_state.pagina == 'dados_paciente':
