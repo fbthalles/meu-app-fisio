@@ -32,38 +32,43 @@ st.set_page_config(
     initial_sidebar_state="auto"
 ) # <-- Era este parêntese que estava faltando!
 
-# --- 3.1. INJEÇÃO DE CSS (DOSE CAVALAR DE UX - CORRIGIDA) ---
-st.markdown("""
+# --- 3.1 E 4. INJEÇÃO DE CSS UNIFICADA (UX PREMIUM E CORES GENUA) ---
+st.markdown(f"""
     <style>
     /* 1. Importação de Tipografia Clínica (Google Fonts) */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
     
-    html, body, [class*="css"] {
+    html, body, [class*="css"] {{
         font-family: 'Inter', sans-serif !important;
-    }
+    }}
 
     /* 2. Remoção do Streamlit Branding */
-    #MainMenu, header, footer, .stDeployButton {
+    #MainMenu, header, footer, .stDeployButton, .stStatusWidget {{
         display: none !important;
-    }
+    }}
 
-    /* 3. Fundo Clínico (SEM MAX-WIDTH PARA NÃO ESMAGAR A TELA) */
-    .stApp {
-        background: linear-gradient(180deg, #F4F7F9 0%, #FFFFFF 100%);
-    }
+    /* 3. Fundo Clínico */
+    .stApp {{
+        background: linear-gradient(180deg, {CORES_GENUA['fundo_claro']} 0%, #FFFFFF 100%);
+        color: {CORES_GENUA['texto_escuro']};
+    }}
+    
+    h1, h2, h3, h4 {{
+        color: {CORES_GENUA['primaria']} !important;
+    }}
 
     /* 4. Inputs e Áreas de Texto (Neumorfismo Suave) */
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stTextArea>div>div>textarea {
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stTextArea>div>div>textarea {{
         border-radius: 12px !important;
         border: 1px solid #E2E8F0 !important;
         background-color: #FFFFFF !important;
         box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
         padding: 12px 16px !important;
-    }
+    }}
 
     /* 5. Botões Premium (Ação de Interface Nativa) */
-    .stButton > button {
-        background: linear-gradient(135deg, #103E55 0%, #1A5473 100%) !important;
+    .stButton > button {{
+        background: linear-gradient(135deg, {CORES_GENUA['primaria']} 0%, #1A5473 100%) !important;
         color: white !important;
         border-radius: 14px !important;
         border: none !important;
@@ -71,21 +76,44 @@ st.markdown("""
         font-weight: 600 !important;
         box-shadow: 0 4px 10px rgba(16, 62, 85, 0.2) !important;
         width: 100% !important;
-    }
-    .stButton > button:hover {
+    }}
+    .stButton > button:hover {{
         transform: translateY(-2px) !important;
         box-shadow: 0 6px 15px rgba(16, 62, 85, 0.3) !important;
-    }
+        background: linear-gradient(135deg, #1A5473 0%, {CORES_GENUA['primaria']} 100%) !important;
+    }}
 
     /* 6. Cards de Métricas (Elevação e Destaque) */
-    [data-testid="metric-container"] {
+    [data-testid="metric-container"] {{
         background-color: #FFFFFF;
         border-radius: 16px;
         padding: 20px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.06);
         border: 1px solid #F0F4F8;
-        border-left: 6px solid #398E9B;
-    }
+        border-left: 6px solid {CORES_GENUA['secundaria']};
+    }}
+
+    /* 7. Abas de Navegação (Pílulas Deslizantes) */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 12px;
+        background-color: transparent;
+        padding: 15px 0px;
+        border-bottom: none !important;
+    }}
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: 30px !important;
+        padding: 10px 22px !important;
+        background-color: #F4F7F9 !important;
+        color: #6C757D !important;
+        font-weight: 600 !important;
+    }}
+    .stTabs [aria-selected="true"] {{
+        background-color: {CORES_GENUA['primaria']} !important;
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(16, 62, 85, 0.2) !important;
+    }}
+    </style>
+""", unsafe_allow_html=True)
 
 # 4. APLICAÇÃO DO TEMA GLOBAL (CSS INJETADO)
 st.markdown(f"""
