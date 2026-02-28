@@ -484,18 +484,46 @@ if st.session_state.pagina == 'login':
             
     st.stop()
 
-## PAGINA 2: SELEÇÃO E CADASTRO DE PACIENTE
+## PAGINA 2: SELEÇÃO E CADASTRO DE PACIENTE (FIREBASE READY)
 elif st.session_state.pagina == 'dados_paciente':
-    st.title("👤 Seleção ou Cadastro de Paciente")
+    st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']};'>👤 Gestão de Pacientes</h2>", unsafe_allow_html=True)
     
-    # INTELIGÊNCIA: Puxa a lista de pacientes diretamente da aba "Cadastro"
-    try:
-        df_cad = conn.read(worksheet="Cadastro", ttl=0).dropna(how="all")
-        lista_pacientes = df_cad['Nome'].dropna().unique().tolist()
-    except:
-        lista_pacientes = []
+    # Busca lista atualizada do Google Cloud
+    df_cad = conn.read(worksheet="Cadastro")
+    lista_pacientes = df_cad['Nome'].tolist() if not df_cad.empty else []
         
-    opcao_paciente = st.selectbox("Selecione um paciente existente ou cadastre um novo:", ["+ Cadastrar Novo"] + lista_pacientes)
+    opcao_paciente = st.selectbox("Selecione um paciente ou cadastre novo:", ["+ Cadastrar Novo"] + lista_pacientes)
+    
+    if opcao_paciente == "+ Cadastrar Novo":
+        with st.form("form_novo_paciente"):
+            c1, c2 = st.columns(2)
+            with c1:
+                novo_nome = st.text_input("Nome Completo *")
+                novo_cpf = st.text_input("CPF")
+                nova_idade = st.number_input("Idade", min_value=0, max_value=120)
+            with c2:
+                novo_tel = st.text_input("WhatsApp")
+                novo_email = st.text_input("E-mail")
+                nova_hma = st.text_area("HMA (História Clínica)")
+            
+            if st.form_submit_button("💾 Salvar no Google Cloud"):
+                if novo_nome:
+                    novo_reg = pd.DataFrame([{
+                        "Nome": novo_nome, "CPF": novo_cpf, "Idade": nova_idade,
+                        "Telefone": novo_tel, "Email": novo_email, "Historia": nova_hma,
+                        "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")
+                    }])
+                    conn.update(worksheet="Cadastro", data=novo_reg)
+                    st.success("Paciente salvo com sucesso!")
+                    st.session_state.paciente = novo_nome
+                    mudar_pagina('selecao_membro')
+                else:
+                    st.error("Nome é obrigatório.")
+    else:
+        st.info(f"Paciente ativo: **{opcao_paciente}**")
+        if st.button("Abrir Prontuário ➡️"):
+            st.session_state.paciente = opcao_paciente
+            mudar_pagina('selecao_membro')
     
     # --- FLUXO 1: FORMULÁRIO COMPLETO DE NOVO PACIENTE ---
     if opcao_paciente == "+ Cadastrar Novo":
