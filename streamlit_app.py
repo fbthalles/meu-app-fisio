@@ -895,16 +895,27 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
 
     t1, t2, t3, t4 = st.tabs(["🧠 Análise Clínica (Guidelines)", "📉 Correlações Padrão-Ouro", "📐 Biomecânica", "🎯 Fatores Externos"])
     
-    with t1:
-        st.markdown(f"### Inteligência Baseada em Evidências")
+   with t1:
+        st.markdown("### 🧠 Raciocínio Clínico Aumentado (IA)")
+        st.info("A Inteligência Artificial atua como um sistema de suporte à decisão, cruzando variáveis ocultas em tempo real. **O raciocínio clínico e a autonomia para guiar o paciente continuam sendo integralmente do Fisioterapeuta.**")
+        
         c_i1, c_i2 = st.columns(2)
         with c_i1:
-            st.info(f"📚 **Parecer Científico:**\n{insight_ia}")
-            if recup_speed > 0: st.success(f"📈 Velocidade de regressão álgica: {recup_speed:.1f} pts/semana.")
+            st.markdown(f"**🔬 Fenótipo Detectado:**")
+            st.markdown(f"**{fenotipo_clinico}**")
+            st.markdown(f"💡 *Diretriz Algorítmica:* {diretriz_ia}")
+            
         with c_i2:
-            if alerta_ami: st.error("🚨 **Atenção (AMI):** Presença de inibição muscular artrogênica detectada.")
-            elif descompasso_nociplastico: st.warning("⚠️ **Perfil Nociplástico:** Dor alta sem justificativa estrutural aguda. Focar em educação.")
-            else: st.success("✅ **Perfil Mecânico:** Quadro condizente com a fisiologia da reabilitação.")
+            st.markdown("**📊 Métricas de Tendência:**")
+            if recup_speed > 0:
+                st.success(f"📈 **Projeção:** Queda de {recup_speed:.1f} pts de dor/semana.")
+            elif recup_speed < 0:
+                st.error(f"📉 **Alerta:** Aumento de {abs(recup_speed):.1f} pts de dor/semana.")
+            else:
+                st.warning("⚖️ **Quadro:** Estacionário (Platô).")
+            
+            st.caption(f"A tendência de dor nas últimas 3 sessões é de **{dor_tendencia:.1f}/10** (A Média histórica total é {media_dor_historica:.1f}/10).")
+
         st.image(buf_ev, use_container_width=True)
 
     with t2:
