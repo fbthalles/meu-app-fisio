@@ -821,13 +821,16 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     else:
         if inchaco_atual >= 2 and dor_atual >= 6:
             fenotipo_clinico = "🔴 Inflamatório Agudo / Alta Irritabilidade"
-            diretriz_ia = "Cascata inflamatória ativa. Priorizar modulação agressiva e repouso articular relativo. Cargas tensionais altas contraindicadas agora."
+            diretriz_ia = "Cascata inflamatória ativa. Priorizar modulação agressiva e repouso articular relativo."
         elif dor_atual <= 3 and lsi_global >= 70:
             fenotipo_clinico = "🟢 Fase de Remodelamento / Baixa Irritabilidade"
             diretriz_ia = "Estável. Progressão de carga estrutural e treinos de função específicos liberados."
         else:
             fenotipo_clinico = "🔵 Misto / Transição"
-            diretriz_ia = "Fase de acomodação mecânica. Progressão guiada por tolerância aos sintomas (Regra da Dor < 4/10 durante o exercício)."
+            diretriz_ia = "Fase de acomodação mecânica. Progressão guiada por tolerância aos sintomas."
+
+    # RESTAURAÇÃO DA VARIÁVEL DE STATUS DO PAINEL
+    status_clinico = "Excelente" if lsi_global >= 85 else "Regular" if lsi_global >= 60 else "Atenção"
 
     # 2.4. CÁLCULO DE VELOCIDADE DE RECUPERAÇÃO E PREVISÃO REALISTA
     recup_speed = 0.0; prev_txt = "Aguardando dados (Min. 3 sessões)"
