@@ -879,29 +879,47 @@ else: # PAINEL ANALÍTICO (O CÉREBRO CLÍNICO TOTAL)
     buf_s = buf_corr
 
     # --- 4. TELA DASHBOARD (INTERFACE UI) ---
+    # RECUPERAÇÃO DA VARIÁVEL: Cálculo da variação percentual da dor
+    media_dor_historica = df_p['Dor'].mean()
+    delta_dor_pct = ((ultima['Dor'] - media_dor_historica) / media_dor_historica * 100) if media_dor_historica > 0 else 0
+
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Dor Atual (vs Média)", f"{ultima['Dor']}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
-    if "Coluna" in st.session_state.membro_ativo: m2.metric("Irradiação", f"{ultima.get('Irradiacao', 'Ausente')}")
-    else: m2.metric("Inchaço", f"Grau {ultima['Inchaco_N']}")
+    
+    if "Coluna" in st.session_state.membro_ativo: 
+        m2.metric("Irradiação", f"{ultima.get('Irradiacao', 'Ausente')}")
+    else: 
+        m2.metric("Inchaço", f"Grau {ultima.get('Inchaco_N', 0)}")
+        
     m3.metric("Prontidão (LSI)", f"{lsi_global:.0f}%", status_clinico)
     m4.metric("Previsão Alta", prev_txt)
     st.write("---")
 
-    # WPP Button
+    # Botão de envio para o Cirurgião
     if not paciente_alvo:
         token_gerado = base64.b64encode(p_sel.encode('utf-8')).decode('utf-8')
         link_wpp = f"https://api.whatsapp.com/send?text=Acesse%20o%20prontuário%20aqui:%20https://meu-app-fisio-sekckq2ebemqgfsv4xeu9v.streamlit.app/?med=true%26token={token_gerado}"
         st.link_button("📲 Enviar para o Cirurgião (Portal Seguro)", link_wpp, type="secondary", use_container_width=True)
 
-    t1, t2, t3, t4 = st.tabs(["🧠 Análise Clínica (Guidelines)", "📉 Correlações Padrão-Ouro", "📐 Biomecânica", "🎯 Fatores Externos"])
-    
-   with t1:
+    # --- UX: BARRA DE PROGRESSO DE REABILITAÇÃO ---
+    st.markdown(f"**Progresso para Alta Clínica (LSI): {lsi_global:.0f}%**")
+    st.progress(lsi_global / 100)
+
+    t1, t2, t3, t4, t5 = st.tabs([
+        "🧠 Análise Clínica", 
+        "📉 Correlações", 
+        "📐 Biomecânica", 
+        "🎯 Fatores Externos",
+        "🏋️ Conduta GENUA (IA)"
+    ])
+
+    with t1:
         st.markdown("### 🧠 Raciocínio Clínico Aumentado (IA)")
         st.info("A Inteligência Artificial atua como um sistema de suporte à decisão, cruzando variáveis ocultas em tempo real. **O raciocínio clínico e a autonomia para guiar o paciente continuam sendo integralmente do Fisioterapeuta.**")
         
         c_i1, c_i2 = st.columns(2)
         with c_i1:
-            st.markdown(f"**🔬 Fenótipo Detectado:**")
+            st.markdown("**🔬 Fenótipo Detectado:**")
             st.markdown(f"**{fenotipo_clinico}**")
             st.markdown(f"💡 *Diretriz Algorítmica:* {diretriz_ia}")
             
