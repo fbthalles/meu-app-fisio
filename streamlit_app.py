@@ -603,8 +603,8 @@ elif st.session_state.pagina == 'painel_clinico':
     # TAG visual mostrando o membro ativo no topo da tela
     st.markdown(f"<span style='background-color: {CORES_GENUA['secundaria']}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold;'>📍 Tratamento: {st.session_state.membro_ativo}</span><br><br>", unsafe_allow_html=True)
 
-# --- MÓDULO 1: AVALIAÇÃO INICIAL ---
-if menu == "Avaliação Inicial 🔎":
+# --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
+elif menu == "Avaliação Inicial 🔎":
     st.header(f"🔎 Avaliação Base: {st.session_state.membro_ativo}")
     st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Paciente Ativo: <b>{st.session_state.paciente}</b> | Primeira Consulta</p>", unsafe_allow_html=True)
 
@@ -630,17 +630,27 @@ if menu == "Avaliação Inicial 🔎":
                 travamento = st.radio("Bloqueio/Travamento Articular Verdadeiro?", ["Não", "Sim (Possível lesão meniscal/corpo livre)"])
 
         with a3:
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exame Físico e Cluster Ortopédico</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Força e Interdependência Regional</h4>", unsafe_allow_html=True)
+            c_f1, c_f2, c_f3 = st.columns(3)
+            with c_f1: quadriceps_forca = st.selectbox("Força Quadríceps", ["Preservada", "Déficit Leve", "Fraqueza Importante (< Grau 3)"])
+            with c_f2: isquio_forca = st.selectbox("Força Isquiotibiais", ["Preservada", "Déficit Leve", "Fraqueza Importante (< Grau 3)"])
+            with c_f3: quadril_forca = st.selectbox("Força Glúteo Médio", ["Preservada", "Déficit Leve", "Fraqueza Importante (< Grau 3)"])
             
-            st.markdown("**Interdependência Regional:**")
-            c_f1, c_f2 = st.columns(2)
-            with c_f1: quadril_forca = st.selectbox("Força Glúteo Médio (Rotadores Ext)", ["Preservada (Grau 5)", "Déficit Leve (Grau 4)", "Fraqueza Importante (< Grau 3)"])
-            with c_f2: tornozelo_adm = st.selectbox("Dorsiflexão Tornozelo (Lunge Test)", ["Normal (>10cm)", "Restrita (<10cm)"])
+            c_f4, c_f5 = st.columns(2)
+            with c_f4: tornozelo_adm = st.selectbox("Dorsiflexão Tornozelo (Lunge)", ["Normal (>10cm)", "Restrita (<10cm)", "Assimétrica"])
+            with c_f5: core_controle = st.selectbox("Controle Pélvico / Core", ["Estável", "Queda Pélvica (Trendelenburg)"])
+
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Testes Funcionais e Biomecânica</h4>", unsafe_allow_html=True)
+            c_fn1, c_fn2 = st.columns(2)
+            with c_fn1: agachamento_uni = st.selectbox("Agachamento Unipodal", ["Bom Alinhamento", "Valgo Dinâmico Leve", "Valgo Dinâmico Severo", "Incapaz por Dor"])
+            with c_fn2: step_down_qualidade = st.selectbox("Step Down (Qualidade)", ["Movimento Fluido", "Estratégia de Quadril Pobre", "Dor Femoropatelar Aguda", "Incapaz"])
+
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Filtro de Testes Ortopédicos (Apenas Positivos)</h4>", unsafe_allow_html=True)
+            st.caption("Selecione apenas os testes que apresentaram sinal positivo (Dor, Frouxidão ou Clique).")
             
-            st.markdown("<br>**Filtro de Testes Especiais (Positivos):**", unsafe_allow_html=True)
-            # Filtro inteligente de testes para o joelho
-            testes_ligamentares = st.multiselect("Testes Ligamentares (Instabilidade)", ["Lachman", "Gaveta Anterior", "Gaveta Posterior", "Pivot Shift", "Estresse Valgo", "Estresse Varo"])
-            testes_meniscais = st.multiselect("Testes Meniscais / Articulares", ["McMurray", "Apley Compressão", "Thessaly (20°)", "Sinal de Clarke", "Rabot"])
+            testes_ligamentares = st.multiselect("LCA, LCP, LCL, LCM e CPL", ["Lachman", "Gaveta Anterior", "Gaveta Posterior", "Pivot Shift", "Estresse Valgo", "Estresse Varo", "Dial Test (CPL)"])
+            testes_meniscais = st.multiselect("Meniscos e Cartilagem", ["McMurray", "Apley Compressão", "Thessaly (20°)", "Sinal de Rabot (Crepitação)"])
+            testes_femoropatelar = st.multiselect("SFP, Tendinopatias e Trato Iliotibial", ["Sinal de Clarke", "Apreensão Patelar", "Decline Squat (Tendinopatia Patelar)", "Teste de Noble (Trato Iliotibial)"])
 
         with a4:
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>PROMs (Métricas de Desfecho)</h4>", unsafe_allow_html=True)
@@ -662,14 +672,16 @@ if menu == "Avaliação Inicial 🔎":
                     "Membro": st.session_state.membro_ativo,
                     "HMA": hma, "HMP": hmp, "Ocupacao": ocupacao, "Objetivo": objetivo,
                     "Trauma": trauma, "Falseio": falseio, "Rigidez": rigidez_matinal, "Travamento": travamento,
-                    "Quadril_Forca": quadril_forca, "Tornozelo_ADM": tornozelo_adm,
+                    "Quadriceps_Forca": quadriceps_forca, "Isquio_Forca": isquio_forca, "Quadril_Forca": quadril_forca, 
+                    "Tornozelo_ADM": tornozelo_adm, "Core_Controle": core_controle,
+                    "Agachamento_Uni": agachamento_uni, "Step_Down_Qualidade": step_down_qualidade,
                     "Testes_Ligamentares": ", ".join(testes_ligamentares),
                     "Testes_Meniscais": ", ".join(testes_meniscais),
+                    "Testes_Femoropatelar": ", ".join(testes_femoropatelar),
                     "IKDC_Inicial": ikdc_score, "LEFS_Inicial": lefs_score,
                     "Profissional_ID": st.session_state.get("user_email", "admin")
                 }
                 
-                # Salva em uma nova "aba/coleção" do banco de dados específica para o Marco Zero
                 df_av = conn.read(worksheet="Avaliacao_Inicial", ttl=0)
                 nova_linha_av = pd.DataFrame([dados_avaliacao])
                 if df_av.empty:
