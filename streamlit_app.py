@@ -574,32 +574,34 @@ elif st.session_state.pagina == 'selecao_membro':
         
     st.stop()
 
-# PAGINA 4: PAINEL CLÍNICO (ARQUITETURA DE NAVEGAÇÃO CORRIGIDA)
+# PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
-    # 1. Configuração do Menu Lateral
+    # 1. Menu Lateral Limpo (Funciona como a "Tab Bar" de um aplicativo)
     with st.sidebar:
         if not paciente_alvo:
-            st.markdown("### 🧭 Navegação")
-            c_voltar1, c_voltar2 = st.columns(2)
-            with c_voltar1:
-                if st.button("⬅️ Membro", use_container_width=True):
-                    mudar_pagina('selecao_membro')
-            with c_voltar2:
-                if st.button("🏠 Início", use_container_width=True):
-                    mudar_pagina('dados_paciente')
-                    
+            st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']}; text-align: center;'>👤 {st.session_state.paciente}</h3>", unsafe_allow_html=True)
             st.markdown("---")
-            menu = st.radio("MÓDULOS", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
+            menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
         else:
             menu = "Painel Analítico 📊"
-            
-    st.markdown(f"<span style='background-color: {CORES_GENUA['secundaria']}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold;'>📍 Tratamento: {st.session_state.membro_ativo}</span><br><br>", unsafe_allow_html=True)
+
+    # 2. App Header (Barra Superior de Navegação Nativa)
+    if not paciente_alvo:
+        c_back, c_title, c_vazio = st.columns([1, 4, 1])
+        with c_back:
+            # Botão Voltar utilizando o novo estilo CSS "secondary" transparente
+            if st.button("⬅️ Voltar", type="secondary", use_container_width=False, help="Voltar para seleção de região"):
+                mudar_pagina('selecao_membro')
+        with c_title:
+            st.markdown(f"<h3 style='text-align: center; color: {CORES_GENUA['primaria']}; margin-top: 5px; font-size: 1.6rem;'>{st.session_state.membro_ativo}</h3>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin-top: -5px; margin-bottom: 25px;'>", unsafe_allow_html=True)
 
     # --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
     if menu == "Avaliação Inicial 🔎":
-        st.header(f"🔎 Avaliação Base: {st.session_state.membro_ativo}")
-        st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Paciente Ativo: <b>{st.session_state.paciente}</b> | Primeira Consulta</p>", unsafe_allow_html=True)
+        # Cabeçalho limpo sem repetição de tags, pois o membro já está no topo (App Header)
+        st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
 
+        # (MANTENHA O SEU CÓDIGO INTACTO A PARTIR DAQUI)
         with st.form(key="form_avaliacao_inicial_firebase"):
             a1, a2, a3, a4 = st.tabs(["🗣️ Anamnese", "🚨 Red Flags", "📐 Físico & Testes", "📝 Questionários"])
 
