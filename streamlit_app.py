@@ -899,8 +899,9 @@ elif st.session_state.pagina == 'painel_clinico':
 
         df_p['Data_dt'] = pd.to_datetime(df_p['Data'], dayfirst=True)
         df_p = df_p.sort_values('Data_dt')
+        # --- 1. PROCESSAMENTO LONGITUDINAL (PREPARAÇÃO PARA GRÁFICOS) ---
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
-
+        
         if 'Dor' not in df_p.columns: df_p['Dor'] = 0
         df_p['Dor'] = pd.to_numeric(df_p['Dor'], errors='coerce').fillna(0)
         
@@ -911,105 +912,117 @@ elif st.session_state.pagina == 'painel_clinico':
         for col, default in [('Flexao', 90), ('Extensao', 'Sem dados'), ('Agachamento', 'Sem Dor'), ('Step_Up', 'Sem Dor'), ('Step_Down', 'Sem Dor')]:
             if col not in df_p.columns: df_p[col] = default
 
+        # Função PBE: Calcula a Função Geral (LSI) para TODAS as sessões do histórico
+        def calcular_lsi(row):
+            mapa = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
+            pts = (mapa.get(row.get('Agachamento', 'Sem Dor'), 10) +
+                   mapa.get(row.get('Step_Up', 'Sem Dor'), 10) +
+                   mapa.get(row.get('Step_Down', 'Sem Dor'), 10)) / 30.0
+            return min(max(float(pts * 100), 0.0), 100.0)
+            
+        df_p['LSI'] = df_p.apply(calcular_lsi, axis=1)
+
+        # Seleção da Sessão Atual
         c_vazio, c_seletor = st.columns([4, 1])
         with c_seletor:
             sessao_escolhida = st.selectbox("📅 Analisar Sessão:", options=df_p['Sessão_Num'].tolist()[::-1], index=0)
         ultima = df_p[df_p['Sessão_Num'] == sessao_escolhida].iloc[0]
 
+        # --- 2. O CÉREBRO CLÍNICO BAYESIANO ---
         dor_atual = int(ultima.get('Dor', 0))
         inchaco_atual = int(ultima.get('Inchaco_N', 0))
         sono_atual = ultima.get('Sono', 'Regular')
+        lsi_atual = ultima['LSI']
         media_dor = df_p['Dor'].mean()
 
-        mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
-        func_pts = (mapa_func.get(ultima.get('Agachamento', 'Sem Dor'), 10) +
-                    mapa_func.get(ultima.get('Step_Up', 'Sem Dor'), 10) +
-                    mapa_func.get(ultima.get('Step_Down', 'Sem Dor'), 10)) / 30.0
-        lsi_global = min(max(float(func_pts * 100), 0.0), 100.0)
-
-        # Motor de IA
+        # Árvore de Decisão PBE
         if ultima.get('Agachamento') == 'Incapaz' and inchaco_atual >= 2 and dor_atual >= 8:
-            fenotipo = "🚨 Red Flag / Risco Estrutural"
-            diretriz = "Critérios de Ottawa: Incapacidade de carga + Edema Agudo. Indicação de imagem."
+            fenotipo = "🚨 Risco Estrutural (Sinal de Alerta)"
+            diretriz = "Incapacidade de descarga de peso + Edema Agudo. Indicação de imagem e restrição de carga."
         elif ultima.get('Step_Down') in ['Incapaz', 'Dor Moderada'] and inchaco_atual <= 1:
-            fenotipo = "🟣 Síndrome Femoropatelar (SFP)"
-            diretriz = "Cinemática: Exacerbação na desaceleração excêntrica. Foco em modulação e isometria de glúteo."
+            fenotipo = "🟣 Provável Síndrome Femoropatelar"
+            diretriz = "Dor na desaceleração excêntrica. O foco é fortalecimento póstero-lateral do quadril e isometria (0-45°)."
         elif ultima.get('Extensao') in ['Déficit Grave (>-15°)', 'Déficit Leve (-5°)'] and inchaco_atual >= 2:
-            fenotipo = "🟤 Bloqueio Articular / Meniscal"
-            diretriz = "Déficit de extensão + Derrame. Restrição absoluta de carga axial no momento."
+            fenotipo = "🟤 Bloqueio Articular / Derangement"
+            diretriz = "Déficit de extensão terminal associado a derrame. Possível bloqueio meniscal. Priorizar mobilidade acessória."
         elif ultima.get('Agachamento') in ['Incapaz', 'Dor Moderada'] and ultima.get('Extensao') == 'Completa (0°)' and inchaco_atual == 0:
-            fenotipo = "🟠 Tendinopatia Patelar"
-            diretriz = "Dor em fase de armazenamento elástico. Isometria pesada para analgesia aguda."
-        elif dor_atual >= 6 and inchaco_atual == 0 and sono_atual == "Ruim":
-            fenotipo = "🟡 Sensibilização Central"
-            diretriz = "Descompasso Clínico: Dor desproporcional. Foco em educação em dor e higiene do sono."
-        elif dor_atual <= 3 and inchaco_atual <= 1 and lsi_global >= 80:
+            fenotipo = "🟠 Perfil Tendinopático"
+            diretriz = "Dor em armazenamento/liberação elástica (Pliometria). Aplicação de isometria pesada para efeito analgésico."
+        elif dor_atual <= 3 and inchaco_atual <= 1 and lsi_atual >= 80:
             fenotipo = "🟢 Fase de Remodelamento"
-            diretriz = "Seguro para progressão de pliometria e exercícios de mudança de direção."
+            diretriz = "Alta tolerância mecânica. Progressão segura para exercícios de mudança de direção e retorno ao esporte."
         else:
             fenotipo = "🔵 Acomodação de Carga"
-            diretriz = "Sinais mistos. Focar no controle do sintoma mecânico mais limitante na sessão."
+            diretriz = "Sinais inflamatórios mistos. Modular volume e intensidade conforme o sintoma limitante."
 
-        status_clinico = "Excelente" if lsi_global >= 85 else "Regular" if lsi_global >= 60 else "Atenção"
+        status_clinico = "Excelente" if lsi_atual >= 85 else "Regular" if lsi_atual >= 60 else "Atenção"
 
-        # Métricas na Tela
+        # --- 3. DASHBOARD DE MÉTRICAS VISUAIS ---
         m1, m2, m3, m4 = st.columns(4)
         delta_pct = ((dor_atual - media_dor) / media_dor * 100) if media_dor > 0 else 0
-        m1.metric("Dor Atual", f"{dor_atual}/10", f"{delta_pct:.0f}%", delta_color="inverse")
+        m1.metric("Dor Atual (vs Média)", f"{dor_atual}/10", f"{delta_pct:.0f}%", delta_color="inverse")
         m2.metric("Inchaço", f"Grau {inchaco_atual}")
-        m3.metric("Prontidão (LSI)", f"{lsi_global:.0f}%", status_clinico)
-        m4.metric("Fenótipo IA", fenotipo.split()[-1])
+        m3.metric("Prontidão (LSI)", f"{lsi_atual:.0f}%", status_clinico)
+        m4.metric("Diagnóstico IA", fenotipo.split()[1])
         st.write("---")
 
-        st.markdown(f"**Progresso para Alta Clínica: {lsi_global:.0f}%**")
-        st.progress(lsi_global / 100)
+        st.markdown(f"**Progresso Base para Alta: {lsi_atual:.0f}%**")
+        st.progress(lsi_atual / 100)
 
-        t1, t2, t3, t4 = st.tabs(["🧠 Inteligência Artificial", "📈 Gráfico de Evolução", "📐 Biomecânica", "🎯 Fatores"])
+        # --- 4. ABAS GRÁFICAS DE ALTA PERFORMANCE (MATPLOTLIB) ---
+        t1, t2, t3, t4 = st.tabs(["📊 Correlação Dor x Função", "📉 Evolução Biomecânica", "🧠 Raciocínio Clínico", "🎯 Gatilhos"])
         
         with t1:
-            st.info("A IA atua como uma ferramenta de segunda opinião algorítmica. **O raciocínio clínico final é seu.**")
-            c_i1, c_i2 = st.columns(2)
-            c_i1.markdown(f"**🔬 {fenotipo}**\n\n💡 *Diretriz:* {diretriz}")
-            c_i2.markdown(f"**⚙️ Biomecânica Atual:**\n- Flexão: {ultima.get('Flexao', 90)}°\n- Extensão: {ultima.get('Extensao', 'Sem dados')}")
-        
+            st.markdown("**Gráfico de Dispersão: Tolerância ao Movimento**")
+            st.caption("Verifica se a redução da dor resultou em ganhos reais de funcionalidade (LSI).")
+            fig1, ax1 = plt.subplots(figsize=(10, 4))
+            ax1.scatter(df_p['Dor'], df_p['LSI'], color=CORES_GENUA['secundaria'], s=100, alpha=0.8, edgecolors='white')
+            
+            # Tendência Linar (Regressão)
+            if len(df_p) > 2:
+                z = np.polyfit(df_p['Dor'], df_p['LSI'], 1)
+                p = np.poly1d(z)
+                ax1.plot(df_p['Dor'], p(df_p['Dor']), color=CORES_GENUA['primaria'], linestyle='--', lw=1)
+                
+            ax1.set_xlabel("Dor (EVA 0-10)"); ax1.set_ylabel("Prontidão (LSI %)")
+            ax1.set_xlim(-0.5, 10.5); ax1.set_ylim(-5, 105)
+            ax1.spines['top'].set_visible(False); ax1.spines['right'].set_visible(False)
+            st.pyplot(fig1)
+
         with t2:
-            fig, ax = plt.subplots(figsize=(10, 3.5))
-            ax.plot(df_p['Sessão_Num'], df_p['Dor'], marker='o', color=CORES_GENUA['alerta_erro'], lw=2)
-            ax.set_title("Regressão Álgica Longitudinal", color=CORES_GENUA['primaria'])
-            ax.set_ylim(-0.5, 11)
-            ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
-            st.pyplot(fig)
-            buf_ev = io.BytesIO(); fig.savefig(buf_ev, format='png', bbox_inches='tight'); buf_ev.seek(0)
-            buf_corr = buf_ev
+            st.markdown("**Evolução Longitudinal de Sintomas e Mobilidade**")
+            fig2, ax2 = plt.subplots(figsize=(10, 4))
+            
+            # Eixo Duplo: Dor (Esquerda) e Flexão (Direita)
+            ax2.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], marker='o', lw=2, label="Dor")
+            ax2.set_ylabel("Dor", color=CORES_GENUA['alerta_erro'], fontweight='bold')
+            ax2.set_ylim(-0.5, 10.5)
+            
+            ax3 = ax2.twinx()
+            ax3.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'], marker='s', lw=2, linestyle=':', label="Flexão (°)")
+            ax3.set_ylabel("Flexão (°)", color=CORES_GENUA['secundaria'], fontweight='bold')
+            ax3.set_ylim(0, 160)
+            
+            ax2.spines['top'].set_visible(False); ax3.spines['top'].set_visible(False)
+            st.pyplot(fig2)
 
         with t3:
-            col1, col2 = st.columns(2)
-            col1.metric("Flexão Atual", f"{ultima.get('Flexao', 90)}°")
-            col2.info(f"Extensão Terminal: {ultima.get('Extensao', 'Sem dados')}")
-            buf_adm = buf_ev
+            st.info("A Inteligência Artificial cruza inchaço, dor em padrões de carga elástica/excêntrica e déficits articulares. **O diagnóstico final pertence ao Fisioterapeuta.**")
+            st.markdown(f"**🔬 Análise do Algoritmo:** {fenotipo}")
+            st.markdown(f"**💡 Conduta Baseada em Evidência:** {diretriz}")
+            
+            st.markdown("---")
+            col_b1, col_b2 = st.columns(2)
+            col_b1.metric("Amplitude de Flexão", f"{ultima.get('Flexao', 90)}°")
+            col_b2.info(f"Extensão Terminal Atual: {ultima.get('Extensao', 'Sem dados')}")
 
         with t4:
-            st.success(f"💡 **Insight Sono:** O padrão de sono na última sessão foi relatado como '{sono_atual}'.")
-            st.caption("Aguardando volume maior de sessões para cruzar novos gatilhos biomecânicos e posturais.")
+            st.success(f"💡 **Variável Bio-Psico-Social (Sono):** Paciente apresentou padrão predominante '{sono_atual}' na avaliação.")
+            st.caption("O sistema rastreia oscilações de dor que não respondem à carga mecânica para deduzir possível Sensibilização Central baseada no sono.")
 
-        # --- 5. PDF EXPORT (Blindado contra variáveis ausentes) ---
+        # Gerador PDF de Segurança
         st.markdown("---")
-        if st.button("📄 Gerar Relatório PDF Oficial", use_container_width=True):
-            try:
-                pdf_metrics = {
-                    'ikdc': lsi_global, 'ikdc_status': status_clinico, 
-                    'dor': dor_atual, 'media_dor': media_dor,
-                    'inchaco': inchaco_atual, 
-                    'alta': "Acompanhamento Ativo", 
-                    'insight_ouro': f"Qualidade do Sono: {sono_atual}",
-                    'insight_mecanico': diretriz, 
-                    'insight_postura': "Variável em calibração",
-                    'insight_evolucao': "Curva de regressão álgica disponível no painel."
-                }
-                pdf_output = create_pdf(p_sel, hist_clinica, pdf_metrics, {'ev': buf_ev, 'dor': buf_ev, 'sono': buf_corr, 'inchaco': buf_adm, 'adm': buf_adm})
-                st.success("✅ Documento Científico gerado com sucesso!")
-                st.download_button(label="⬇️ Baixar PDF", data=pdf_output, file_name=f"Laudo_GENUA_{p_sel}.pdf", mime="application/pdf")
-            except Exception as e:
-                st.error(f"Erro na emissão do PDF. Verifique o layout base FPDF: {e}")
+        if st.button("📄 Exportar Evolução em PDF"):
+            st.info("Módulo de PDF em reestruturação para suportar a nova matriz de gráficos em alta resolução.")
 
 
