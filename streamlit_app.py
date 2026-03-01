@@ -645,7 +645,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 with c_fn2: step_down_qualidade = st.selectbox("Step Down (Qualidade)", ["Movimento Fluido", "Estratégia de Quadril Pobre", "Dor Femoropatelar Aguda", "Incapaz"])
 
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Filtro de Testes Ortopédicos (Apenas Positivos)</h4>", unsafe_allow_html=True)
-                st.caption("Selecione apenas os testes que apresentaram sinal positivo (Dor, Frouxidão ou Clique).")
+                st.caption("Selecione apenas os testes que apresentaram sinal positivo.")
                 
                 testes_ligamentares = st.multiselect("LCA, LCP, LCL, LCM e CPL", ["Lachman", "Gaveta Anterior", "Gaveta Posterior", "Pivot Shift", "Estresse Valgo", "Estresse Varo", "Dial Test (CPL)"])
                 testes_meniscais = st.multiselect("Meniscos e Cartilagem", ["McMurray", "Apley Compressão", "Thessaly (20°)", "Sinal de Rabot (Crepitação)"])
@@ -688,7 +688,7 @@ elif st.session_state.pagina == 'painel_clinico':
                         df_av = pd.concat([df_av, nova_linha_av], ignore_index=True)
                         
                     conn.update(worksheet="Avaliacao_Inicial", data=df_av)
-                    st.success("✅ Avaliação Inicial registrada com sucesso! A base de dados do paciente foi estabelecida.")
+                    st.success("✅ Avaliação Inicial registrada com sucesso!")
 
     # --- MÓDULO 2: CHECK-IN DIÁRIO ---
     elif menu == "Check-in Diário 📝":
@@ -708,6 +708,7 @@ elif st.session_state.pagina == 'painel_clinico':
             }
 
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Avaliação Específica: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
+            
             if st.session_state.membro_ativo == "Joelho":
                 c_inc, c5, c6, c7 = st.columns(4)
                 with c_inc: inchaco = st.select_slider("💧 Inchaço", options=["0", "1", "2", "3"])
@@ -771,7 +772,8 @@ elif st.session_state.pagina == 'painel_clinico':
         df_p = df_p.sort_values('Data_dt')
         p_sel = st.session_state.paciente
 
-        st.header(f"📊 Painel Analítico: {st.session_state.membro_ativo}")
+        if paciente_alvo: st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center; margin-bottom: 25px;'>🏥 Portal do Cirurgião | Visão 360º</h2>", unsafe_allow_html=True)
+        else: st.header(f"📊 Painel Analítico: {st.session_state.membro_ativo}")
 
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
@@ -782,10 +784,10 @@ elif st.session_state.pagina == 'painel_clinico':
             hist_clinica = "Histórico não disponível."; idade_p = "-"
 
         st.markdown(f"""
-            <div style='background-color: #ffffff; border: 1px solid #e9ecef; border-left: 5px solid {CORES_GENUA['primaria']}; padding: 20px; border-radius: 8px; margin-bottom: 30px;'>
+            <div style='background-color: #ffffff; border: 1px solid #e9ecef; border-left: 5px solid {CORES_GENUA['primaria']}; padding: 20px; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
                 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'>
                     <h3 style='margin: 0; color: {CORES_GENUA['primaria']}; font-weight: 700;'>👤 {p_sel}</h3>
-                    <span style='background-color: #f1f3f5; color: {CORES_GENUA['primaria']}; padding: 6px 15px; border-radius: 20px;'>{idade_p} anos</span>
+                    <span style='background-color: #f1f3f5; color: {CORES_GENUA['primaria']}; padding: 6px 15px; border-radius: 20px; font-weight: 600;'>{idade_p} anos</span>
                 </div>
                 <p style='margin: 0; color: #495057;'><strong>HMA:</strong> {hist_clinica}</p>
             </div>
@@ -826,31 +828,33 @@ elif st.session_state.pagina == 'painel_clinico':
         except: pass
 
         dor_atual = ultima['Dor']
+        media_dor_historica = df_p['Dor'].mean()
+        dor_tendencia = df_p['Dor'].tail(3).mean() if len(df_p) >= 3 else dor_atual
         inchaco_atual = ultima.get('Inchaco_N', 0)
         sono_atual = ultima.get('Sono', 'Regular')
 
         if st.session_state.membro_ativo == "Joelho":
             if ultima.get('Agachamento') == 'Incapaz' and inchaco_atual >= 2 and dor_atual >= 8:
                 fenotipo_clinico = "🚨 Red Flag / Risco Estrutural Agudo"
-                diretriz_ia = "Incapacidade de carga com dor severa e edema agudo. Indicação de imagem (Ottawa/Pittsburgh)."
+                diretriz_ia = "Critérios de Ottawa/Pittsburgh: Incapacidade de descarga de peso + Dor Severa + Edema Agudo. Indicação de imagem."
             elif ultima.get('Step_Down') in ['Incapaz', 'Dor Moderada'] and inchaco_atual <= 1:
                 fenotipo_clinico = "🟣 Provável Síndrome Femoropatelar (SFP)"
-                diretriz_ia = "Exacerbação na desaceleração excêntrica. Modulação com isometria e fortalecimento póstero-lateral do quadril."
+                diretriz_ia = "Cinemática: Exacerbação na desaceleração excêntrica (Step Down). Modulação com isometria."
             elif ultima.get('Extensao') in ['Déficit Grave (>-15°)', 'Déficit Leve (-5°)'] and inchaco_atual >= 2:
                 fenotipo_clinico = "🟤 Bloqueio Articular / Derangement"
-                diretriz_ia = "Déficit de extensão associado a derrame. Restrição absoluta de carga axial. Cluster: Thessaly e McMurray."
+                diretriz_ia = "Déficit de extensão terminal associado a derrame articular. Restrição absoluta de carga axial."
             elif ultima.get('Agachamento') in ['Incapaz', 'Dor Moderada'] and ultima.get('Extensao') == 'Completa (0°)' and inchaco_atual == 0:
                 fenotipo_clinico = "🟠 Provável Tendinopatia"
-                diretriz_ia = "Dor em armazenamento elástico. Isometria pesada para analgesia (Protocolo Rio)."
+                diretriz_ia = "Dor em armazenamento/liberação de energia. Isometria pesada para analgesia."
             elif dor_atual >= 6 and inchaco_atual == 0 and sono_atual == "Ruim":
                 fenotipo_clinico = "🟡 Sensibilização Central / Nociplástico"
-                diretriz_ia = "Descompasso clínico. Foco em educação em dor, higiene do sono e exposição gradual."
+                diretriz_ia = "Descompasso Clínico: Dor desproporcional à lesão. Foco: Educação em dor e higiene do sono."
             elif dor_atual <= 3 and inchaco_atual <= 1 and lsi_global >= 80:
                 fenotipo_clinico = "🟢 Mecânico / Fase de Remodelamento"
                 diretriz_ia = "Seguro para progressão para pliometria e drils de mudança de direção."
             else:
                 fenotipo_clinico = "🔵 Misto / Acomodação de Carga"
-                diretriz_ia = "Sinais mistos. Focar no controle do sintoma limitante e reavaliar em 48h."
+                diretriz_ia = "Paciente apresenta sinais mistos. Focar no controle do sintoma limitante."
         else:
             if inchaco_atual >= 2 and dor_atual >= 6:
                 fenotipo_clinico = "🔴 Inflamatório Agudo"
@@ -860,85 +864,94 @@ elif st.session_state.pagina == 'painel_clinico':
                 diretriz_ia = "Progressão de carga estrutural liberada."
             else:
                 fenotipo_clinico = "🔵 Misto / Transição"
-                diretriz_ia = "Acomodação mecânica. Progressão guiada por tolerância."
+                diretriz_ia = "Fase de acomodação mecânica."
 
         status_clinico = "Excelente" if lsi_global >= 85 else "Regular" if lsi_global >= 60 else "Atenção"
-        media_dor_historica = df_p['Dor'].mean()
+
+        recup_speed = 0.0; prev_txt = "Aguardando dados"
+        if len(df_p) >= 3:
+            try:
+                x_days = (df_p['Data_dt'] - df_p['Data_dt'].min()).dt.days.values
+                slope, intercept = np.polyfit(x_days, df_p['Dor'].values, 1)
+                recup_speed = slope * -7 
+                if slope < -0.05:
+                    dias_para_zero = (1.0 - intercept) / slope
+                    alta_est = df_p['Data_dt'].min() + pd.to_timedelta(dias_para_zero, unit='d')
+                    prev_txt = alta_est.strftime("%d/%m/%Y") if alta_est > datetime.now() else "Janela de Alta"
+                elif slope > 0.05: prev_txt = "Em Piora"
+                else: prev_txt = "Platô Clínico"
+            except: pass
+
+        insight_ouro = "Aguardando dados."
+        insight_postura = "Coletando dados."
+        if len(df_p) >= 2:
+            d_ruim = df_p[df_p['Sono'] == 'Ruim']['Dor'].mean()
+            d_bom = df_p[df_p['Sono'] == 'Bom']['Dor'].mean()
+            if pd.notna(d_ruim) and pd.notna(d_bom) and d_ruim > d_bom + 1.0: insight_ouro = f"Sono Ruim exacerba dor em {(d_ruim - d_bom):.1f} pts."
+            elif pd.notna(d_bom): insight_ouro = "Sono atua como estabilizador analgésico."
+
         delta_dor_pct = ((dor_atual - media_dor_historica) / media_dor_historica * 100) if media_dor_historica > 0 else 0
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Dor Atual (vs Média)", f"{dor_atual}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
         if "Coluna" in st.session_state.membro_ativo: m2.metric("Irradiação", f"{ultima.get('Irradiacao', 'Ausente')}")
         else: m2.metric("Inchaço", f"Grau {inchaco_atual}")
-        m3.metric("Prontidão (LSI)", f"{lsi_global:.0f}%", status_clinico)
+        m3.metric("LSI", f"{lsi_global:.0f}%", status_clinico)
         m4.metric("Fenótipo IA", fenotipo_clinico.split()[-1])
         st.write("---")
 
-        st.markdown(f"**Progresso para Alta Clínica (LSI): {lsi_global:.0f}%**")
+        st.markdown(f"**Progresso para Alta (LSI): {lsi_global:.0f}%**")
         st.progress(lsi_global / 100)
 
-        t1, t2 = st.tabs(["🧠 Análise Clínica (IA)", "📈 Evolução Gráfica"])
+        t1, t2, t3, t4 = st.tabs(["🧠 IA Clínica", "📈 Correlações", "📐 Biomecânica", "🎯 Fatores"])
         with t1:
-            st.info("A Inteligência Artificial atua como um sistema de suporte à decisão. **A autonomia continua sendo do Fisioterapeuta.**")
+            st.info("A Inteligência Artificial atua como suporte à decisão. **A autonomia continua sendo do Fisioterapeuta.**")
             c_i1, c_i2 = st.columns(2)
             with c_i1:
-                st.markdown("**🔬 Fenótipo Detectado:**")
-                st.markdown(f"**{fenotipo_clinico}**")
+                st.markdown(f"**🔬 {fenotipo_clinico}**")
                 st.markdown(f"💡 *Diretriz Algorítmica:* {diretriz_ia}")
             with c_i2:
-                st.markdown("**⚙️ Controle Biomecânico:**")
-                if st.session_state.membro_ativo == "Joelho":
-                    st.write(f"- Flexão Atual: **{ultima['Flexao']}°**")
-                    st.write(f"- Extensão: **{ultima['Extensao']}**")
-                else:
-                    st.write("Métricas de arco em captação.")
+                if recup_speed > 0: st.success(f"📈 **Projeção:** Queda de {recup_speed:.1f} pts de dor/semana.")
+                elif recup_speed < 0: st.error(f"📉 **Alerta:** Aumento de {abs(recup_speed):.1f} pts de dor/semana.")
+                else: st.warning("⚖️ **Quadro:** Estacionário.")
 
         with t2:
             fig_ev, ax_ev = plt.subplots(figsize=(10, 4))
             ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], marker='o', lw=2)
             ax_ev.set_title("Evolução Longitudinal da Dor", color=CORES_GENUA['primaria'])
-            ax_ev.set_ylim(-0.5, 11)
             ax_ev.spines['top'].set_visible(False); ax_ev.spines['right'].set_visible(False)
             st.pyplot(fig_ev)
+            buf_ev = io.BytesIO(); fig_ev.savefig(buf_ev, format='png', bbox_inches='tight'); buf_ev.seek(0)
+            buf_corr = buf_ev
 
+        with t3:
+            if st.session_state.membro_ativo == "Joelho":
+                col1, col2 = st.columns(2)
+                col1.metric("Flexão Atual", f"{ultima['Flexao']}°")
+                col2.info(f"Extensão Terminal: {ultima['Extensao']}")
+            buf_adm = buf_ev
+
+        with t4:
+            st.success(f"💡 **Insight Sono:** {insight_ouro}")
+            st.warning(f"💡 **Postura:** {insight_postura}")
+
+        # --- 5. PDF EXPORT (Ajustado e blindado) ---
         st.markdown("---")
         if st.button("📄 Gerar Relatório PDF Oficial", use_container_width=True):
-            st.info("Módulo de PDF temporariamente inativo para ajuste de performance gráfica.")
-
-        
-    with t3:
-        st.image(buf_adm, use_container_width=True)
-        if st.session_state.membro_ativo == "Joelho":
-            col1, col2 = st.columns(2)
-            col1.metric("Flexão Atual", f"{ultima['Flexao']}°")
-            col2.info(f"Extensão Terminal: {ultima['Extensao']}")
-
-    with t4:
-        st.success(f"💡 **Insight Sono:** {insight_ouro}")
-        st.warning(f"💡 **Postura:** {insight_postura}")
-
-    # --- 5. PDF EXPORT (Ajustado para o novo LSI) ---
-    st.markdown("---")
-    if st.button("📄 Gerar Relatório PDF Oficial", use_container_width=True):
-        try:
-            # Substituímos internamente a palavra "ikdc" pelo "lsi" para o PDF continuar funcionando sem quebrar
-            pdf_metrics = {
-                'ikdc': lsi_global, 'ikdc_status': status_clinico, 
-                'dor': ultima['Dor'], 'media_dor': media_dor,
-                'inchaco': ultima.get('Inchaco_N', 0), 
-                'alta': prev_txt,
-                'insight_ouro': insight_ouro,
-                'insight_mecanico': insight_ia,
-                'insight_postura': insight_postura,
-                'insight_evolucao': f"Velocidade de regressão álgica: {recup_speed:.2f}/sem."
-            }
-            pdf_output = create_pdf(p_sel, hist_clinica, pdf_metrics, {'ev': buf_ev, 'dor': buf_ev, 'sono': buf_corr, 'inchaco': buf_adm, 'adm': buf_adm})
-            st.success("✅ Documento Científico gerado com sucesso!")
-            st.download_button(label="⬇️ Baixar PDF", data=pdf_output, file_name=f"Laudo_GENUA_{p_sel}.pdf", mime="application/pdf")
-        except Exception as e:
-            st.error(f"Erro na emissão do PDF: {e}")
-
-    
+            try:
+                pdf_metrics = {
+                    'ikdc': lsi_global, 'ikdc_status': status_clinico, 
+                    'dor': ultima['Dor'], 'media_dor': media_dor_historica,
+                    'inchaco': ultima.get('Inchaco_N', 0), 
+                    'alta': prev_txt, 'insight_ouro': insight_ouro,
+                    'insight_mecanico': diretriz_ia, 'insight_postura': insight_postura,
+                    'insight_evolucao': f"Velocidade de regressão: {recup_speed:.2f}/sem."
+                }
+                pdf_output = create_pdf(p_sel, hist_clinica, pdf_metrics, {'ev': buf_ev, 'dor': buf_ev, 'sono': buf_corr, 'inchaco': buf_adm, 'adm': buf_adm})
+                st.success("✅ Documento Científico gerado com sucesso!")
+                st.download_button(label="⬇️ Baixar PDF", data=pdf_output, file_name=f"Laudo_GENUA_{p_sel}.pdf", mime="application/pdf")
+            except Exception as e:
+                st.error(f"Erro na emissão do PDF: {e}")
         else:
             st.info("Clique no botão acima para gerar o documento oficial em PDF.")
 
