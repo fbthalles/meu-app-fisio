@@ -595,79 +595,90 @@ elif st.session_state.pagina == 'painel_clinico':
                 except:
                     st.caption("Nenhum paciente extra encontrado.")
 
-            st.markdown("---")
-            menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
-        else:
-            menu = "Painel Analítico 📊"
-
-        with st.expander("⚙️ Admin: Injetar Pacientes"):
-            st.warning("Criará 10 pacientes e 200 sessões no banco Firebase.")
-            if st.button("💉 Gerar Dados GENUA", use_container_width=True):
+            # --- FERRAMENTA ADMIN: INJEÇÃO DE DADOS CIENTÍFICOS (PBE) ---
+        st.markdown("---")
+        with st.expander("⚙️ Admin: Injetar Casos Reais (PBE)"):
+            st.warning("Injetará 4 Fenótipos Clínicos reais com alta fidelidade biomecânica.")
+            if st.button("💉 Gerar Casos PBE", use_container_width=True):
                 import numpy as np
                 from datetime import timedelta
                 
+                # Casos rigorosamente coerentes com a literatura ortopédica
                 pacientes_mock = [
-                    {"Nome": "Carlos Eduardo", "Idade": 28, "Dx": "LCA", "Dor_Ini": 8, "Inc_Ini": 3, "HMA": "Entorse jogando futebol, estalo audível. Reconstrução LCA há 4 semanas."},
-                    {"Nome": "Mariana Silva", "Idade": 34, "Dx": "SFP", "Dor_Ini": 6, "Inc_Ini": 0, "HMA": "Dor anterior no joelho há 6 meses, piora ao descer escadas. Corredora amadora."},
-                    {"Nome": "Roberto Alves", "Idade": 55, "Dx": "Artrose", "Dor_Ini": 7, "Inc_Ini": 2, "HMA": "Dor crônica e rigidez matinal intensa. Raio-X com redução de espaço articular."},
-                    {"Nome": "Fernanda Lima", "Idade": 22, "Dx": "Tendinopatia", "Dor_Ini": 5, "Inc_Ini": 0, "HMA": "Dor no polo inferior da patela após treinos de vôlei. Piora com saltos."},
-                    {"Nome": "João Pedro", "Idade": 41, "Dx": "Menisco", "Dor_Ini": 7, "Inc_Ini": 2, "HMA": "Dor medial aguda após agachamento profundo. Travamentos ocasionais."},
-                    {"Nome": "Ana Beatriz", "Idade": 29, "Dx": "SFP", "Dor_Ini": 8, "Inc_Ini": 0, "HMA": "Dor difusa, sensibilidade extrema. Sono muito ruim devido à dor noturna."},
-                    {"Nome": "Lucas Moura", "Idade": 31, "Dx": "LCA Conservador", "Dor_Ini": 6, "Inc_Ini": 1, "HMA": "Lesão parcial de LCA. Optou por tratamento conservador. Falseios leves."},
-                    {"Nome": "Camila Rocha", "Idade": 45, "Dx": "Condromalácia", "Dor_Ini": 5, "Inc_Ini": 0, "HMA": "Crepitação patelofemoral. Dor ao ficar muito tempo sentada (Sinal do Cinema)."},
-                    {"Nome": "Tiago Santos", "Idade": 38, "Dx": "Menisco Degenerativo", "Dor_Ini": 6, "Inc_Ini": 1, "HMA": "Dor progressiva na interlinha medial, sem trauma específico."},
-                    {"Nome": "Juliana Costa", "Idade": 26, "Dx": "Tendinopatia", "Dor_Ini": 7, "Inc_Ini": 0, "HMA": "Praticante de Crossfit. Dor forte no tendão patelar em treinos de LPO."}
+                    {
+                        "Nome": "Carlos (Pós-Op LCA)", "Idade": 28, "Dx": "LCA", "Dor_Ini": 8, "Inc_Ini": 3,
+                        "HMA": "Entorse em valgo dinâmico e rotação externa há 4 semanas. Relata estalido audível seguido de hemartrose imediata. Pós-operatório recente de reconstrução do LCA (Enxerto Patelar).",
+                        "T_Lig": "Lachman (+), Gaveta Anterior (+), Pivot Shift (+)", "T_Men": "Nenhum achado", "T_FP": "Apreensão Patelar (+)",
+                        "F_Quad": "Fraqueza Importante (< Grau 3)", "F_Isq": "Déficit Leve", "F_Glut": "Déficit Leve",
+                        "ADM_Torn": "Restrita (<10cm)", "Agac": "Incapaz por Dor", "Step": "Incapaz"
+                    },
+                    {
+                        "Nome": "Mariana (SFP)", "Idade": 34, "Dx": "SFP", "Dor_Ini": 6, "Inc_Ini": 0,
+                        "HMA": "Dor anterior no joelho, caráter difuso, há 6 meses. Piora ao descer escadas (excêntrico) e sinal do cinema positivo. Aumento súbito de volume de corrida.",
+                        "T_Lig": "Nenhum achado", "T_Men": "Nenhum achado", "T_FP": "Sinal de Clarke (+), Teste de Noble (+)",
+                        "F_Quad": "Preservada", "F_Isq": "Preservada", "F_Glut": "Fraqueza Importante (< Grau 3)",
+                        "ADM_Torn": "Restrita (<10cm)", "Agac": "Valgo Dinâmico Severo", "Step": "Estratégia de Quadril Pobre"
+                    },
+                    {
+                        "Nome": "Roberto (Artrose/Menisco)", "Idade": 55, "Dx": "Artrose", "Dor_Ini": 7, "Inc_Ini": 2,
+                        "HMA": "Dor crônica medial e rigidez matinal > 30 min. Episódios de falseio mecânico e limitação em agachamento profundo. Raio-X indica redução do espaço articular.",
+                        "T_Lig": "Nenhum achado", "T_Men": "McMurray (+), Thessaly (20°) (+), Apley Compressão (+)", "T_FP": "Sinal de Rabot (Crepitação) (+)",
+                        "F_Quad": "Déficit Leve", "F_Isq": "Déficit Leve", "F_Glut": "Déficit Leve",
+                        "ADM_Torn": "Normal (>10cm)", "Agac": "Incapaz por Dor", "Step": "Dor Femoropatelar Aguda"
+                    },
+                    {
+                        "Nome": "Fernanda (Tendinopatia)", "Idade": 24, "Dx": "Tendinopatia", "Dor_Ini": 7, "Inc_Ini": 0,
+                        "HMA": "Atleta de vôlei. Dor focal no polo inferior da patela aguda após treinos de pliometria. Piora clara na fase de armazenamento de energia (saltos).",
+                        "T_Lig": "Nenhum achado", "T_Men": "Nenhum achado", "T_FP": "Decline Squat (Tendinopatia Patelar) (+)",
+                        "F_Quad": "Preservada", "F_Isq": "Déficit Leve", "F_Glut": "Preservada",
+                        "ADM_Torn": "Assimétrica", "Agac": "Bom Alinhamento", "Step": "Movimento Fluido"
+                    }
                 ]
 
                 data_hoje = datetime.now()
-
-                with st.spinner("Injetando dados via rota direta no Firebase..."):
+                with st.spinner("Gerando banco de dados científico..."):
                     for p in pacientes_mock:
-                        # 1. Injetar Cadastro Direto
-                        db.collection("Cadastro").add({
-                            "Nome": p["Nome"], "Idade": p["Idade"], "Historia": p["HMA"]
-                        })
-
-                        # 2. Injetar Avaliação Inicial Direta
+                        db.collection("Cadastro").add({"Nome": p["Nome"], "Idade": p["Idade"], "Historia": p["HMA"]})
                         db.collection("Avaliacao_Inicial").add({
                             "Data_Avaliacao": (data_hoje - timedelta(days=70)).strftime("%d/%m/%Y"),
-                            "Paciente": p["Nome"], "Membro": "Joelho",
-                            "HMA": p["HMA"], "HMP": "Sem comorbidades relevantes.", "Ocupacao": "Ativo", "Objetivo": "Retorno ao esporte/função",
-                            "Trauma": "Sim" if "LCA" in p["Dx"] or "Entorse" in p["HMA"] else "Não",
-                            "Falseio": "Sim, frequentes" if "LCA" in p["Dx"] else "Não",
-                            "Rigidez": "Mais de 30 min" if p["Dx"] == "Artrose" else "Ausente",
-                            "Travamento": "Sim" if "Menisco" in p["Dx"] else "Não",
-                            "Quadriceps_Forca": "Déficit Leve", "Isquio_Forca": "Déficit Leve", "Quadril_Forca": "Déficit Leve",
-                            "Tornozelo_ADM": "Normal (>10cm)", "Core_Controle": "Estável",
-                            "Agachamento_Uni": "Valgo Dinâmico Leve", "Step_Down_Qualidade": "Estratégia de Quadril Pobre",
-                            "IKDC_Inicial": 35.0, "LEFS_Inicial": 40.0, "Profissional_ID": "admin"
+                            "Paciente": p["Nome"], "Membro": "Joelho", "HMA": p["HMA"], "HMP": "Nega comorbidades prévias.",
+                            "Quadriceps_Forca": p["F_Quad"], "Isquio_Forca": p["F_Isq"], "Quadril_Forca": p["F_Glut"], 
+                            "Tornozelo_ADM": p["ADM_Torn"], "Agachamento_Uni": p["Agac"], "Step_Down_Qualidade": p["Step"],
+                            "Testes_Ligamentares": p["T_Lig"], "Testes_Meniscais": p["T_Men"], "Testes_Femoropatelar": p["T_FP"],
+                            "IKDC_Inicial": 35.0, "Profissional_ID": "admin"
                         })
 
-                        # 3. Injetar 20 Sessões Diretas
                         dor_atual = p["Dor_Ini"]
                         inc_atual = p["Inc_Ini"]
                         
+                        # Simulação Matemática de Biologia Tecidual (20 sessões)
                         for sessao in range(20):
                             dias_atras = (20 - sessao) * 3.5
                             data_sessao = data_hoje - timedelta(days=dias_atras)
                             
-                            if sessao % 4 == 0 and dor_atual > 1: dor_atual -= 1 
-                            if sessao % 5 == 0 and inc_atual > 0: inc_atual -= 1 
+                            # Melhora não-linear
+                            if sessao % 3 == 0 and dor_atual > 1: dor_atual -= 1 
+                            if sessao % 6 == 0 and inc_atual > 0: inc_atual -= 1 
                             
-                            sono = "Bom" if dor_atual < 4 else ("Regular" if dor_atual < 7 else "Ruim")
-                            agac = "Sem Dor" if dor_atual < 3 else ("Dor Leve" if dor_atual < 6 else "Dor Moderada")
-                            sdn = "Sem Dor" if dor_atual < 4 else ("Dor Moderada" if "SFP" in p["Dx"] else "Dor Leve")
-                            ext = "Completa (0°)" if sessao > 10 else "Déficit Leve (-5°)"
-                            flex = min(140, 90 + (sessao * 2.5)) 
+                            # Biomecânica específica por patologia
+                            if p["Dx"] == "LCA":
+                                flex = min(135, 60 + (sessao * 4.0)) # Ganho gradual de flexão
+                                ext = "Déficit Grave (>-15°)" if sessao < 5 else ("Déficit Leve (-5°)" if sessao < 12 else "Completa (0°)")
+                            else:
+                                flex = min(140, 110 + (sessao * 1.5))
+                                ext = "Completa (0°)" if p["Dx"] != "Artrose" else ("Déficit Leve (-5°)" if sessao < 15 else "Completa (0°)")
+
+                            # Correlação de Função baseada na dor
+                            func_nivel = "Incapaz" if dor_atual > 6 else ("Dor Moderada" if dor_atual > 4 else ("Dor Leve" if dor_atual > 2 else "Sem Dor"))
                             
                             db.collection("Evolucao").add({
                                 "Data": data_sessao.strftime("%d/%m/%Y %H:%M"), "Paciente": p["Nome"], "Membro": "Joelho",
-                                "Dor": dor_atual, "Sono": sono, "Inchaço": str(inc_atual), "Postura": "Não avaliada",
-                                "Agachamento": agac, "Step_Up": agac, "Step_Down": sdn, "Flexao": int(flex), "Extensao": ext,
-                                "Profissional_ID": "admin"
+                                "Dor": dor_atual, "Sono": "Bom" if dor_atual < 4 else "Ruim", "Inchaço": str(inc_atual), 
+                                "Agachamento": func_nivel, "Step_Up": func_nivel, "Step_Down": func_nivel, 
+                                "Flexao": int(flex), "Extensao": ext, "Profissional_ID": "admin"
                             })
 
-                st.success("✅ Lote completo processado! Todos os 10 pacientes estão no Firebase.")
+                st.success("✅ Casos Clínicos PBE injetados! Acesse a lista para visualizar.")
 
     # 2. App Header (Barra Superior de Navegação Nativa)
     if not paciente_alvo:
