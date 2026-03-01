@@ -32,16 +32,16 @@ st.set_page_config(
     initial_sidebar_state="expanded" # <-- FORÇA A BARRA ABRIR POR PADRÃO
 )
 
-# --- 3.1 E 4. INJEÇÃO DE CSS UNIFICADA (UX PREMIUM TABLET/MOBILE) ---
+# --- 3.1 E 4. INJEÇÃO DE CSS UNIFICADA (UX PREMIUM E APP NAVIGATION) ---
 st.markdown(f"""
     <style>
     /* 1. Tipografia e Reset */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
     html, body, [class*="css"] {{ font-family: 'Inter', sans-serif !important; }}
     
-    /* 2. Remoção do Branding (Corrigido: Devolve o botão da Sidebar) */
+    /* 2. Remoção do Branding */
     #MainMenu, footer, .stDeployButton, .stStatusWidget {{ display: none !important; }}
-    header {{ background-color: transparent !important; }} /* Torna o topo invisível mas mantém o botão clicável */
+    header {{ background-color: transparent !important; }}
 
     /* 3. Container Principal */
     .stApp {{
@@ -49,7 +49,7 @@ st.markdown(f"""
         color: {CORES_GENUA['texto_escuro']};
     }}
     [data-testid="block-container"] {{
-        padding-top: 3.5rem !important; /* Adiciona respiro para o botão da sidebar não sobrepor o título */
+        padding-top: 3.5rem !important;
         padding-bottom: 3rem !important;
         padding-left: 5% !important;
         padding-right: 5% !important;
@@ -68,15 +68,8 @@ st.markdown(f"""
         line-height: 1.5 !important;
         min-height: 48px !important;
     }}
-    
-    /* 5. Correção dos Sliders */
-    .stSlider > div {{
-        padding-top: 18px !important;
-        padding-bottom: 18px !important;
-    }}
-    [data-testid="stTickBar"] {{ fill: {CORES_GENUA['texto_suave']} !important; }}
 
-    /* 6. Botões Nativos */
+    /* 5. Botões Nativos (Primários vs Navegação) */
     .stButton > button {{
         background: linear-gradient(135deg, {CORES_GENUA['primaria']} 0%, #1A5473 100%) !important;
         color: white !important;
@@ -92,40 +85,37 @@ st.markdown(f"""
     .stButton > button:hover {{
         transform: translateY(-2px) !important;
         box-shadow: 0 6px 15px rgba(16, 62, 85, 0.3) !important;
-        background: linear-gradient(135deg, #1A5473 0%, {CORES_GENUA['primaria']} 100%) !important;
     }}
-
-    /* 7. Cards de Métricas */
-    [data-testid="metric-container"] {{
-        background-color: #FFFFFF;
-        border-radius: 16px;
-        padding: 24px 20px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.05);
-        border: 1px solid #F0F4F8;
-        border-left: 6px solid {CORES_GENUA['secundaria']};
-        margin-bottom: 10px;
-    }}
-    [data-testid="stMetricValue"] {{ font-size: 2.2rem !important; }}
-
-    /* 8. Abas (Tabs) Modernas */
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 15px;
-        padding: 10px 0px 20px 0px;
-        border-bottom: none !important;
-    }}
-    .stTabs [data-baseweb="tab"] {{
-        border-radius: 30px !important;
-        padding: 12px 24px !important;
-        background-color: #F4F7F9 !important;
-        color: #6C757D !important;
-        font-weight: 600 !important;
+    
+    /* Botão Voltar (Estilo Link App Nativo) */
+    .stButton > button[kind="secondary"] {{
+        background: transparent !important;
+        color: {CORES_GENUA['texto_suave']} !important;
         border: 1px solid transparent !important;
+        box-shadow: none !important;
+        padding: 8px 16px !important;
+        min-height: 40px !important;
+        width: auto !important;
+        font-weight: 600 !important;
     }}
-    .stTabs [aria-selected="true"] {{
-        background-color: {CORES_GENUA['primaria']} !important;
-        color: white !important;
-        box-shadow: 0 4px 12px rgba(16, 62, 85, 0.2) !important;
+    .stButton > button[kind="secondary"]:hover {{
+        color: {CORES_GENUA['primaria']} !important;
+        background-color: #F1F5F9 !important;
+        transform: translateX(-4px) !important; /* Animação de voltar */
     }}
+
+    /* 6. Cards e Abas (Tabs) */
+    [data-testid="metric-container"] {{
+        background-color: #FFFFFF; border-radius: 16px; padding: 24px 20px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.05); border: 1px solid #F0F4F8;
+        border-left: 6px solid {CORES_GENUA['secundaria']}; margin-bottom: 10px;
+    }}
+    .stTabs [data-baseweb="tab-list"] {{ gap: 15px; border-bottom: none !important; }}
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: 30px !important; padding: 12px 24px !important;
+        background-color: #F4F7F9 !important; color: #6C757D !important; font-weight: 600 !important;
+    }}
+    .stTabs [aria-selected="true"] {{ background-color: {CORES_GENUA['primaria']} !important; color: white !important; }}
     </style>
 """, unsafe_allow_html=True)
 
