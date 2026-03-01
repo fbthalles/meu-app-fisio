@@ -687,9 +687,6 @@ elif st.session_state.pagina == 'painel_clinico':
 
     # --- MÓDULO 2: CHECK-IN DIÁRIO ---
     elif menu == "Check-in Diário 📝":
-        st.header(f"📝 Check-in Diário: {st.session_state.membro_ativo}")
-        st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']};'>Paciente Ativo: <b>{st.session_state.paciente}</b></p>", unsafe_allow_html=True)
-        
         with st.form(key="form_checkin_diario_firebase", clear_on_submit=True):
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Quadro Sistêmico Universal</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
