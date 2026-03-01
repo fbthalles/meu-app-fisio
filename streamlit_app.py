@@ -587,8 +587,6 @@ elif st.session_state.pagina == 'painel_clinico':
         else:
             menu = "Painel Analítico 📊"
 
-        # --- FERRAMENTA ADMIN: INJEÇÃO DE DADOS PILOTO ---
-        st.markdown("---")
         with st.expander("⚙️ Admin: Injetar Pacientes"):
             st.warning("Criará 10 pacientes e 200 sessões no banco Firebase.")
             if st.button("💉 Gerar Dados GENUA", use_container_width=True):
@@ -608,67 +606,55 @@ elif st.session_state.pagina == 'painel_clinico':
                     {"Nome": "Juliana Costa", "Idade": 26, "Dx": "Tendinopatia", "Dor_Ini": 7, "Inc_Ini": 0, "HMA": "Praticante de Crossfit. Dor forte no tendão patelar em treinos de LPO."}
                 ]
 
-                # 1. Gerar Cadastros
-                df_cad = pd.DataFrame([{"Nome": p["Nome"], "Idade": p["Idade"], "Historia": p["HMA"]} for p in pacientes_mock])
-                try: df_banco_cad = conn.read("Cadastro", ttl=0)
-                except: df_banco_cad = pd.DataFrame()
-                conn.update("Cadastro", pd.concat([df_banco_cad, df_cad], ignore_index=True) if not df_banco_cad.empty else df_cad)
-
-                evolucao_lote = []
-                avaliacao_lote = []
                 data_hoje = datetime.now()
 
-                for p in pacientes_mock:
-                    # 2. Gerar Avaliação Inicial Rica
-                    aval = {
-                        "Data_Avaliacao": (data_hoje - timedelta(days=70)).strftime("%d/%m/%Y"),
-                        "Paciente": p["Nome"], "Membro": "Joelho",
-                        "HMA": p["HMA"], "HMP": "Sem comorbidades relevantes.", "Ocupacao": "Ativo", "Objetivo": "Retorno ao esporte/função",
-                        "Trauma": "Sim" if "LCA" in p["Dx"] or "Entorse" in p["HMA"] else "Não",
-                        "Falseio": "Sim, frequentes" if "LCA" in p["Dx"] else "Não",
-                        "Rigidez": "Mais de 30 min" if p["Dx"] == "Artrose" else "Ausente",
-                        "Travamento": "Sim" if "Menisco" in p["Dx"] else "Não",
-                        "Quadriceps_Forca": "Déficit Leve", "Isquio_Forca": "Déficit Leve", "Quadril_Forca": "Déficit Leve",
-                        "Tornozelo_ADM": "Normal (>10cm)", "Core_Controle": "Estável",
-                        "Agachamento_Uni": "Valgo Dinâmico Leve", "Step_Down_Qualidade": "Estratégia de Quadril Pobre",
-                        "IKDC_Inicial": 35.0, "LEFS_Inicial": 40.0, "Profissional_ID": "admin"
-                    }
-                    avaliacao_lote.append(aval)
-
-                    # 3. Gerar 20 Sessões (Curva de Recuperação Realista)
-                    dor_atual = p["Dor_Ini"]
-                    inc_atual = p["Inc_Ini"]
-                    
-                    for sessao in range(20):
-                        dias_atras = (20 - sessao) * 3.5
-                        data_sessao = data_hoje - timedelta(days=dias_atras)
-                        
-                        if sessao % 4 == 0 and dor_atual > 1: dor_atual -= 1 
-                        if sessao % 5 == 0 and inc_atual > 0: inc_atual -= 1 
-                        
-                        sono = "Bom" if dor_atual < 4 else ("Regular" if dor_atual < 7 else "Ruim")
-                        agac = "Sem Dor" if dor_atual < 3 else ("Dor Leve" if dor_atual < 6 else "Dor Moderada")
-                        sdn = "Sem Dor" if dor_atual < 4 else ("Dor Moderada" if "SFP" in p["Dx"] else "Dor Leve")
-                        ext = "Completa (0°)" if sessao > 10 else "Déficit Leve (-5°)"
-                        flex = min(140, 90 + (sessao * 2.5)) 
-                        
-                        evolucao_lote.append({
-                            "Data": data_sessao.strftime("%d/%m/%Y %H:%M"), "Paciente": p["Nome"], "Membro": "Joelho",
-                            "Dor": dor_atual, "Sono": sono, "Inchaço": str(inc_atual), "Postura": "Não avaliada",
-                            "Agachamento": agac, "Step_Up": agac, "Step_Down": sdn, "Flexao": int(flex), "Extensao": ext,
-                            "Profissional_ID": "admin"
+                with st.spinner("Injetando dados via rota direta no Firebase..."):
+                    for p in pacientes_mock:
+                        # 1. Injetar Cadastro Direto
+                        db.collection("Cadastro").add({
+                            "Nome": p["Nome"], "Idade": p["Idade"], "Historia": p["HMA"]
                         })
 
-                # Salvar Lotes no Banco (O Firebase cuidará disso)
-                try: df_banco_av = conn.read("Avaliacao_Inicial", ttl=0)
-                except: df_banco_av = pd.DataFrame()
-                conn.update("Avaliacao_Inicial", pd.concat([df_banco_av, pd.DataFrame(avaliacao_lote)], ignore_index=True) if not df_banco_av.empty else pd.DataFrame(avaliacao_lote))
+                        # 2. Injetar Avaliação Inicial Direta
+                        db.collection("Avaliacao_Inicial").add({
+                            "Data_Avaliacao": (data_hoje - timedelta(days=70)).strftime("%d/%m/%Y"),
+                            "Paciente": p["Nome"], "Membro": "Joelho",
+                            "HMA": p["HMA"], "HMP": "Sem comorbidades relevantes.", "Ocupacao": "Ativo", "Objetivo": "Retorno ao esporte/função",
+                            "Trauma": "Sim" if "LCA" in p["Dx"] or "Entorse" in p["HMA"] else "Não",
+                            "Falseio": "Sim, frequentes" if "LCA" in p["Dx"] else "Não",
+                            "Rigidez": "Mais de 30 min" if p["Dx"] == "Artrose" else "Ausente",
+                            "Travamento": "Sim" if "Menisco" in p["Dx"] else "Não",
+                            "Quadriceps_Forca": "Déficit Leve", "Isquio_Forca": "Déficit Leve", "Quadril_Forca": "Déficit Leve",
+                            "Tornozelo_ADM": "Normal (>10cm)", "Core_Controle": "Estável",
+                            "Agachamento_Uni": "Valgo Dinâmico Leve", "Step_Down_Qualidade": "Estratégia de Quadril Pobre",
+                            "IKDC_Inicial": 35.0, "LEFS_Inicial": 40.0, "Profissional_ID": "admin"
+                        })
 
-                try: df_banco_ev = conn.read("Evolucao", ttl=0)
-                except: df_banco_ev = pd.DataFrame()
-                conn.update("Evolucao", pd.concat([df_banco_ev, pd.DataFrame(evolucao_lote)], ignore_index=True) if not df_banco_ev.empty else pd.DataFrame(evolucao_lote))
-                
-                st.success("✅ 10 Pacientes e 200 Sessões injetadas com sucesso no Firebase! Atualize a página.")
+                        # 3. Injetar 20 Sessões Diretas
+                        dor_atual = p["Dor_Ini"]
+                        inc_atual = p["Inc_Ini"]
+                        
+                        for sessao in range(20):
+                            dias_atras = (20 - sessao) * 3.5
+                            data_sessao = data_hoje - timedelta(days=dias_atras)
+                            
+                            if sessao % 4 == 0 and dor_atual > 1: dor_atual -= 1 
+                            if sessao % 5 == 0 and inc_atual > 0: inc_atual -= 1 
+                            
+                            sono = "Bom" if dor_atual < 4 else ("Regular" if dor_atual < 7 else "Ruim")
+                            agac = "Sem Dor" if dor_atual < 3 else ("Dor Leve" if dor_atual < 6 else "Dor Moderada")
+                            sdn = "Sem Dor" if dor_atual < 4 else ("Dor Moderada" if "SFP" in p["Dx"] else "Dor Leve")
+                            ext = "Completa (0°)" if sessao > 10 else "Déficit Leve (-5°)"
+                            flex = min(140, 90 + (sessao * 2.5)) 
+                            
+                            db.collection("Evolucao").add({
+                                "Data": data_sessao.strftime("%d/%m/%Y %H:%M"), "Paciente": p["Nome"], "Membro": "Joelho",
+                                "Dor": dor_atual, "Sono": sono, "Inchaço": str(inc_atual), "Postura": "Não avaliada",
+                                "Agachamento": agac, "Step_Up": agac, "Step_Down": sdn, "Flexao": int(flex), "Extensao": ext,
+                                "Profissional_ID": "admin"
+                            })
+
+                st.success("✅ Lote completo processado! Todos os 10 pacientes estão no Firebase.")
 
     # 2. App Header (Barra Superior de Navegação Nativa)
     if not paciente_alvo:
