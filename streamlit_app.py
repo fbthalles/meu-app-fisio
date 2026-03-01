@@ -685,7 +685,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     conn.update(worksheet="Avaliacao_Inicial", data=df_av)
                     st.success("✅ Avaliação Inicial registrada com sucesso!")
 
-    # --- MÓDULO 2: CHECK-IN DIÁRIO ---
+    # --- MÓDULO 2: CHECK-IN DIÁRIO (EXCLUSIVO JOELHO) ---
     elif menu == "Check-in Diário 📝":
         with st.form(key="form_checkin_diario_firebase", clear_on_submit=True):
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Quadro Sistêmico Universal</h4>", unsafe_allow_html=True)
@@ -695,50 +695,33 @@ elif st.session_state.pagina == 'painel_clinico':
                 
             dados_sessao = {
                 "Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": st.session_state.paciente,
-                "Membro": st.session_state.membro_ativo, "Dor": int(dor), "Sono": sono, "Postura": "Não avaliada",
+                "Membro": "Joelho", "Dor": int(dor), "Sono": sono, "Postura": "Não avaliada",
                 "Profissional_ID": st.session_state.get("user_email", "admin")
             }
 
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Avaliação Específica: {st.session_state.membro_ativo}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Avaliação Específica: Joelho</h4>", unsafe_allow_html=True)
             
-            if st.session_state.membro_ativo == "Joelho":
-                c_inc, c5, c6, c7 = st.columns(4)
-                with c_inc: inchaco = st.select_slider("💧 Inchaço", options=["0", "1", "2", "3"])
-                with c5: agac = st.selectbox("🏋️ Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-                with c6: sup = st.selectbox("🪜 Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-                with c7: sdn = st.selectbox("📉 Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-                c8, c9 = st.columns(2)
-                with c8: flexao = st.slider("📐 Flexão (Graus)", 0, 150, 90)
-                with c9: extensao = st.selectbox("📏 Extensão Terminal", ["Completa (0°)", "Déficit Leve (-5°)", "Déficit Grave (>-15°)"])
-                dados_sessao.update({"Inchaço": str(inchaco), "Agachamento": agac, "Step_Up": sup, "Step_Down": sdn, "Flexao": int(flexao), "Extensao": extensao})
-                
-            elif "Coluna" in st.session_state.membro_ativo:
-                c5, c6, c7 = st.columns(3)
-                with c5: irradiacao = st.selectbox("⚡ Irradiação (Nervo)", ["Ausente", "Apenas Proximal", "Até a Extremidade"])
-                with c6: mobilidade = st.selectbox("🔄 Mobilidade", ["Livre", "Limitada no Final", "Bloqueada"])
-                with c7: parestesia = st.radio("🐜 Parestesia", ["Não", "Sim"], horizontal=True)
-                dados_sessao.update({"Inchaço": "0", "Irradiacao": irradiacao, "Mobilidade_Coluna": mobilidade, "Parestesia": parestesia})
-
-            elif st.session_state.membro_ativo == "Ombro":
-                c_inc, c5, c6 = st.columns(3)
-                with c_inc: inchaco = st.select_slider("💧 Edema Agudo", options=["0", "1", "2", "3"]) 
-                with c5: elevacao = st.slider("📐 Elevação (Graus)", 0, 180, 90)
-                with c6: rotacao = st.selectbox("🔄 Rotação", ["Livre", "Déficit Interna", "Déficit Externa", "Bloqueio Global"])
-                dados_sessao.update({"Inchaço": str(inchaco), "Elevacao_Ombro": int(elevacao), "Rotacao_Ombro": rotacao})
-                
-            else:
-                c_inc, c5, c6 = st.columns(3)
-                with c_inc: inchaco = st.select_slider("💧 Inchaço Articular", options=["0", "1", "2", "3"])
-                with c5: marcha = st.selectbox("🚶 Marcha", ["Sem claudicação", "Claudicação Leve", "Uso de muleta"])
-                with c6: carga = st.selectbox("⚖️ Tolerância a Carga", ["Incapaz", "Parcial", "Total sem Dor"])
-                dados_sessao.update({"Inchaço": str(inchaco), "Marcha": marcha, "Carga": carga})
+            c_inc, c5, c6, c7 = st.columns(4)
+            with c_inc: inchaco = st.select_slider("💧 Inchaço", options=["0", "1", "2", "3"])
+            with c5: agac = st.selectbox("🏋️ Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+            with c6: sup = st.selectbox("🪜 Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+            with c7: sdn = st.selectbox("📉 Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
+            
+            c8, c9 = st.columns(2)
+            with c8: flexao = st.slider("📐 Flexão (Graus)", 0, 150, 90)
+            with c9: extensao = st.selectbox("📏 Extensão Terminal", ["Completa (0°)", "Déficit Leve (-5°)", "Déficit Grave (>-15°)"])
+            
+            dados_sessao.update({
+                "Inchaço": str(inchaco), "Agachamento": agac, "Step_Up": sup, 
+                "Step_Down": sdn, "Flexao": int(flexao), "Extensao": extensao
+            })
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
                 df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
                 nova_linha = pd.DataFrame([dados_sessao])
                 conn.update(worksheet="Evolucao", data=pd.concat([df, nova_linha], ignore_index=True))
-                st.success(f"Dados registrados com sucesso!")
+                st.success(f"Dados do Joelho registrados com sucesso!")
                 
         st.write("---")
         with st.expander("⚖️ Conformidade LGPD e Privacidade"):
