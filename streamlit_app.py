@@ -561,8 +561,8 @@ elif st.session_state.pagina == 'selecao_membro':
 
     st.markdown("---")
     st.markdown("### ➕ Iniciar Novo Tratamento")
-    novo_membro = st.selectbox("Selecione a nova região anatômica:", 
-                         ["Joelho", "Coluna Cervical", "Coluna Lombar", "Ombro", "Tornozelo/Pé", "Quadril"])
+    # Foco absoluto do MVP: Joelho
+    novo_membro = "Joelho" 
     
     if st.button(f"Iniciar Prontuário para {novo_membro} 🆕", use_container_width=True, type="primary"):
         st.session_state.membro_ativo = novo_membro
