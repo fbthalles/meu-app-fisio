@@ -576,15 +576,25 @@ elif st.session_state.pagina == 'selecao_membro':
 
 # PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
-    # 1. Menu Lateral Limpo (Funciona como a "Tab Bar" de um aplicativo)
+    # 1. Menu Lateral Limpo (UX Estilo App Nativo)
     with st.sidebar:
         if not st.session_state.get('paciente_alvo', False): 
             st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']}; text-align: center;'>👤 {st.session_state.paciente}</h3>", unsafe_allow_html=True)
             
-            # NOVO BOTÃO DE NAVEGAÇÃO: Voltar para a lista de pacientes
-            if st.button("⬅️ Trocar Paciente", use_container_width=True):
-                mudar_pagina('dados_paciente')
-                
+            # NOVO: Expansor elegante para troca rápida de pacientes sem sair da tela
+            with st.expander("🔄 Trocar Paciente Ativo"):
+                try:
+                    df_lista_pacientes = conn.read("Cadastro", ttl=0)
+                    if not df_lista_pacientes.empty:
+                        todos_pacientes = df_lista_pacientes['Nome'].unique().tolist()
+                        idx_atual = todos_pacientes.index(st.session_state.paciente) if st.session_state.paciente in todos_pacientes else 0
+                        paciente_selecionado = st.selectbox("Selecione:", todos_pacientes, index=idx_atual, label_visibility="collapsed")
+                        if st.button("Carregar Prontuário", use_container_width=True):
+                            st.session_state.paciente = paciente_selecionado
+                            st.rerun()
+                except:
+                    st.caption("Nenhum paciente extra encontrado.")
+
             st.markdown("---")
             menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
         else:
