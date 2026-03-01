@@ -878,7 +878,7 @@ elif st.session_state.pagina == 'painel_clinico':
         st.progress(lsi_global / 100)
 
         t1, t2 = st.tabs(["🧠 Análise Clínica (IA)", "📈 Evolução Gráfica"])
-        with t1:
+    with t1:
             st.info("A Inteligência Artificial atua como um sistema de suporte à decisão. **A autonomia continua sendo do Fisioterapeuta.**")
             c_i1, c_i2 = st.columns(2)
             with c_i1:
@@ -893,7 +893,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 else:
                     st.write("Métricas de arco em captação.")
 
-        with t2:
+    with t2:
             fig_ev, ax_ev = plt.subplots(figsize=(10, 4))
             ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], marker='o', lw=2)
             ax_ev.set_title("Evolução Longitudinal da Dor", color=CORES_GENUA['primaria'])
