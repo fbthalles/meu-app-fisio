@@ -727,188 +727,119 @@ elif st.session_state.pagina == 'painel_clinico':
         with st.expander("⚖️ Conformidade LGPD e Privacidade"):
             st.caption("Processamento anonimizado de dados para finalidade exclusiva de Inteligência Clínica.")
 
-    # --- MÓDULO 3: PAINEL ANALÍTICO (O CÉREBRO) ---
-    elif menu == "Painel Analítico 📊":
-        df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
-        
-        if df.empty or 'Paciente' not in df.columns:
-            st.warning(f"⚠️ A base de dados clínica ainda está vazia ou o paciente **{st.session_state.paciente}** não possui evoluções. Faça o primeiro Check-in.")
-            st.stop()
-        
-        if 'Membro' not in df.columns: df['Membro'] = "Joelho"
-        df['Membro'] = df['Membro'].fillna("Joelho")
-        df_p = df[(df['Paciente'] == st.session_state.paciente) & (df['Membro'] == st.session_state.membro_ativo)].copy()
+    ## --- 2. O CÉREBRO CLÍNICO AVANÇADO (MOTOR EXCLUSIVO PARA JOELHO) ---
+    lsi_global = 0.0
+    insight_ia = "Processando dados..."
+    fenotipo_clinico = "Indeterminado"
 
-        if df_p.empty:
-            st.warning(f"⚠️ Sem dados registrados para {st.session_state.paciente} em {st.session_state.membro_ativo}. Faça o Check-in.")
-            st.stop()
+    # 2.1. CÁLCULO DE FUNÇÃO (LSI) - JOELHO
+    try:
+        mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
+        func_pts = (mapa_func.get(ultima.get('Agachamento', 'Sem Dor'), 10) +
+                    mapa_func.get(ultima.get('Step_Up', 'Sem Dor'), 10) +
+                    mapa_func.get(ultima.get('Step_Down', 'Sem Dor'), 10)) / 30.0
+        lsi_global = min(max(float(func_pts * 100), 0.0), 100.0)
+        df_p['LSI'] = lsi_global
+    except: pass
 
-        df_p['Data_dt'] = pd.to_datetime(df_p['Data'], dayfirst=True)
-        df_p = df_p.sort_values('Data_dt')
-        p_sel = st.session_state.paciente
+    # 2.2. ESTADO INFLAMATÓRIO E TENDÊNCIA ÁLGICA
+    dor_atual = ultima['Dor']
+    media_dor_historica = df_p['Dor'].mean()
+    dor_tendencia = df_p['Dor'].tail(3).mean() if len(df_p) >= 3 else dor_atual
+    inchaco_atual = ultima.get('Inchaco_N', 0)
+    sono_atual = ultima.get('Sono', 'Regular')
 
-        if paciente_alvo: st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']}; text-align: center; margin-bottom: 25px;'>🏥 Portal do Cirurgião | Visão 360º</h2>", unsafe_allow_html=True)
-        else: st.header(f"📊 Painel Analítico: {st.session_state.membro_ativo}")
+    # 2.3. TRIAGEM BAYESIANA E FENÓTIPO CLÍNICO (MOTOR GENUA AVANÇADO)
+    if ultima.get('Agachamento') == 'Incapaz' and inchaco_atual >= 2 and dor_atual >= 8:
+        fenotipo_clinico = "🚨 Red Flag / Risco Estrutural Agudo"
+        diretriz_ia = "Critérios de Ottawa/Pittsburgh: Incapacidade de descarga de peso + Dor Severa + Edema Agudo. Indicação de imagem."
+    elif ultima.get('Step_Down') in ['Incapaz', 'Dor Moderada'] and inchaco_atual <= 1:
+        fenotipo_clinico = "🟣 Provável Síndrome Femoropatelar (SFP)"
+        diretriz_ia = "Cinemática: Exacerbação na desaceleração excêntrica (Step Down). Modulação com isometria."
+    elif ultima.get('Extensao') in ['Déficit Grave (>-15°)', 'Déficit Leve (-5°)'] and inchaco_atual >= 2:
+        fenotipo_clinico = "🟤 Bloqueio Articular / Derangement"
+        diretriz_ia = "Déficit de extensão terminal associado a derrame articular. Restrição absoluta de carga axial."
+    elif ultima.get('Agachamento') in ['Incapaz', 'Dor Moderada'] and ultima.get('Extensao') == 'Completa (0°)' and inchaco_atual == 0:
+        fenotipo_clinico = "🟠 Provável Tendinopatia"
+        diretriz_ia = "Dor em armazenamento/liberação de energia. Isometria pesada para analgesia."
+    elif dor_atual >= 6 and inchaco_atual == 0 and sono_atual == "Ruim":
+        fenotipo_clinico = "🟡 Sensibilização Central / Nociplástico"
+        diretriz_ia = "Descompasso Clínico: Dor desproporcional à lesão. Foco: Educação em dor e higiene do sono."
+    elif dor_atual <= 3 and inchaco_atual <= 1 and lsi_global >= 80:
+        fenotipo_clinico = "🟢 Mecânico / Fase de Remodelamento"
+        diretriz_ia = "Seguro para progressão para pliometria e drils de mudança de direção."
+    else:
+        fenotipo_clinico = "🔵 Misto / Acomodação de Carga"
+        diretriz_ia = "Paciente apresenta sinais mistos. Focar no controle do sintoma limitante."
 
+    status_clinico = "Excelente" if lsi_global >= 85 else "Regular" if lsi_global >= 60 else "Atenção"
+
+    # 2.4. CÁLCULO DE VELOCIDADE DE RECUPERAÇÃO E PREVISÃO REALISTA
+    recup_speed = 0.0; prev_txt = "Aguardando dados"
+    if len(df_p) >= 3:
         try:
-            df_cad = conn.read(worksheet="Cadastro", ttl=0)
-            registro_p = df_cad[df_cad['Nome'].str.strip() == p_sel].iloc[0]
-            hist_clinica = registro_p['Historia']
-            idade_p = int(float(registro_p['Idade'])) if pd.notna(registro_p['Idade']) else "N/A"
-        except:
-            hist_clinica = "Histórico não disponível."; idade_p = "-"
-
-        st.markdown(f"""
-            <div style='background-color: #ffffff; border: 1px solid #e9ecef; border-left: 5px solid {CORES_GENUA['primaria']}; padding: 20px; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
-                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'>
-                    <h3 style='margin: 0; color: {CORES_GENUA['primaria']}; font-weight: 700;'>👤 {p_sel}</h3>
-                    <span style='background-color: #f1f3f5; color: {CORES_GENUA['primaria']}; padding: 6px 15px; border-radius: 20px; font-weight: 600;'>{idade_p} anos</span>
-                </div>
-                <p style='margin: 0; color: #495057;'><strong>HMA:</strong> {hist_clinica}</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
-        col_inc = 'Inchaço' if 'Inchaço' in df_p.columns else 'Inchaco'
-        df_p['Inchaco_N'] = pd.to_numeric(df_p[col_inc], errors='coerce').fillna(0)
-        
-        for col, default in [('Flexao', 90), ('Extensao', 'Sem dados'), ('Mobilidade_Coluna', 'Livre'), ('Irradiacao', 'Ausente'), ('Elevacao_Ombro', 90), ('Rotacao_Ombro', 'Livre'), ('Marcha', 'Sem claudicação'), ('Carga', 'Total sem Dor'), ('Agachamento', 'Sem Dor'), ('Step_Up', 'Sem Dor'), ('Step_Down', 'Sem Dor')]:
-            if col not in df_p.columns: df_p[col] = default
-
-        ultima = df_p.iloc[-1]
-        lsi_global = 0.0; fenotipo_clinico = "Indeterminado"
-
-        try:
-            if st.session_state.membro_ativo == "Joelho":
-                mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
-                func_pts = (mapa_func.get(ultima.get('Agachamento', 'Sem Dor'), 10) +
-                            mapa_func.get(ultima.get('Step_Up', 'Sem Dor'), 10) +
-                            mapa_func.get(ultima.get('Step_Down', 'Sem Dor'), 10)) / 30.0
-                lsi_global = func_pts * 100
-            elif "Coluna" in st.session_state.membro_ativo:
-                mapa_mob = {"Bloqueada": 0, "Limitada no Final": 5, "Livre": 10}
-                mapa_neuro = {"Até a Extremidade": 0, "Apenas Proximal": 5, "Ausente": 10}
-                func_pts = (mapa_mob.get(ultima.get('Mobilidade_Coluna', 'Livre'), 10) +
-                            mapa_neuro.get(ultima.get('Irradiacao', 'Ausente'), 10)) / 20.0
-                lsi_global = func_pts * 100
-            elif st.session_state.membro_ativo == "Ombro":
-                elev = pd.to_numeric(ultima.get('Elevacao_Ombro', 90), errors='coerce')
-                lsi_global = (elev / 180.0) * 100 if pd.notna(elev) else 0
-            else:
-                mapa_carga = {"Incapaz": 0, "Parcial": 5, "Total sem Dor": 10}
-                lsi_global = (mapa_carga.get(ultima.get('Carga', 'Total sem Dor'), 10) / 10.0) * 100
-
-            lsi_global = min(max(float(lsi_global), 0.0), 100.0)
-            df_p['LSI'] = lsi_global
+            x_days = (df_p['Data_dt'] - df_p['Data_dt'].min()).dt.days.values
+            slope, intercept = np.polyfit(x_days, df_p['Dor'].values, 1)
+            recup_speed = slope * -7 
+            if slope < -0.05:
+                dias_para_zero = (1.0 - intercept) / slope
+                alta_est = df_p['Data_dt'].min() + pd.to_timedelta(dias_para_zero, unit='d')
+                prev_txt = alta_est.strftime("%d/%m/%Y") if alta_est > datetime.now() else "Janela de Alta"
+            elif slope > 0.05: prev_txt = "Em Piora"
+            else: prev_txt = "Platô Clínico"
         except: pass
 
-        dor_atual = ultima['Dor']
-        media_dor_historica = df_p['Dor'].mean()
-        dor_tendencia = df_p['Dor'].tail(3).mean() if len(df_p) >= 3 else dor_atual
-        inchaco_atual = ultima.get('Inchaco_N', 0)
-        sono_atual = ultima.get('Sono', 'Regular')
+    # 2.5. MINERAÇÃO DE GATILHOS (POSTURA E SONO PROFUNDO)
+    insight_ouro = "Aguardando dados."
+    insight_postura = "Coletando dados."
+    if len(df_p) >= 2:
+        d_ruim = df_p[df_p['Sono'] == 'Ruim']['Dor'].mean()
+        d_bom = df_p[df_p['Sono'] == 'Bom']['Dor'].mean()
+        if pd.notna(d_ruim) and pd.notna(d_bom) and d_ruim > d_bom + 1.0: insight_ouro = f"Sono Ruim exacerba dor em {(d_ruim - d_bom):.1f} pts."
+        elif pd.notna(d_bom): insight_ouro = "Sono atua como estabilizador analgésico."
 
-        if st.session_state.membro_ativo == "Joelho":
-            if ultima.get('Agachamento') == 'Incapaz' and inchaco_atual >= 2 and dor_atual >= 8:
-                fenotipo_clinico = "🚨 Red Flag / Risco Estrutural Agudo"
-                diretriz_ia = "Critérios de Ottawa/Pittsburgh: Incapacidade de descarga de peso + Dor Severa + Edema Agudo. Indicação de imagem."
-            elif ultima.get('Step_Down') in ['Incapaz', 'Dor Moderada'] and inchaco_atual <= 1:
-                fenotipo_clinico = "🟣 Provável Síndrome Femoropatelar (SFP)"
-                diretriz_ia = "Cinemática: Exacerbação na desaceleração excêntrica (Step Down). Modulação com isometria."
-            elif ultima.get('Extensao') in ['Déficit Grave (>-15°)', 'Déficit Leve (-5°)'] and inchaco_atual >= 2:
-                fenotipo_clinico = "🟤 Bloqueio Articular / Derangement"
-                diretriz_ia = "Déficit de extensão terminal associado a derrame articular. Restrição absoluta de carga axial."
-            elif ultima.get('Agachamento') in ['Incapaz', 'Dor Moderada'] and ultima.get('Extensao') == 'Completa (0°)' and inchaco_atual == 0:
-                fenotipo_clinico = "🟠 Provável Tendinopatia"
-                diretriz_ia = "Dor em armazenamento/liberação de energia. Isometria pesada para analgesia."
-            elif dor_atual >= 6 and inchaco_atual == 0 and sono_atual == "Ruim":
-                fenotipo_clinico = "🟡 Sensibilização Central / Nociplástico"
-                diretriz_ia = "Descompasso Clínico: Dor desproporcional à lesão. Foco: Educação em dor e higiene do sono."
-            elif dor_atual <= 3 and inchaco_atual <= 1 and lsi_global >= 80:
-                fenotipo_clinico = "🟢 Mecânico / Fase de Remodelamento"
-                diretriz_ia = "Seguro para progressão para pliometria e drils de mudança de direção."
-            else:
-                fenotipo_clinico = "🔵 Misto / Acomodação de Carga"
-                diretriz_ia = "Paciente apresenta sinais mistos. Focar no controle do sintoma limitante."
-        else:
-            if inchaco_atual >= 2 and dor_atual >= 6:
-                fenotipo_clinico = "🔴 Inflamatório Agudo"
-                diretriz_ia = "Cascata inflamatória ativa. Repouso articular relativo."
-            elif dor_atual <= 3 and lsi_global >= 70:
-                fenotipo_clinico = "🟢 Remodelamento / Baixa Irritabilidade"
-                diretriz_ia = "Progressão de carga estrutural liberada."
-            else:
-                fenotipo_clinico = "🔵 Misto / Transição"
-                diretriz_ia = "Fase de acomodação mecânica."
+    delta_dor_pct = ((dor_atual - media_dor_historica) / media_dor_historica * 100) if media_dor_historica > 0 else 0
 
-        status_clinico = "Excelente" if lsi_global >= 85 else "Regular" if lsi_global >= 60 else "Atenção"
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Dor Atual (vs Média)", f"{dor_atual}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
+    m2.metric("Inchaço", f"Grau {inchaco_atual}")
+    m3.metric("LSI", f"{lsi_global:.0f}%", status_clinico)
+    m4.metric("Fenótipo IA", fenotipo_clinico.split()[-1])
+    st.write("---")
 
-        recup_speed = 0.0; prev_txt = "Aguardando dados"
-        if len(df_p) >= 3:
-            try:
-                x_days = (df_p['Data_dt'] - df_p['Data_dt'].min()).dt.days.values
-                slope, intercept = np.polyfit(x_days, df_p['Dor'].values, 1)
-                recup_speed = slope * -7 
-                if slope < -0.05:
-                    dias_para_zero = (1.0 - intercept) / slope
-                    alta_est = df_p['Data_dt'].min() + pd.to_timedelta(dias_para_zero, unit='d')
-                    prev_txt = alta_est.strftime("%d/%m/%Y") if alta_est > datetime.now() else "Janela de Alta"
-                elif slope > 0.05: prev_txt = "Em Piora"
-                else: prev_txt = "Platô Clínico"
-            except: pass
+    st.markdown(f"**Progresso para Alta (LSI): {lsi_global:.0f}%**")
+    st.progress(lsi_global / 100)
 
-        insight_ouro = "Aguardando dados."
-        insight_postura = "Coletando dados."
-        if len(df_p) >= 2:
-            d_ruim = df_p[df_p['Sono'] == 'Ruim']['Dor'].mean()
-            d_bom = df_p[df_p['Sono'] == 'Bom']['Dor'].mean()
-            if pd.notna(d_ruim) and pd.notna(d_bom) and d_ruim > d_bom + 1.0: insight_ouro = f"Sono Ruim exacerba dor em {(d_ruim - d_bom):.1f} pts."
-            elif pd.notna(d_bom): insight_ouro = "Sono atua como estabilizador analgésico."
+    t1, t2, t3, t4 = st.tabs(["🧠 IA Clínica", "📈 Correlações", "📐 Biomecânica", "🎯 Fatores"])
+    with t1:
+        st.info("A Inteligência Artificial atua como suporte à decisão. **A autonomia continua sendo do Fisioterapeuta.**")
+        c_i1, c_i2 = st.columns(2)
+        with c_i1:
+            st.markdown(f"**🔬 {fenotipo_clinico}**")
+            st.markdown(f"💡 *Diretriz Algorítmica:* {diretriz_ia}")
+        with c_i2:
+            if recup_speed > 0: st.success(f"📈 **Projeção:** Queda de {recup_speed:.1f} pts de dor/semana.")
+            elif recup_speed < 0: st.error(f"📉 **Alerta:** Aumento de {abs(recup_speed):.1f} pts de dor/semana.")
+            else: st.warning("⚖️ **Quadro:** Estacionário.")
 
-        delta_dor_pct = ((dor_atual - media_dor_historica) / media_dor_historica * 100) if media_dor_historica > 0 else 0
+    with t2:
+        fig_ev, ax_ev = plt.subplots(figsize=(10, 4))
+        ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], marker='o', lw=2)
+        ax_ev.set_title("Evolução Longitudinal da Dor", color=CORES_GENUA['primaria'])
+        ax_ev.spines['top'].set_visible(False); ax_ev.spines['right'].set_visible(False)
+        st.pyplot(fig_ev)
+        buf_ev = io.BytesIO(); fig_ev.savefig(buf_ev, format='png', bbox_inches='tight'); buf_ev.seek(0)
+        buf_corr = buf_ev
 
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Dor Atual (vs Média)", f"{dor_atual}/10", f"{delta_dor_pct:.0f}%", delta_color="inverse")
-        if "Coluna" in st.session_state.membro_ativo: m2.metric("Irradiação", f"{ultima.get('Irradiacao', 'Ausente')}")
-        else: m2.metric("Inchaço", f"Grau {inchaco_atual}")
-        m3.metric("LSI", f"{lsi_global:.0f}%", status_clinico)
-        m4.metric("Fenótipo IA", fenotipo_clinico.split()[-1])
-        st.write("---")
+    with t3:
+        col1, col2 = st.columns(2)
+        col1.metric("Flexão Atual", f"{ultima['Flexao']}°")
+        col2.info(f"Extensão Terminal: {ultima['Extensao']}")
+        buf_adm = buf_ev
 
-        st.markdown(f"**Progresso para Alta (LSI): {lsi_global:.0f}%**")
-        st.progress(lsi_global / 100)
-
-        t1, t2, t3, t4 = st.tabs(["🧠 IA Clínica", "📈 Correlações", "📐 Biomecânica", "🎯 Fatores"])
-        with t1:
-            st.info("A Inteligência Artificial atua como suporte à decisão. **A autonomia continua sendo do Fisioterapeuta.**")
-            c_i1, c_i2 = st.columns(2)
-            with c_i1:
-                st.markdown(f"**🔬 {fenotipo_clinico}**")
-                st.markdown(f"💡 *Diretriz Algorítmica:* {diretriz_ia}")
-            with c_i2:
-                if recup_speed > 0: st.success(f"📈 **Projeção:** Queda de {recup_speed:.1f} pts de dor/semana.")
-                elif recup_speed < 0: st.error(f"📉 **Alerta:** Aumento de {abs(recup_speed):.1f} pts de dor/semana.")
-                else: st.warning("⚖️ **Quadro:** Estacionário.")
-
-        with t2:
-            fig_ev, ax_ev = plt.subplots(figsize=(10, 4))
-            ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], marker='o', lw=2)
-            ax_ev.set_title("Evolução Longitudinal da Dor", color=CORES_GENUA['primaria'])
-            ax_ev.spines['top'].set_visible(False); ax_ev.spines['right'].set_visible(False)
-            st.pyplot(fig_ev)
-            buf_ev = io.BytesIO(); fig_ev.savefig(buf_ev, format='png', bbox_inches='tight'); buf_ev.seek(0)
-            buf_corr = buf_ev
-
-        with t3:
-            if st.session_state.membro_ativo == "Joelho":
-                col1, col2 = st.columns(2)
-                col1.metric("Flexão Atual", f"{ultima['Flexao']}°")
-                col2.info(f"Extensão Terminal: {ultima['Extensao']}")
-            buf_adm = buf_ev
-
-        with t4:
-            st.success(f"💡 **Insight Sono:** {insight_ouro}")
-            st.warning(f"💡 **Postura:** {insight_postura}")
+    with t4:
+        st.success(f"💡 **Insight Sono:** {insight_ouro}")
+        st.warning(f"💡 **Postura:** {insight_postura}")
 
         # --- 5. PDF EXPORT (Ajustado e blindado) ---
         st.markdown("---")
