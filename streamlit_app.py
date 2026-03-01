@@ -577,11 +577,14 @@ elif st.session_state.pagina == 'selecao_membro':
 # PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
     # 1. Menu Lateral Limpo (Funciona como a "Tab Bar" de um aplicativo)
-    # 1. Menu Lateral Limpo (Funciona como a "Tab Bar" de um aplicativo)
     with st.sidebar:
-        # Se a variável paciente_alvo não existir no seu código atual, substitua a linha abaixo por: if True:
         if not st.session_state.get('paciente_alvo', False): 
             st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']}; text-align: center;'>👤 {st.session_state.paciente}</h3>", unsafe_allow_html=True)
+            
+            # NOVO BOTÃO DE NAVEGAÇÃO: Voltar para a lista de pacientes
+            if st.button("⬅️ Trocar Paciente", use_container_width=True):
+                mudar_pagina('dados_paciente')
+                
             st.markdown("---")
             menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
         else:
@@ -800,28 +803,83 @@ elif st.session_state.pagina == 'painel_clinico':
 
     # --- MÓDULO 3: PAINEL ANALÍTICO (CÉREBRO EXCLUSIVO JOELHO) ---
     elif menu == "Painel Analítico 📊":
-        df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
+        p_sel = st.session_state.paciente
         
-        # 1. Blindagem Total contra Banco Vazio
+        # --- A. RESGATE DO CADASTRO (HMA E IDADE) ---
+        try:
+            df_cad = conn.read(worksheet="Cadastro", ttl=0)
+            registro_p = df_cad[df_cad['Nome'].str.strip() == p_sel].iloc[-1]
+            hist_clinica = registro_p.get('Historia', 'Histórico não cadastrado.')
+            idade_p = int(float(registro_p.get('Idade', 0))) if pd.notna(registro_p.get('Idade')) else "N/A"
+        except:
+            hist_clinica = "Histórico não disponível."; idade_p = "-"
+
+        # --- B. RESGATE DA AVALIAÇÃO BASE (TESTES E FORÇA) ---
+        try:
+            df_av = conn.read(worksheet="Avaliacao_Inicial", ttl=0)
+            av_p = df_av[df_av['Paciente'].str.strip() == p_sel].iloc[-1]
+            av_data = av_p.get('Data_Avaliacao', 'N/A')
+            av_quad = av_p.get('Quadriceps_Forca', 'Não testado')
+            av_isq = av_p.get('Isquio_Forca', 'Não testado')
+            av_glut = av_p.get('Quadril_Forca', 'Não testado')
+            av_agac = av_p.get('Agachamento_Uni', 'Não avaliado')
+            av_step = av_p.get('Step_Down_Qualidade', 'Não avaliado')
+            av_tlig = av_p.get('Testes_Ligamentares', '')
+            av_tmen = av_p.get('Testes_Meniscais', '')
+            av_tfp = av_p.get('Testes_Femoropatelar', '')
+            tem_av = True
+        except:
+            tem_av = False
+
+        st.header(f"📊 Painel Analítico: Joelho")
+
+        # 1. HEADER DO PACIENTE
+        st.markdown(f"""
+            <div style='background-color: #ffffff; border: 1px solid #e9ecef; border-left: 5px solid {CORES_GENUA['primaria']}; padding: 20px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'>
+                    <h3 style='margin: 0; color: {CORES_GENUA['primaria']}; font-weight: 700;'>👤 {p_sel}</h3>
+                    <span style='background-color: #f1f3f5; color: {CORES_GENUA['primaria']}; padding: 6px 15px; border-radius: 20px; font-weight: 600;'>{idade_p} anos</span>
+                </div>
+                <p style='margin: 0; color: #495057;'><strong>HMA:</strong> {hist_clinica}</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # 2. CARD DE AVALIAÇÃO FÍSICA (Expander para não poluir a tela)
+        if tem_av:
+            with st.expander(f"📋 Consultar Ficha de Avaliação Base (Data: {av_data})"):
+                c_av1, c_av2 = st.columns(2)
+                with c_av1:
+                    st.markdown("**💪 Força Muscular:**")
+                    st.markdown(f"- Quadríceps: {av_quad}\n- Isquiotibiais: {av_isq}\n- Glúteo Médio: {av_glut}")
+                    st.markdown("**⚙️ Biomecânica Dinâmica:**")
+                    st.markdown(f"- Agachamento Unipodal: {av_agac}\n- Step Down: {av_step}")
+                with c_av2:
+                    st.markdown("**🔬 Testes Ortopédicos (Positivos):**")
+                    st.markdown(f"- Ligamentares: {av_tlig if av_tlig else 'Nenhum achado'}")
+                    st.markdown(f"- Meniscais: {av_tmen if av_tmen else 'Nenhum achado'}")
+                    st.markdown(f"- Femoropatelar: {av_tfp if av_tfp else 'Nenhum achado'}")
+        else:
+            st.info("⚠️ Nenhuma Avaliação Inicial rica registrada no sistema para este paciente.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # --- C. MOTOR DE EVOLUÇÃO (CHECK-INS) ---
+        df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
         if df.empty or 'Paciente' not in df.columns:
-            st.warning("⚠️ Base de dados clínica vazia. Faça o primeiro Check-in na aba lateral.")
+            st.warning("⚠️ O paciente ainda não possui sessões de Check-in diário registradas.")
             st.stop()
         
         df['Membro'] = df.get('Membro', "Joelho").fillna("Joelho")
-        df_p = df[(df['Paciente'] == st.session_state.paciente) & (df['Membro'] == "Joelho")].copy()
+        df_p = df[(df['Paciente'] == p_sel) & (df['Membro'] == "Joelho")].copy()
 
         if df_p.empty:
-            st.warning(f"⚠️ Sem evoluções registradas para {st.session_state.paciente} no Joelho.")
+            st.warning("⚠️ O paciente ainda não possui sessões de Check-in diário registradas.")
             st.stop()
 
-        # 2. Ordenação de Tempo e Sessões
         df_p['Data_dt'] = pd.to_datetime(df_p['Data'], dayfirst=True)
         df_p = df_p.sort_values('Data_dt')
         df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
-        
-        st.header(f"📊 Painel Analítico: Joelho")
 
-        # 3. Configuração Segura de Variáveis (Fail-Safe)
         if 'Dor' not in df_p.columns: df_p['Dor'] = 0
         df_p['Dor'] = pd.to_numeric(df_p['Dor'], errors='coerce').fillna(0)
         
@@ -832,26 +890,23 @@ elif st.session_state.pagina == 'painel_clinico':
         for col, default in [('Flexao', 90), ('Extensao', 'Sem dados'), ('Agachamento', 'Sem Dor'), ('Step_Up', 'Sem Dor'), ('Step_Down', 'Sem Dor')]:
             if col not in df_p.columns: df_p[col] = default
 
-        # 4. Controle Dinâmico de Sessão (A variável perdida foi restaurada aqui)
         c_vazio, c_seletor = st.columns([4, 1])
         with c_seletor:
             sessao_escolhida = st.selectbox("📅 Analisar Sessão:", options=df_p['Sessão_Num'].tolist()[::-1], index=0)
         ultima = df_p[df_p['Sessão_Num'] == sessao_escolhida].iloc[0]
 
-        # --- 5. O CÉREBRO CLÍNICO BAYESIANO ---
         dor_atual = int(ultima.get('Dor', 0))
         inchaco_atual = int(ultima.get('Inchaco_N', 0))
         sono_atual = ultima.get('Sono', 'Regular')
         media_dor = df_p['Dor'].mean()
 
-        # Cálculo do LSI Funcional (Prontidão do Joelho)
         mapa_func = {"Incapaz": 0, "Dor Moderada": 4, "Dor Leve": 7, "Sem Dor": 10}
         func_pts = (mapa_func.get(ultima.get('Agachamento', 'Sem Dor'), 10) +
                     mapa_func.get(ultima.get('Step_Up', 'Sem Dor'), 10) +
                     mapa_func.get(ultima.get('Step_Down', 'Sem Dor'), 10)) / 30.0
         lsi_global = min(max(float(func_pts * 100), 0.0), 100.0)
 
-        # Árvore de Decisão / Algoritmo
+        # Motor de IA
         if ultima.get('Agachamento') == 'Incapaz' and inchaco_atual >= 2 and dor_atual >= 8:
             fenotipo = "🚨 Red Flag / Risco Estrutural"
             diretriz = "Critérios de Ottawa: Incapacidade de carga + Edema Agudo. Indicação de imagem."
@@ -876,7 +931,7 @@ elif st.session_state.pagina == 'painel_clinico':
 
         status_clinico = "Excelente" if lsi_global >= 85 else "Regular" if lsi_global >= 60 else "Atenção"
 
-        # --- 6. INTERFACE DE USUÁRIO (Painel) ---
+        # Métricas na Tela
         m1, m2, m3, m4 = st.columns(4)
         delta_pct = ((dor_atual - media_dor) / media_dor * 100) if media_dor > 0 else 0
         m1.metric("Dor Atual", f"{dor_atual}/10", f"{delta_pct:.0f}%", delta_color="inverse")
@@ -888,7 +943,6 @@ elif st.session_state.pagina == 'painel_clinico':
         st.markdown(f"**Progresso para Alta Clínica: {lsi_global:.0f}%**")
         st.progress(lsi_global / 100)
 
-    
         t1, t2, t3, t4 = st.tabs(["🧠 Inteligência Artificial", "📈 Gráfico de Evolução", "📐 Biomecânica", "🎯 Fatores"])
         
         with t1:
@@ -904,8 +958,6 @@ elif st.session_state.pagina == 'painel_clinico':
             ax.set_ylim(-0.5, 11)
             ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
             st.pyplot(fig)
-            
-            # Buffers de segurança para o PDF não quebrar
             buf_ev = io.BytesIO(); fig.savefig(buf_ev, format='png', bbox_inches='tight'); buf_ev.seek(0)
             buf_corr = buf_ev
 
@@ -916,7 +968,7 @@ elif st.session_state.pagina == 'painel_clinico':
             buf_adm = buf_ev
 
         with t4:
-            st.success(f"💡 **Insight Sono:** A última sessão registrou padrão de sono '{sono_atual}'.")
+            st.success(f"💡 **Insight Sono:** O padrão de sono na última sessão foi relatado como '{sono_atual}'.")
             st.caption("Aguardando volume maior de sessões para cruzar novos gatilhos biomecânicos e posturais.")
 
         # --- 5. PDF EXPORT (Blindado contra variáveis ausentes) ---
