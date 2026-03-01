@@ -576,12 +576,12 @@ elif st.session_state.pagina == 'selecao_membro':
 
 # PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
-    # 1. Menu Lateral Limpo (UX Estilo App Nativo)
+    # 1. Menu Lateral Limpo e Unificado
     with st.sidebar:
         if not st.session_state.get('paciente_alvo', False): 
             st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']}; text-align: center;'>👤 {st.session_state.paciente}</h3>", unsafe_allow_html=True)
             
-            # NOVO: Expansor elegante para troca rápida de pacientes sem sair da tela
+            # Expansor de Navegação
             with st.expander("🔄 Trocar Paciente Ativo"):
                 try:
                     df_lista_pacientes = conn.read("Cadastro", ttl=0)
@@ -595,7 +595,13 @@ elif st.session_state.pagina == 'painel_clinico':
                 except:
                     st.caption("Nenhum paciente extra encontrado.")
 
-            # --- FERRAMENTA ADMIN: INJEÇÃO DE DADOS CIENTÍFICOS (PBE) ---
+            st.markdown("---")
+            # --- A VARIÁVEL MENU RESTAURADA ---
+            menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
+        else:
+            menu = "Painel Analítico 📊"
+
+        # --- FERRAMENTA ADMIN: INJEÇÃO DE DADOS CIENTÍFICOS (PBE) ---
         st.markdown("---")
         with st.expander("⚙️ Admin: Injetar Casos Reais (PBE)"):
             st.warning("Injetará 4 Fenótipos Clínicos reais com alta fidelidade biomecânica.")
@@ -603,7 +609,6 @@ elif st.session_state.pagina == 'painel_clinico':
                 import numpy as np
                 from datetime import timedelta
                 
-                # Casos rigorosamente coerentes com a literatura ortopédica
                 pacientes_mock = [
                     {
                         "Nome": "Carlos (Pós-Op LCA)", "Idade": 28, "Dx": "LCA", "Dor_Ini": 8, "Inc_Ini": 3,
@@ -651,24 +656,20 @@ elif st.session_state.pagina == 'painel_clinico':
                         dor_atual = p["Dor_Ini"]
                         inc_atual = p["Inc_Ini"]
                         
-                        # Simulação Matemática de Biologia Tecidual (20 sessões)
                         for sessao in range(20):
                             dias_atras = (20 - sessao) * 3.5
                             data_sessao = data_hoje - timedelta(days=dias_atras)
                             
-                            # Melhora não-linear
                             if sessao % 3 == 0 and dor_atual > 1: dor_atual -= 1 
                             if sessao % 6 == 0 and inc_atual > 0: inc_atual -= 1 
                             
-                            # Biomecânica específica por patologia
                             if p["Dx"] == "LCA":
-                                flex = min(135, 60 + (sessao * 4.0)) # Ganho gradual de flexão
+                                flex = min(135, 60 + (sessao * 4.0))
                                 ext = "Déficit Grave (>-15°)" if sessao < 5 else ("Déficit Leve (-5°)" if sessao < 12 else "Completa (0°)")
                             else:
                                 flex = min(140, 110 + (sessao * 1.5))
                                 ext = "Completa (0°)" if p["Dx"] != "Artrose" else ("Déficit Leve (-5°)" if sessao < 15 else "Completa (0°)")
 
-                            # Correlação de Função baseada na dor
                             func_nivel = "Incapaz" if dor_atual > 6 else ("Dor Moderada" if dor_atual > 4 else ("Dor Leve" if dor_atual > 2 else "Sem Dor"))
                             
                             db.collection("Evolucao").add({
