@@ -916,25 +916,27 @@ elif st.session_state.pagina == 'painel_clinico':
             buf_adm = buf_ev
 
         with t4:
-            st.success(f"💡 **Insight Sono:** {insight_ouro}")
-            st.warning(f"💡 **Postura:** {insight_postura}")
+            st.success(f"💡 **Insight Sono:** A última sessão registrou padrão de sono '{sono_atual}'.")
+            st.caption("Aguardando volume maior de sessões para cruzar novos gatilhos biomecânicos e posturais.")
 
-        # --- 5. PDF EXPORT ---
+        # --- 5. PDF EXPORT (Blindado contra variáveis ausentes) ---
         st.markdown("---")
         if st.button("📄 Gerar Relatório PDF Oficial", use_container_width=True):
             try:
                 pdf_metrics = {
                     'ikdc': lsi_global, 'ikdc_status': status_clinico, 
-                    'dor': ultima['Dor'], 'media_dor': media_dor,
-                    'inchaco': ultima.get('Inchaco_N', 0), 
-                    'alta': prev_txt, 'insight_ouro': insight_ouro,
-                    'insight_mecanico': diretriz, 'insight_postura': insight_postura,
-                    'insight_evolucao': f"Velocidade de regressão: {recup_speed:.2f}/sem."
+                    'dor': dor_atual, 'media_dor': media_dor,
+                    'inchaco': inchaco_atual, 
+                    'alta': "Acompanhamento Ativo", 
+                    'insight_ouro': f"Qualidade do Sono: {sono_atual}",
+                    'insight_mecanico': diretriz, 
+                    'insight_postura': "Variável em calibração",
+                    'insight_evolucao': "Curva de regressão álgica disponível no painel."
                 }
                 pdf_output = create_pdf(p_sel, hist_clinica, pdf_metrics, {'ev': buf_ev, 'dor': buf_ev, 'sono': buf_corr, 'inchaco': buf_adm, 'adm': buf_adm})
                 st.success("✅ Documento Científico gerado com sucesso!")
                 st.download_button(label="⬇️ Baixar PDF", data=pdf_output, file_name=f"Laudo_GENUA_{p_sel}.pdf", mime="application/pdf")
             except Exception as e:
-                st.error(f"Erro na emissão do PDF: {e}")
+                st.error(f"Erro na emissão do PDF. Verifique o layout base FPDF: {e}")
 
 
