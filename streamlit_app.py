@@ -898,10 +898,12 @@ elif st.session_state.pagina == 'painel_clinico':
             ax_ev.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], marker='o', lw=2)
             ax_ev.set_title("Evolução Longitudinal da Dor", color=CORES_GENUA['primaria'])
             ax_ev.set_ylim(-0.5, 11)
-            ax_ev.spines['top'].set_visible(False); ax_ev.spines['right'].set_visible(False)
+            ax_ev.spines['top'].set_visible(False)
+            ax_ev.spines['right'].set_visible(False)
             st.pyplot(fig_ev)
 
         st.markdown("---")
+        
         if st.button("📄 Gerar Relatório PDF Oficial", use_container_width=True):
             st.info("Módulo de PDF temporariamente inativo para ajuste de performance gráfica.")
 
