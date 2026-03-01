@@ -742,11 +742,15 @@ elif st.session_state.pagina == 'painel_clinico':
         df_p['LSI'] = lsi_global
     except: pass
 
-    # 2.2. ESTADO INFLAMATÓRIO E TENDÊNCIA ÁLGICA
-    dor_atual = ultima['Dor']
+   # 2.2. ESTADO INFLAMATÓRIO E TENDÊNCIA ÁLGICA (BLINDADO)
+    if 'Dor' not in df_p.columns: 
+        df_p['Dor'] = 0
+    df_p['Dor'] = pd.to_numeric(df_p['Dor'], errors='coerce').fillna(0)
+    
+    dor_atual = int(ultima.get('Dor', 0))
     media_dor_historica = df_p['Dor'].mean()
     dor_tendencia = df_p['Dor'].tail(3).mean() if len(df_p) >= 3 else dor_atual
-    inchaco_atual = ultima.get('Inchaco_N', 0)
+    inchaco_atual = int(ultima.get('Inchaco_N', 0))
     sono_atual = ultima.get('Sono', 'Regular')
 
     # 2.3. TRIAGEM BAYESIANA E FENÓTIPO CLÍNICO (MOTOR GENUA AVANÇADO)
