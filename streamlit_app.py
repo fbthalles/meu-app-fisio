@@ -29,8 +29,8 @@ st.set_page_config(
     page_title="GENUA | Inteligência Clínica",
     page_icon=NOVO_LOGO_GENUA, 
     layout="wide",
-    initial_sidebar_state="auto"
-) # <-- Era este parêntese que estava faltando!
+    initial_sidebar_state="expanded" # <-- FORÇA A BARRA ABRIR POR PADRÃO
+)
 
 # --- 3.1 E 4. INJEÇÃO DE CSS UNIFICADA (UX PREMIUM TABLET/MOBILE) ---
 st.markdown(f"""
@@ -38,24 +38,27 @@ st.markdown(f"""
     /* 1. Tipografia e Reset */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
     html, body, [class*="css"] {{ font-family: 'Inter', sans-serif !important; }}
-    #MainMenu, header, footer, .stDeployButton, .stStatusWidget {{ display: none !important; }}
+    
+    /* 2. Remoção do Branding (Corrigido: Devolve o botão da Sidebar) */
+    #MainMenu, footer, .stDeployButton, .stStatusWidget {{ display: none !important; }}
+    header {{ background-color: transparent !important; }} /* Torna o topo invisível mas mantém o botão clicável */
 
-    /* 2. Container Principal (Respirabilidade para Tablets/iPads) */
+    /* 3. Container Principal */
     .stApp {{
         background: linear-gradient(180deg, {CORES_GENUA['fundo_claro']} 0%, #FFFFFF 100%);
         color: {CORES_GENUA['texto_escuro']};
     }}
     [data-testid="block-container"] {{
-        padding-top: 2rem !important;
+        padding-top: 3.5rem !important; /* Adiciona respiro para o botão da sidebar não sobrepor o título */
         padding-bottom: 3rem !important;
         padding-left: 5% !important;
         padding-right: 5% !important;
-        max-width: 1200px !important; /* Evita que o layout wide estique infinitamente em monitores ultrawide */
+        max-width: 1200px !important;
     }}
     
     h1, h2, h3, h4 {{ color: {CORES_GENUA['primaria']} !important; }}
 
-    /* 3. Correção de Cortes em Inputs, TextAreas e Selectboxes */
+    /* 4. Correção de Cortes em Inputs e Selectboxes */
     .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox [data-baseweb="select"] {{
         border-radius: 12px !important;
         border: 1px solid #E2E8F0 !important;
@@ -63,17 +66,17 @@ st.markdown(f"""
         box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
         padding: 10px 14px !important;
         line-height: 1.5 !important;
-        min-height: 48px !important; /* Garante altura mínima para toques no tablet */
+        min-height: 48px !important;
     }}
     
-    /* 4. Correção do Esmagamento dos Sliders */
+    /* 5. Correção dos Sliders */
     .stSlider > div {{
         padding-top: 18px !important;
         padding-bottom: 18px !important;
     }}
     [data-testid="stTickBar"] {{ fill: {CORES_GENUA['texto_suave']} !important; }}
 
-    /* 5. Botões Nativos */
+    /* 6. Botões Nativos */
     .stButton > button {{
         background: linear-gradient(135deg, {CORES_GENUA['primaria']} 0%, #1A5473 100%) !important;
         color: white !important;
@@ -92,7 +95,7 @@ st.markdown(f"""
         background: linear-gradient(135deg, #1A5473 0%, {CORES_GENUA['primaria']} 100%) !important;
     }}
 
-    /* 6. Cards de Métricas e Dashboards */
+    /* 7. Cards de Métricas */
     [data-testid="metric-container"] {{
         background-color: #FFFFFF;
         border-radius: 16px;
@@ -104,7 +107,7 @@ st.markdown(f"""
     }}
     [data-testid="stMetricValue"] {{ font-size: 2.2rem !important; }}
 
-    /* 7. Abas (Tabs) com Design de Pílulas Modernas */
+    /* 8. Abas (Tabs) Modernas */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 15px;
         padding: 10px 0px 20px 0px;
