@@ -902,7 +902,9 @@ elif st.session_state.pagina == 'painel_clinico':
         st.markdown(f"**Progresso para Alta Clínica: {lsi_global:.0f}%**")
         st.progress(lsi_global / 100)
 
-        t1, t2 = st.tabs(["🧠 Inteligência Artificial", "📈 Gráfico de Evolução"])
+    
+        t1, t2, t3, t4 = st.tabs(["🧠 Inteligência Artificial", "📈 Gráfico de Evolução", "📐 Biomecânica", "🎯 Fatores"])
+        
         with t1:
             st.info("A IA atua como uma ferramenta de segunda opinião algorítmica. **O raciocínio clínico final é seu.**")
             c_i1, c_i2 = st.columns(2)
@@ -916,27 +918,31 @@ elif st.session_state.pagina == 'painel_clinico':
             ax.set_ylim(-0.5, 11)
             ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
             st.pyplot(fig)
+            
+            # Buffers de segurança para o PDF não quebrar
+            buf_ev = io.BytesIO(); fig.savefig(buf_ev, format='png', bbox_inches='tight'); buf_ev.seek(0)
+            buf_corr = buf_ev
 
         with t3:
             col1, col2 = st.columns(2)
-            col1.metric("Flexão Atual", f"{ultima['Flexao']}°")
-            col2.info(f"Extensão Terminal: {ultima['Extensao']}")
+            col1.metric("Flexão Atual", f"{ultima.get('Flexao', 90)}°")
+            col2.info(f"Extensão Terminal: {ultima.get('Extensao', 'Sem dados')}")
             buf_adm = buf_ev
 
         with t4:
             st.success(f"💡 **Insight Sono:** {insight_ouro}")
             st.warning(f"💡 **Postura:** {insight_postura}")
 
-        # --- 5. PDF EXPORT (Ajustado e blindado) ---
+        # --- 5. PDF EXPORT ---
         st.markdown("---")
         if st.button("📄 Gerar Relatório PDF Oficial", use_container_width=True):
             try:
                 pdf_metrics = {
                     'ikdc': lsi_global, 'ikdc_status': status_clinico, 
-                    'dor': ultima['Dor'], 'media_dor': media_dor_historica,
+                    'dor': ultima['Dor'], 'media_dor': media_dor,
                     'inchaco': ultima.get('Inchaco_N', 0), 
                     'alta': prev_txt, 'insight_ouro': insight_ouro,
-                    'insight_mecanico': diretriz_ia, 'insight_postura': insight_postura,
+                    'insight_mecanico': diretriz, 'insight_postura': insight_postura,
                     'insight_evolucao': f"Velocidade de regressão: {recup_speed:.2f}/sem."
                 }
                 pdf_output = create_pdf(p_sel, hist_clinica, pdf_metrics, {'ev': buf_ev, 'dor': buf_ev, 'sono': buf_corr, 'inchaco': buf_adm, 'adm': buf_adm})
@@ -944,7 +950,5 @@ elif st.session_state.pagina == 'painel_clinico':
                 st.download_button(label="⬇️ Baixar PDF", data=pdf_output, file_name=f"Laudo_GENUA_{p_sel}.pdf", mime="application/pdf")
             except Exception as e:
                 st.error(f"Erro na emissão do PDF: {e}")
-        else:
-            st.info("Clique no botão acima para gerar o documento oficial em PDF.")
 
 
