@@ -832,15 +832,15 @@ elif st.session_state.pagina == 'painel_clinico':
             ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
             st.pyplot(fig)
 
-    with t3:
-        col1, col2 = st.columns(2)
-        col1.metric("Flexão Atual", f"{ultima['Flexao']}°")
-        col2.info(f"Extensão Terminal: {ultima['Extensao']}")
-        buf_adm = buf_ev
+        with t3:
+            col1, col2 = st.columns(2)
+            col1.metric("Flexão Atual", f"{ultima['Flexao']}°")
+            col2.info(f"Extensão Terminal: {ultima['Extensao']}")
+            buf_adm = buf_ev
 
-    with t4:
-        st.success(f"💡 **Insight Sono:** {insight_ouro}")
-        st.warning(f"💡 **Postura:** {insight_postura}")
+        with t4:
+            st.success(f"💡 **Insight Sono:** {insight_ouro}")
+            st.warning(f"💡 **Postura:** {insight_postura}")
 
         # --- 5. PDF EXPORT (Ajustado e blindado) ---
         st.markdown("---")
