@@ -780,23 +780,29 @@ elif st.session_state.pagina == 'painel_clinico':
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.form_submit_button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True):
-                if hma.strip() == "" or qp.strip() == "":
-                    st.error("A Queixa Principal (QP) e a HMA são obrigatórias.")
+                # Validação agressiva: Verifica se algum campo de texto foi deixado vazio
+                campos_texto = [qp, hma, sinais_sintomas, fat_alivio, fat_piora, trat_previos, mapa_dor]
+                if any(campo.strip() == "" for campo in campos_texto):
+                    st.error("⚠️ ERRO: Todos os campos abertos são obrigatórios. Se não houver dado clínico, preencha com 'Nenhum', 'Negativo' ou 'N/A'.")
                 else:
                     dados_avaliacao = {
                         "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
                         "Paciente": st.session_state.paciente, "Membro": st.session_state.membro_ativo,
                         "QP": qp, "HMA": hma, "Sinais_Sintomas": sinais_sintomas,
                         "Fatores_Alivio": fat_alivio, "Fatores_Piora": fat_piora, "Tratamentos_Previos": trat_previos,
-                        "Class_Dor": class_dor, "Origem_Dor": origem_dor, "Mapa_Dor": mapa_dor,
+                        "Class_Dor": class_dor, "Origem_Dor": origem_dor, 
+                        "Zonas_Dor": ", ".join(zonas_dor), "Mapa_Dor": mapa_dor, # <- Novas variáveis da Dor adicionadas aqui
                         "Red_Flags": ", ".join(red_flags), "Yellow_Cog": ", ".join(yellow_cog), 
-                        "Sono": qualidade_sono, "Fatores_Sociais": fat_sociais, "Comorbidades": comorbidades,
+                        "Sono": qualidade_sono, 
+                        "Fatores_Sociais": ", ".join(fat_sociais), # <- Atualizado para multiselect
+                        "Comorbidades": ", ".join(comorbidades),   # <- Atualizado para multiselect
                         "Derrame": derrame, "Alinhamento": alinhamento, "Marcha": marcha,
                         "Trofismo": trofismo, "Perimetria": perimetria, "Pele": ", ".join(pele),
                         "Palpacao": ", ".join(palpacao_comp), "Godet": godet, "Temperatura": temp,
                         "Testes_Ligamentares": ", ".join(t_lig), "Testes_Meniscais": ", ".join(t_men),
                         "Forca_Qualitativa": forca_qual, "Din_Quad": din_quad, "Din_Isq": din_isq, "Din_Glut": din_glut,
-                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, "Flexibilidade": flexibilidade,
+                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, 
+                        "Flexibilidade": ", ".join(flexibilidade), # <- Atualizado para multiselect
                         "CM_Agachamento": cm_agac, "Dor_Agachamento": dor_agac,
                         "CM_Step": cm_step, "Dor_Step": dor_step,
                         "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
@@ -811,7 +817,7 @@ elif st.session_state.pagina == 'painel_clinico':
                         df_av = pd.concat([df_av, nova_linha_av], ignore_index=True)
                         
                     conn.update(worksheet="Avaliacao_Inicial", data=df_av)
-                    st.success("✅ Avaliação Inicial registrada com sucesso!")
+                    st.success("✅ Avaliação Inicial validada e registrada com sucesso!")
 
     # --- MÓDULO 2: CHECK-IN DIÁRIO (EXCLUSIVO JOELHO) ---
     elif menu == "Check-in Diário 📝":
