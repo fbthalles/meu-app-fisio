@@ -659,80 +659,87 @@ elif st.session_state.pagina == 'painel_clinico':
 
     # --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
     if menu == "Avaliação Inicial 🔎":
-        # Cabeçalho limpo sem repetição de tags, pois o membro já está no topo (App Header)
         st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
 
-        # (MANTENHA O SEU CÓDIGO INTACTO A PARTIR DAQUI)
         with st.form(key="form_avaliacao_inicial_firebase"):
-            a1, a2, a3, a4 = st.tabs(["🗣️ Anamnese", "🚨 Red Flags", "📐 Físico & Testes", "📝 Questionários"])
-
-            with a1:
+            t_anamnese, t_dor, t_flags, t_fisico = st.tabs(["🗣️ Anamnese", "💥 Dor", "🚩 Bandeiras de Triagem", "📐 Exame Físico"])
+            
+            with t_anamnese:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Histórico e Contexto</h4>", unsafe_allow_html=True)
-                hma = st.text_area("HMA (História da Moléstia Atual) *", placeholder="Mecanismo de lesão, tempo de dor, comportamento dos sintomas...")
-                hmp = st.text_area("HMP (Histórico Médico Pregresso)", placeholder="Cirurgias anteriores, comorbidades, medicações em uso...")
-                c_a1, c_a2 = st.columns(2)
-                with c_a1: ocupacao = st.text_input("Profissão / Esporte")
-                with c_a2: objetivo = st.text_input("Objetivo Principal do Paciente", placeholder="Ex: Voltar a correr 5km sem dor")
+                qp = st.text_input("Queixa Principal (QP) *", placeholder="O que você deixou de fazer devido à dor?")
+                hma = st.text_area("História da Moléstia Atual (HMA) *", placeholder="Descrição detalhada do início e evolução do quadro...")
+                sinais_sintomas = st.text_input("Sinais e Sintomas (Localização / Mapa Corporal)", placeholder="Ex: Dor na interlinha medial, estalos...")
+                
+                c_an1, c_an2 = st.columns(2)
+                with c_an1: fat_alivio = st.text_input("Fatores de Alívio", placeholder="Ex: Repouso, decúbito, gelo...")
+                with c_an2: fat_piora = st.text_input("Fatores de Piora", placeholder="Ex: Descer escadas, agachar, carga mecânica...")
+                
+                trat_previos = st.text_area("Tratamentos Anteriores", placeholder="Intervenções médicas e fisioterapêuticas prévias...")
 
-            with a2:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Rastreio de Risco (Joelho)</h4>", unsafe_allow_html=True)
-                c_r1, c_r2 = st.columns(2)
-                with c_r1:
-                    trauma = st.radio("Trauma Direto Recente?", ["Não", "Sim"])
-                    falseio = st.radio("Falseios Francos / Falha da Articulação?", ["Não", "Sim, frequentes", "Apenas sensação de insegurança"])
-                with c_r2:
-                    rigidez_matinal = st.radio("Rigidez Matinal Articular", ["Ausente", "Menos de 30 min", "Mais de 30 min (Sinal Inflamatório)"])
-                    travamento = st.radio("Bloqueio/Travamento Articular Verdadeiro?", ["Não", "Sim (Possível lesão meniscal/corpo livre)"])
+            with t_dor:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Classificação e Origem</h4>", unsafe_allow_html=True)
+                c_dor1, c_dor2 = st.columns(2)
+                with c_dor1: class_dor = st.selectbox("Classificação da Dor", ["Não avaliada", "Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)"])
+                with c_dor2: origem_dor = st.text_input("Origem (Traumática, insidiosa, sobrecarga...)")
+                mapa_dor = st.text_area("Mapa da Dor", placeholder="Descreva as zonas exatas de dor e irradiação (se houver)...")
 
-            with a3:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Força e Interdependência Regional</h4>", unsafe_allow_html=True)
+            with t_flags:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação de Risco e Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
+                red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta para Encaminhamento Médico)", 
+                    ["Nenhum", "Trauma significativo recente", "Cirurgia recente", "Sinais de infecção (febre/secreção)", "Suspeita de fratura", "Dor constante/noturna intensa", "Histórico de câncer / Perda de peso", "Sinais de TVP", "Deformidade visível"])
+                
+                yellow_cog = st.multiselect("🟡 Yellow Flags (Cognitivo-Emocionais)", 
+                    ["Nenhum", "Cinesiofobia", "Catastrofização", "Crenças limitantes", "Estresse", "Ansiedade"])
+                
+                c_fl1, c_fl2 = st.columns(2)
+                with c_fl1: qualidade_sono = st.selectbox("Qualidade do Sono (Comportamental)", ["Normal/Restaurador", "Irregular", "Ruim (Insônia/Acorda com dor)"])
+                with c_fl2: fat_sociais = st.text_input("Fatores Contextuais e Sociais", placeholder="Problemas no trabalho, família...")
+                
+                comorbidades = st.text_area("Comorbidades Associadas", placeholder="Ex: Diabetes, Hipertensão, Obesidade...")
+
+            with t_fisico:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Inspeção Estática e Dinâmica</h4>", unsafe_allow_html=True)
                 c_f1, c_f2, c_f3 = st.columns(3)
-                with c_f1: quadriceps_forca = st.selectbox("Força Quadríceps", ["Preservada", "Déficit Leve", "Fraqueza Importante (< Grau 3)"])
-                with c_f2: isquio_forca = st.selectbox("Força Isquiotibiais", ["Preservada", "Déficit Leve", "Fraqueza Importante (< Grau 3)"])
-                with c_f3: quadril_forca = st.selectbox("Força Glúteo Médio", ["Preservada", "Déficit Leve", "Fraqueza Importante (< Grau 3)"])
+                with c_f1: derrame = st.selectbox("Derrame Articular", ["Ausente", "Leve", "Moderado", "Grave"])
+                with c_f2: alinhamento = st.selectbox("Alinhamento Postural", ["Normal", "Valgo", "Varo", "Recurvatum", "Flexo"])
+                with c_f3: marcha = st.selectbox("Padrão de Marcha", ["Normal", "Antálgica", "Claudicante", "Uso de dispositivo"])
                 
                 c_f4, c_f5 = st.columns(2)
-                with c_f4: tornozelo_adm = st.selectbox("Dorsiflexão Tornozelo (Lunge)", ["Normal (>10cm)", "Restrita (<10cm)", "Assimétrica"])
-                with c_f5: core_controle = st.selectbox("Controle Pélvico / Core", ["Estável", "Queda Pélvica (Trendelenburg)"])
-
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Testes Funcionais e Biomecânica</h4>", unsafe_allow_html=True)
-                c_fn1, c_fn2 = st.columns(2)
-                with c_fn1: agachamento_uni = st.selectbox("Agachamento Unipodal", ["Bom Alinhamento", "Valgo Dinâmico Leve", "Valgo Dinâmico Severo", "Incapaz por Dor"])
-                with c_fn2: step_down_qualidade = st.selectbox("Step Down (Qualidade)", ["Movimento Fluido", "Estratégia de Quadril Pobre", "Dor Femoropatelar Aguda", "Incapaz"])
-
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Filtro de Testes Ortopédicos (Apenas Positivos)</h4>", unsafe_allow_html=True)
-                st.caption("Selecione apenas os testes que apresentaram sinal positivo.")
+                with c_f4: 
+                    trofismo = st.selectbox("Trofismo Muscular", ["Normal", "Hipotrófico"])
+                    perimetria = st.text_input("Perimetria (Se hipotrófico)", placeholder="Ex: -2cm no VMO direito")
+                with c_f5: 
+                    pele = st.multiselect("Alterações Cutâneas", ["Nenhuma", "Equimose", "Hematoma", "Cicatrizes", "Fístulas"])
                 
-                testes_ligamentares = st.multiselect("LCA, LCP, LCL, LCM e CPL", ["Lachman", "Gaveta Anterior", "Gaveta Posterior", "Pivot Shift", "Estresse Valgo", "Estresse Varo", "Dial Test (CPL)"])
-                testes_meniscais = st.multiselect("Meniscos e Cartilagem", ["McMurray", "Apley Compressão", "Thessaly (20°)", "Sinal de Rabot (Crepitação)"])
-                testes_femoropatelar = st.multiselect("SFP, Tendinopatias e Trato Iliotibial", ["Sinal de Clarke", "Apreensão Patelar", "Decline Squat (Tendinopatia Patelar)", "Teste de Noble (Trato Iliotibial)"])
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Palpação</h4>", unsafe_allow_html=True)
+                c_p1, c_p2, c_p3 = st.columns(3)
+                with c_p1: palpacao_comp = st.multiselect("Estruturas Dolorosas", ["Anterior", "Medial", "Lateral", "Posterior", "Nenhuma"])
+                with c_p2: godet = st.radio("Sinal de Godet (Edema)", ["Negativo", "Positivo"])
+                with c_p3: temp = st.radio("Temperatura", ["Normal", "Aumentada", "Diminuída"])
 
-            with a4:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>PROMs (Métricas de Desfecho)</h4>", unsafe_allow_html=True)
-                st.info("Insira o score inicial do paciente para balizar a alta futura.")
-                c_q1, c_q2 = st.columns(2)
-                with c_q1: ikdc_score = st.number_input("Score IKDC (0-100)", min_value=0.0, max_value=100.0, step=1.0, value=0.0)
-                with c_q2: lefs_score = st.number_input("Score LEFS (0-80)", min_value=0, max_value=80, step=1, value=0)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Testes Especiais Ortopédicos (Positivos)</h4>", unsafe_allow_html=True)
+                t_lig = st.multiselect("Testes Ligamentares", ["Nenhum", "Lachman", "Gaveta Anterior", "Gaveta Posterior", "Estresse Valgo", "Estresse Varo", "Pivot Shift", "Dial Test"])
+                t_men = st.multiselect("Testes Meniscais", ["Nenhum", "McMurray", "Apley"])
 
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.form_submit_button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True):
-                if hma.strip() == "":
-                    st.error("A HMA é obrigatória para registrar a avaliação.")
+                if hma.strip() == "" or qp.strip() == "":
+                    st.error("A Queixa Principal (QP) e a HMA são obrigatórias.")
                 else:
                     dados_avaliacao = {
                         "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
                         "Paciente": st.session_state.paciente,
                         "Membro": st.session_state.membro_ativo,
-                        "HMA": hma, "HMP": hmp, "Ocupacao": ocupacao, "Objetivo": objetivo,
-                        "Trauma": trauma, "Falseio": falseio, "Rigidez": rigidez_matinal, "Travamento": travamento,
-                        "Quadriceps_Forca": quadriceps_forca, "Isquio_Forca": isquio_forca, "Quadril_Forca": quadril_forca, 
-                        "Tornozelo_ADM": tornozelo_adm, "Core_Controle": core_controle,
-                        "Agachamento_Uni": agachamento_uni, "Step_Down_Qualidade": step_down_qualidade,
-                        "Testes_Ligamentares": ", ".join(testes_ligamentares),
-                        "Testes_Meniscais": ", ".join(testes_meniscais),
-                        "Testes_Femoropatelar": ", ".join(testes_femoropatelar),
-                        "IKDC_Inicial": ikdc_score, "LEFS_Inicial": lefs_score,
+                        "QP": qp, "HMA": hma, "Sinais_Sintomas": sinais_sintomas,
+                        "Fatores_Alivio": fat_alivio, "Fatores_Piora": fat_piora, "Tratamentos_Previos": trat_previos,
+                        "Class_Dor": class_dor, "Origem_Dor": origem_dor, "Mapa_Dor": mapa_dor,
+                        "Red_Flags": ", ".join(red_flags), "Yellow_Cog": ", ".join(yellow_cog), 
+                        "Sono": qualidade_sono, "Fatores_Sociais": fat_sociais, "Comorbidades": comorbidades,
+                        "Derrame": derrame, "Alinhamento": alinhamento, "Marcha": marcha,
+                        "Trofismo": trofismo, "Perimetria": perimetria, "Pele": ", ".join(pele),
+                        "Palpacao": ", ".join(palpacao_comp), "Godet": godet, "Temperatura": temp,
+                        "Testes_Ligamentares": ", ".join(t_lig), "Testes_Meniscais": ", ".join(t_men),
                         "Profissional_ID": st.session_state.get("user_email", "admin")
                     }
                     
