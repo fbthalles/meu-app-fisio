@@ -682,23 +682,39 @@ elif st.session_state.pagina == 'painel_clinico':
             with t_dor:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Classificação e Origem</h4>", unsafe_allow_html=True)
                 c_dor1, c_dor2 = st.columns(2)
-                with c_dor1: class_dor = st.selectbox("Classificação da Dor", ["Não avaliada", "Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)"])
-                with c_dor2: origem_dor = st.text_input("Origem (Traumática, insidiosa, sobrecarga...)")
-                mapa_dor = st.text_area("Mapa da Dor", placeholder="Descreva as zonas exatas de dor e irradiação (se houver)...")
+                with c_dor1: class_dor = st.selectbox("Classificação da Dor *", ["Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)", "Não Aplicável"])
+                with c_dor2: origem_dor = st.selectbox("Origem *", ["Traumática", "Insidiosa / Sobrecarga", "Pós-operatória", "Degenerativa", "Não Aplicável"])
+                
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Mapa Anatômico da Dor</h4>", unsafe_allow_html=True)
+                st.info("Observe a referência visual e selecione as zonas de dor correspondentes.")
+                
+                c_mapa1, c_mapa2 = st.columns([1, 2])
+                with c_mapa1:
+                    # Inserindo uma imagem clínica de referência para o Joelho
+                    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Knee_diagram.svg/400px-Knee_diagram.svg.png", caption="Zonas Articulares", use_container_width=True)
+                with c_mapa2:
+                    zonas_dor = st.multiselect("Localização Apontada (Selecione 1 ou mais) *", 
+                        ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], default=["Nenhuma"])
+                    mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva se houver dor em outra região (Lombar, Tornozelo), ou mantenha 'Nenhuma'.")
 
             with t_flags:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação de Risco e Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
-                red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta para Encaminhamento Médico)", 
-                    ["Nenhum", "Trauma significativo recente", "Cirurgia recente", "Sinais de infecção (febre/secreção)", "Suspeita de fratura", "Dor constante/noturna intensa", "Histórico de câncer / Perda de peso", "Sinais de TVP", "Deformidade visível"])
+                red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta para Encaminhamento) *", 
+                    ["Nenhum", "Trauma significativo recente", "Cirurgia recente", "Sinais de infecção", "Suspeita de fratura", "Dor constante/noturna intensa", "Histórico de câncer", "Sinais de TVP", "Deformidade visível"], default=["Nenhum"])
                 
-                yellow_cog = st.multiselect("🟡 Yellow Flags (Cognitivo-Emocionais)", 
-                    ["Nenhum", "Cinesiofobia", "Catastrofização", "Crenças limitantes", "Estresse", "Ansiedade"])
+                yellow_cog = st.multiselect("🟡 Yellow Flags (Cognitivo-Emocionais) *", 
+                    ["Nenhum", "Cinesiofobia", "Catastrofização", "Crenças limitantes", "Estresse", "Ansiedade"], default=["Nenhum"])
                 
                 c_fl1, c_fl2 = st.columns(2)
-                with c_fl1: qualidade_sono = st.selectbox("Qualidade do Sono (Comportamental)", ["Normal/Restaurador", "Irregular", "Ruim (Insônia/Acorda com dor)"])
-                with c_fl2: fat_sociais = st.text_input("Fatores Contextuais e Sociais", placeholder="Problemas no trabalho, família...")
+                with c_fl1: qualidade_sono = st.selectbox("Qualidade do Sono (Comportamental) *", ["Normal/Restaurador", "Irregular", "Ruim (Insônia/Acorda com dor)"])
+                with c_fl2: 
+                    # Substituído para Multi-seleção padronizada
+                    fat_sociais = st.multiselect("Fatores Contextuais e Sociais *", 
+                        ["Nenhum", "Problemas no trabalho", "Conflitos familiares", "Afastamento INSS", "Isolamento social", "Dificuldade financeira"], default=["Nenhum"])
                 
-                comorbidades = st.text_area("Comorbidades Associadas", placeholder="Ex: Diabetes, Hipertensão, Obesidade...")
+                # Substituído para Multi-seleção padronizada
+                comorbidades = st.multiselect("Comorbidades Associadas *", 
+                    ["Nenhuma", "Hipertensão Arterial", "Diabetes Mellitus", "Obesidade", "Doença Reumatológica", "Cardiopatia", "Distúrbio Tireoidiano", "Asma/DPOC", "Doença Neurológica"], default=["Nenhuma"])
 
             with t_fisico:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Inspeção Estática e Dinâmica</h4>", unsafe_allow_html=True)
@@ -754,10 +770,12 @@ elif st.session_state.pagina == 'painel_clinico':
                 
                 c_cm3, c_cm4 = st.columns(2)
                 with c_cm3:
-                    cm_lunge = st.selectbox("Afundo (Lunge)", ["Bom controle", "Desvio de tronco", "Valgo dinâmico", "Incapaz"])
-                    dor_lunge = st.slider("Dor no Afundo (0-10)", 0, 10, 0)
+                    cm_lunge = st.selectbox("Afundo (Lunge) *", ["Bom controle", "Desvio de tronco", "Valgo dinâmico", "Incapaz", "Não avaliado"])
+                    dor_lunge = st.slider("Dor no Afundo (0-10) *", 0, 10, 0)
                 with c_cm4:
-                    flexibilidade = st.text_input("Flexibilidade (Testes Específicos)", placeholder="Ex: Thomas (+), Sentar e Alcançar (-5cm)...")
+                    # Substituído para Multi-seleção de testes padronizados
+                    flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
+                        ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
 
             st.markdown("<br>", unsafe_allow_html=True)
             
