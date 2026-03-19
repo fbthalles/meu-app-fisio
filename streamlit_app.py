@@ -483,96 +483,61 @@ if st.session_state.pagina == 'login':
             
     st.stop()
 
-## PAGINA 2: SELEÇÃO E CADASTRO DE PACIENTE (FIREBASE READY)
+# PAGINA 2: SELEÇÃO DE PACIENTE E CADASTRO COMPLETO
 elif st.session_state.pagina == 'dados_paciente':
-    st.markdown(f"<h2 style='color: {CORES_GENUA['primaria']};'>👤 Gestão de Pacientes</h2>", unsafe_allow_html=True)
+    st.header("👤 Gestão de Pacientes")
     
-    # Busca lista atualizada do Google Cloud
-    df_cad = conn.read(worksheet="Cadastro")
-    lista_pacientes = df_cad['Nome'].tolist() if not df_cad.empty else []
+    try:
+        df_cad = conn.read("Cadastro", ttl=0)
+        lista = df_cad['Nome'].dropna().unique().tolist() if not df_cad.empty else []
+    except:
+        lista = []
         
-    opcao_paciente = st.selectbox("Selecione um paciente ou cadastre novo:", ["+ Cadastrar Novo"] + lista_pacientes)
+    paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
     
-    # --- FLUXO 1: FORMULÁRIO COMPLETO DE NOVO PACIENTE ---
-    if opcao_paciente == "+ Cadastrar Novo":
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>📋 Nova Ficha de Cadastro</h4>", unsafe_allow_html=True)
-        
-        # Chave única adicionada para evitar o StreamlitAPIException
-        with st.form(key="form_cadastro_firebase"):
-            c1, c2 = st.columns(2)
-            with c1:
-                novo_nome = st.text_input("Nome Completo *", placeholder="Ex: João da Silva")
-                novo_cpf = st.text_input("CPF")
-                nova_idade = st.number_input("Idade", min_value=0, max_value=120, step=1)
-            with c2:
-                novo_telefone = st.text_input("WhatsApp / Telefone")
-                novo_email = st.text_input("E-mail")
-                nova_hma = st.text_area("HMA (História Clínica / Cirurgia)", height=68, placeholder="Ex: Pós-operatório de LCA...")
+    if paciente == "+ Novo Paciente":
+        with st.form("cad_novo"):
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação do Paciente</h4>", unsafe_allow_html=True)
+            nome = st.text_input("Nome Completo *")
+            
+            c_cad1, c_cad2, c_cad3 = st.columns(3)
+            with c_cad1: dt_nasc = st.date_input("Data de Nascimento", format="DD/MM/YYYY", max_value=datetime.today())
+            with c_cad2: cpf = st.text_input("CPF")
+            with c_cad3: telefone = st.text_input("Telefone (WhatsApp)")
+            
+            c_cad4, c_cad5 = st.columns(2)
+            with c_cad4: email = st.text_input("E-mail")
+            with c_cad5: ocupacao = st.text_input("Atividade Ocupacional")
+            
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Rápido (Triagem)</h4>", unsafe_allow_html=True)
+            dx_rapido = st.text_input("Diagnóstico Clínico/Médico Prévio", placeholder="Ex: Pós-operatório de LCA, Condropatia Patelar...")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            submit_cadastro = st.form_submit_button("💾 Salvar no Google Cloud", use_container_width=True)
-            
-            if submit_cadastro:
-                if novo_nome.strip() == "":
-                    st.error("⚠️ O Nome Completo é obrigatório.")
+            if st.form_submit_button("💾 Salvar Cadastro Completo", use_container_width=True):
+                if nome.strip() == "":
+                    st.error("O Nome Completo é um campo obrigatório para registro.")
                 else:
-                    novo_registro = pd.DataFrame([{
-                        "Nome": novo_nome.strip(), "CPF": novo_cpf, "Idade": nova_idade,
-                        "Telefone": novo_telefone, "Email": novo_email, "Historia": nova_hma,
-                        "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")
-                    }])
-                    conn.update(worksheet="Cadastro", data=novo_registro)
-                    st.success("Cadastro realizado com sucesso!")
-                    st.session_state.paciente = novo_nome.strip()
+                    idade_calc = (datetime.now().date() - dt_nasc).days // 365
+                    novo_cad = {
+                        "Nome": nome, "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
+                        "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
+                        "Email": email, "Ocupacao": ocupacao, "Diagnostico_Rapido": dx_rapido
+                    }
+                    
+                    df_banco_cad = conn.read("Cadastro", ttl=0)
+                    if df_banco_cad.empty:
+                        conn.update("Cadastro", pd.DataFrame([novo_cad]))
+                    else:
+                        conn.update("Cadastro", pd.concat([df_banco_cad, pd.DataFrame([novo_cad])], ignore_index=True))
+                    
+                    st.session_state.paciente = nome
+                    st.success("✅ Paciente registrado com sucesso na base de dados!")
                     mudar_pagina('selecao_membro')
-
-    # --- FLUXO 2: PACIENTE JÁ EXISTENTE ---
     else:
-        st.success(f"Paciente selecionado: **{opcao_paciente}**")
-        if st.button("Próximo: Selecionar Tratamento ➡️", use_container_width=True):
-            st.session_state.paciente = opcao_paciente
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Abrir Prontuário Eletrônico", use_container_width=True, type="primary"):
+            st.session_state.paciente = paciente
             mudar_pagina('selecao_membro')
-            
-    st.stop()
-
-# PAGINA 3: SELEÇÃO DE MEMBRO INTELIGENTE
-elif st.session_state.pagina == 'selecao_membro':
-    st.title("🎯 Área de Reabilitação")
-    st.markdown(f"Paciente Ativo: **{st.session_state.paciente}**")
-    
-    # INTELIGÊNCIA: Verifica quais membros este paciente já tratou no passado
-    try:
-        df_ev = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
-        if 'Membro' not in df_ev.columns: df_ev['Membro'] = "Joelho" # Blindagem de legado
-        df_ev['Membro'] = df_ev['Membro'].fillna("Joelho")
-        
-        membros_existentes = df_ev[df_ev['Paciente'] == st.session_state.paciente]['Membro'].unique().tolist()
-    except:
-        membros_existentes = []
-
-    st.markdown("### 🔄 Continuar Tratamento Existente")
-    if membros_existentes:
-        for m in membros_existentes:
-            if st.button(f"Abrir Prontuário: {m} 📊", use_container_width=True):
-                st.session_state.membro_ativo = m
-                mudar_pagina('painel_clinico')
-    else:
-        st.info("Nenhum tratamento anterior encontrado para este paciente. Inicie um abaixo.")
-
-    st.markdown("---")
-    st.markdown("### ➕ Iniciar Novo Tratamento")
-    # Foco absoluto do MVP: Joelho
-    novo_membro = "Joelho" 
-    
-    if st.button(f"Iniciar Prontuário para {novo_membro} 🆕", use_container_width=True, type="primary"):
-        st.session_state.membro_ativo = novo_membro
-        mudar_pagina('painel_clinico')
-        
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("⬅️ Voltar", type="secondary"):
-        mudar_pagina('dados_paciente')
-        
-    st.stop()
 
 # PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
