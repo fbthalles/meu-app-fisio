@@ -664,7 +664,8 @@ elif st.session_state.pagina == 'painel_clinico':
         st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
 
         with st.form(key="form_avaliacao_inicial_firebase"):
-            t_anamnese, t_dor, t_flags, t_fisico = st.tabs(["🗣️ Anamnese", "💥 Dor", "🚩 Bandeiras de Triagem", "📐 Exame Físico"])
+            # Adicionamos a nova aba "🏃 Funcional"
+            t_anamnese, t_dor, t_flags, t_fisico, t_funcional = st.tabs(["🗣️ Anamnese", "💥 Dor", "🚩 Bandeiras", "📐 Físico", "🏃 Funcional"])
             
             with t_anamnese:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Histórico e Contexto</h4>", unsafe_allow_html=True)
@@ -704,7 +705,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 c_f1, c_f2, c_f3 = st.columns(3)
                 with c_f1: derrame = st.selectbox("Derrame Articular", ["Ausente", "Leve", "Moderado", "Grave"])
                 with c_f2: alinhamento = st.selectbox("Alinhamento Postural", ["Normal", "Valgo", "Varo", "Recurvatum", "Flexo"])
-                with c_f3: marcha = st.selectbox("Padrão de Marcha", ["Normal", "Antálgica", "Claudicante", "Uso de dispositivo"])
+                with c_f3: marcha = st.selectbox("Padrão de Marcha (Estrutural)", ["Normal", "Antálgica", "Claudicante", "Uso de dispositivo"])
                 
                 c_f4, c_f5 = st.columns(2)
                 with c_f4: 
@@ -723,6 +724,41 @@ elif st.session_state.pagina == 'painel_clinico':
                 t_lig = st.multiselect("Testes Ligamentares", ["Nenhum", "Lachman", "Gaveta Anterior", "Gaveta Posterior", "Estresse Valgo", "Estresse Varo", "Pivot Shift", "Dial Test"])
                 t_men = st.multiselect("Testes Meniscais", ["Nenhum", "McMurray", "Apley"])
 
+            with t_funcional:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
+                forca_qual = st.selectbox("Força Geral (Qualitativa 0 a 5)", ["Grau 5 (Normal)", "Grau 4 (Boa)", "Grau 3 (Razoável)", "Grau 2 (Fraca)", "Grau 1 (Traço)", "Grau 0 (Nula)"])
+                
+                st.caption("Insira os valores em kgf ou N da dinamometria isométrica:")
+                c_din1, c_din2, c_din3 = st.columns(3)
+                with c_din1: din_quad = st.number_input("Quadríceps", min_value=0.0, step=1.0)
+                with c_din2: din_isq = st.number_input("Isquiotibiais", min_value=0.0, step=1.0)
+                with c_din3: din_glut = st.number_input("Glúteo Médio", min_value=0.0, step=1.0)
+                
+                # Motor de cálculo em tempo real
+                if din_quad > 0 and din_isq > 0:
+                    st.info(f"📊 **Razão Isquios/Quadríceps (I/Q):** {(din_isq/din_quad)*100:.1f}%")
+
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Mobilidade Articular (Goniometria)</h4>", unsafe_allow_html=True)
+                c_adm1, c_adm2 = st.columns(2)
+                with c_adm1: adm_flex = st.number_input("Flexão Máxima (Graus)", min_value=0, max_value=160, value=130)
+                with c_adm2: adm_ext = st.number_input("Extensão Máxima (Graus)", min_value=-20, max_value=20, value=0)
+
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Controle Motor e Testes Relacionais</h4>", unsafe_allow_html=True)
+                c_cm1, c_cm2 = st.columns(2)
+                with c_cm1: 
+                    cm_agac = st.selectbox("Agachamento (Bi/Unipodal)", ["Bom controle", "Valgo dinâmico", "Estratégia pobre de quadril", "Incapaz"])
+                    dor_agac = st.slider("Dor no Agachamento (0-10)", 0, 10, 0)
+                with c_cm2:
+                    cm_step = st.selectbox("Subir/Descer Escadas", ["Bom controle", "Valgo dinâmico", "Estratégia pobre", "Incapaz"])
+                    dor_step = st.slider("Dor no Step (0-10)", 0, 10, 0)
+                
+                c_cm3, c_cm4 = st.columns(2)
+                with c_cm3:
+                    cm_lunge = st.selectbox("Afundo (Lunge)", ["Bom controle", "Desvio de tronco", "Valgo dinâmico", "Incapaz"])
+                    dor_lunge = st.slider("Dor no Afundo (0-10)", 0, 10, 0)
+                with c_cm4:
+                    flexibilidade = st.text_input("Flexibilidade (Testes Específicos)", placeholder="Ex: Thomas (+), Sentar e Alcançar (-5cm)...")
+
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.form_submit_button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True):
@@ -731,8 +767,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 else:
                     dados_avaliacao = {
                         "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
-                        "Paciente": st.session_state.paciente,
-                        "Membro": st.session_state.membro_ativo,
+                        "Paciente": st.session_state.paciente, "Membro": st.session_state.membro_ativo,
                         "QP": qp, "HMA": hma, "Sinais_Sintomas": sinais_sintomas,
                         "Fatores_Alivio": fat_alivio, "Fatores_Piora": fat_piora, "Tratamentos_Previos": trat_previos,
                         "Class_Dor": class_dor, "Origem_Dor": origem_dor, "Mapa_Dor": mapa_dor,
@@ -742,6 +777,11 @@ elif st.session_state.pagina == 'painel_clinico':
                         "Trofismo": trofismo, "Perimetria": perimetria, "Pele": ", ".join(pele),
                         "Palpacao": ", ".join(palpacao_comp), "Godet": godet, "Temperatura": temp,
                         "Testes_Ligamentares": ", ".join(t_lig), "Testes_Meniscais": ", ".join(t_men),
+                        "Forca_Qualitativa": forca_qual, "Din_Quad": din_quad, "Din_Isq": din_isq, "Din_Glut": din_glut,
+                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, "Flexibilidade": flexibilidade,
+                        "CM_Agachamento": cm_agac, "Dor_Agachamento": dor_agac,
+                        "CM_Step": cm_step, "Dor_Step": dor_step,
+                        "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
                         "Profissional_ID": st.session_state.get("user_email", "admin")
                     }
                     
