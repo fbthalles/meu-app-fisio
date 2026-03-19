@@ -505,37 +505,37 @@ elif st.session_state.pagina == 'dados_paciente':
             with c_cad2: cpf = st.text_input("CPF")
             with c_cad3: telefone = st.text_input("Telefone (WhatsApp)")
             
-            c_cad4, c_cad5 = st.columns(2)
+            c_cad4, c_cad5, c_cad6 = st.columns(3)
             with c_cad4: email = st.text_input("E-mail")
-            with c_cad5: ocupacao = st.text_input("Atividade Ocupacional")
+            with c_cad5: cidade = st.text_input("Cidade e Estado")
+            with c_cad6: ocupacao = st.text_input("Atividade Ocupacional")
             
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Rápido (Triagem)</h4>", unsafe_allow_html=True)
-            dx_rapido = st.text_input("Diagnóstico Clínico/Médico Prévio", placeholder="Ex: Pós-operatório de LCA, Condropatia Patelar...")
+            dx_rapido = st.text_input("Diagnóstico Clínico/Médico", placeholder="Ex: LCA, Condropatia, Tendinopatia...")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("💾 Salvar Cadastro Completo", use_container_width=True):
+            if st.form_submit_button("💾 Salvar Cadastro", use_container_width=True):
                 if nome.strip() == "":
-                    st.error("O Nome Completo é um campo obrigatório para registro.")
+                    st.error("O Nome é obrigatório.")
                 else:
                     idade_calc = (datetime.now().date() - dt_nasc).days // 365
                     novo_cad = {
                         "Nome": nome, "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
                         "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
-                        "Email": email, "Ocupacao": ocupacao, "Diagnostico_Rapido": dx_rapido
+                        "Email": email, "Cidade_Estado": cidade, "Ocupacao": ocupacao, 
+                        "Diagnostico_Rapido": dx_rapido, "Historia": "" # Mantido para não quebrar legados
                     }
                     
                     df_banco_cad = conn.read("Cadastro", ttl=0)
-                    if df_banco_cad.empty:
-                        conn.update("Cadastro", pd.DataFrame([novo_cad]))
-                    else:
-                        conn.update("Cadastro", pd.concat([df_banco_cad, pd.DataFrame([novo_cad])], ignore_index=True))
+                    if df_banco_cad.empty: conn.update("Cadastro", pd.DataFrame([novo_cad]))
+                    else: conn.update("Cadastro", pd.concat([df_banco_cad, pd.DataFrame([novo_cad])], ignore_index=True))
                     
                     st.session_state.paciente = nome
-                    st.success("✅ Paciente registrado com sucesso na base de dados!")
+                    st.success("✅ Paciente registrado com sucesso!")
                     mudar_pagina('selecao_membro')
     else:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Abrir Prontuário Eletrônico", use_container_width=True, type="primary"):
+        if st.button("Abrir Prontuário", use_container_width=True, type="primary"):
             st.session_state.paciente = paciente
             mudar_pagina('selecao_membro')
 
