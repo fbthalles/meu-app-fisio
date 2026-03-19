@@ -523,7 +523,7 @@ elif st.session_state.pagina == 'dados_paciente':
                         "Nome": nome, "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
                         "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
                         "Email": email, "Cidade_Estado": cidade, "Ocupacao": ocupacao, 
-                        "Diagnostico_Rapido": dx_rapido, "Historia": "" # Mantido para não quebrar legados
+                        "Diagnostico_Rapido": dx_rapido, "Historia": "" 
                     }
                     
                     df_banco_cad = conn.read("Cadastro", ttl=0)
@@ -531,13 +531,15 @@ elif st.session_state.pagina == 'dados_paciente':
                     else: conn.update("Cadastro", pd.concat([df_banco_cad, pd.DataFrame([novo_cad])], ignore_index=True))
                     
                     st.session_state.paciente = nome
+                    st.session_state.membro_ativo = "Joelho" # <-- FORÇA O FOCO NO MVP
                     st.success("✅ Paciente registrado com sucesso!")
-                    mudar_pagina('selecao_membro')
+                    mudar_pagina('painel_clinico') # <-- ROTEAMENTO DIRETO
     else:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Abrir Prontuário", use_container_width=True, type="primary"):
             st.session_state.paciente = paciente
-            mudar_pagina('selecao_membro')
+            st.session_state.membro_ativo = "Joelho" # <-- FORÇA O FOCO NO MVP
+            mudar_pagina('painel_clinico') # <-- ROTEAMENTO DIRETO
 
 # PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
