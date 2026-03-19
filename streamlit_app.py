@@ -668,8 +668,8 @@ elif st.session_state.pagina == 'painel_clinico':
         st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
 
         with st.form(key="form_avaliacao_inicial_firebase"):
-            # Adicionamos a nova aba "🏃 Funcional"
-            t_anamnese, t_dor, t_flags, t_fisico, t_funcional = st.tabs(["🗣️ Anamnese", "💥 Dor", "🚩 Bandeiras", "📐 Físico", "🏃 Funcional"])
+            # Estrutura expandida com as duas novas abas
+            t_anamnese, t_dor, t_flags, t_fisico, t_funcional, t_exames, t_quest = st.tabs(["🗣️ Anamnese", "💥 Dor", "🚩 Bandeiras", "📐 Físico", "🏃 Funcional", "🩻 Exames", "📋 Questionários"])
             
             with t_anamnese:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Histórico e Contexto</h4>", unsafe_allow_html=True)
@@ -781,13 +781,52 @@ elif st.session_state.pagina == 'painel_clinico':
                     flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
                         ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
 
+            with t_exames:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
+                tipos_exames = st.multiselect("Exames Apresentados *", 
+                    ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"], default=["Nenhum"])
+                
+                laudo_exames = st.text_area("Laudo / Achados Importantes *", value="Nenhum", 
+                    placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
+
+            with t_quest:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Escala Funcional (LEFS - Adaptada para Joelho)</h4>", unsafe_allow_html=True)
+                st.caption("Selecione o grau de dificuldade do paciente para as seguintes atividades hoje (0 = Incapaz, 4 = Sem dificuldade):")
+                
+                opcoes_resp = {"Incapaz / Extrema Dificuldade": 0, "Muita Dificuldade": 1, "Dificuldade Moderada": 2, "Um Pouco de Dificuldade": 3, "Nenhuma Dificuldade": 4}
+                perguntas_lefs = [
+                    "1. Agachar ou ajoelhar", "2. Andar 2 quarteirões", "3. Subir um lance de escadas", 
+                    "4. Descer um lance de escadas", "5. Ficar em pé por 1 hora", "6. Correr em terreno plano",
+                    "7. Fazer trabalho pesado", "8. Mudança rápida de direção (Corte)"
+                ]
+                
+                score_lefs = 0
+                c_q1, c_q2 = st.columns(2)
+                for i, p in enumerate(perguntas_lefs):
+                    col = c_q1 if i < 4 else c_q2
+                    with col:
+                        # O Streamlit guarda a resposta e somamos o valor correspondente (0 a 4)
+                        resp = st.selectbox(p, list(opcoes_resp.keys()), key=f"lefs_{i}")
+                        score_lefs += opcoes_resp[resp]
+                
+                score_max = len(perguntas_lefs) * 4
+                pct_funcional = (score_lefs / score_max) * 100
+                
+                # Motor de Interpretação Automática
+                if pct_funcional < 30: interp = "🚨 Função Muito Ruim (Alta dependência mecânica / Fase Aguda)"
+                elif pct_funcional < 60: interp = "🟡 Função Regular (Limitação funcional moderada)"
+                elif pct_funcional < 85: interp = "🟢 Função Boa (Independência nas AVDs)"
+                else: interp = "⭐ Função Excelente (Apto para transição desportiva)"
+                    
+                st.info(f"📊 **Resultado Automático:** {score_lefs}/{score_max} pontos ({pct_funcional:.1f}%) — **Interpretação:** {interp}")
+            
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.form_submit_button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True):
-                # Validação agressiva: Verifica se algum campo de texto foi deixado vazio
-                campos_texto = [qp, hma, sinais_sintomas, fat_alivio, fat_piora, trat_previos, mapa_dor]
+                # Adicionamos 'laudo_exames' na validação rigorosa
+                campos_texto = [qp, hma, sinais_sintomas, fat_alivio, fat_piora, trat_previos, mapa_dor, laudo_exames]
                 if any(campo.strip() == "" for campo in campos_texto):
-                    st.error("⚠️ ERRO: Todos os campos abertos são obrigatórios. Se não houver dado clínico, preencha com 'Nenhum', 'Negativo' ou 'N/A'.")
+                    st.error("⚠️ ERRO: Todos os campos abertos são obrigatórios. Se não houver dado clínico, preencha com 'Nenhum' ou 'N/A'.")
                 else:
                     dados_avaliacao = {
                         "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
@@ -795,33 +834,29 @@ elif st.session_state.pagina == 'painel_clinico':
                         "QP": qp, "HMA": hma, "Sinais_Sintomas": sinais_sintomas,
                         "Fatores_Alivio": fat_alivio, "Fatores_Piora": fat_piora, "Tratamentos_Previos": trat_previos,
                         "Class_Dor": class_dor, "Origem_Dor": origem_dor, 
-                        "Zonas_Dor": ", ".join(zonas_dor), "Mapa_Dor": mapa_dor, # <- Novas variáveis da Dor adicionadas aqui
+                        "Zonas_Dor": ", ".join(zonas_dor), "Mapa_Dor": mapa_dor,
                         "Red_Flags": ", ".join(red_flags), "Yellow_Cog": ", ".join(yellow_cog), 
-                        "Sono": qualidade_sono, 
-                        "Fatores_Sociais": ", ".join(fat_sociais), # <- Atualizado para multiselect
-                        "Comorbidades": ", ".join(comorbidades),   # <- Atualizado para multiselect
+                        "Sono": qualidade_sono, "Fatores_Sociais": ", ".join(fat_sociais), "Comorbidades": ", ".join(comorbidades),
                         "Derrame": derrame, "Alinhamento": alinhamento, "Marcha": marcha,
                         "Trofismo": trofismo, "Perimetria": perimetria, "Pele": ", ".join(pele),
                         "Palpacao": ", ".join(palpacao_comp), "Godet": godet, "Temperatura": temp,
                         "Testes_Ligamentares": ", ".join(t_lig), "Testes_Meniscais": ", ".join(t_men),
                         "Forca_Qualitativa": forca_qual, "Din_Quad": din_quad, "Din_Isq": din_isq, "Din_Glut": din_glut,
-                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, 
-                        "Flexibilidade": ", ".join(flexibilidade), # <- Atualizado para multiselect
+                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, "Flexibilidade": ", ".join(flexibilidade),
                         "CM_Agachamento": cm_agac, "Dor_Agachamento": dor_agac,
-                        "CM_Step": cm_step, "Dor_Step": dor_step,
-                        "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
+                        "CM_Step": cm_step, "Dor_Step": dor_step, "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
+                        "Exames_Apresentados": ", ".join(tipos_exames), "Laudo_Exames": laudo_exames, # <- Novos dados de Exame
+                        "Score_LEFS_Pts": score_lefs, "Score_LEFS_Pct": pct_funcional, "Interpretacao_LEFS": interp, # <- Novos dados do Questionário
                         "Profissional_ID": st.session_state.get("user_email", "admin")
                     }
                     
                     df_av = conn.read(worksheet="Avaliacao_Inicial", ttl=0)
                     nova_linha_av = pd.DataFrame([dados_avaliacao])
-                    if df_av.empty:
-                        df_av = nova_linha_av
-                    else:
-                        df_av = pd.concat([df_av, nova_linha_av], ignore_index=True)
+                    if df_av.empty: df_av = nova_linha_av
+                    else: df_av = pd.concat([df_av, nova_linha_av], ignore_index=True)
                         
                     conn.update(worksheet="Avaliacao_Inicial", data=df_av)
-                    st.success("✅ Avaliação Inicial validada e registrada com sucesso!")
+                    st.success("✅ Avaliação Inicial registrada com sucesso!")
 
     # --- MÓDULO 2: CHECK-IN DIÁRIO (EXCLUSIVO JOELHO) ---
     elif menu == "Check-in Diário 📝":
