@@ -548,7 +548,12 @@ elif st.session_state.pagina == 'painel_clinico':
         if not st.session_state.get('paciente_alvo', False): 
             st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']}; text-align: center;'>👤 {st.session_state.paciente}</h3>", unsafe_allow_html=True)
             
-            # Expansor de Navegação
+            # --- CORREÇÃO DE ROTA: BOTÃO VOLTAR BLINDADO ---
+            if st.button("⬅️ Voltar para Pacientes", use_container_width=True):
+                st.session_state.pagina = 'dados_paciente'
+                st.rerun()
+            
+            # Expansor de Navegação Rápida
             with st.expander("🔄 Trocar Paciente Ativo"):
                 try:
                     df_lista_pacientes = conn.read("Cadastro", ttl=0)
@@ -563,7 +568,6 @@ elif st.session_state.pagina == 'painel_clinico':
                     st.caption("Nenhum paciente extra encontrado.")
 
             st.markdown("---")
-            # --- A VARIÁVEL MENU RESTAURADA ---
             menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
         else:
             menu = "Painel Analítico 📊"
@@ -1062,5 +1066,12 @@ elif st.session_state.pagina == 'painel_clinico':
         st.markdown("---")
         if st.button("📄 Exportar Evolução em PDF"):
             st.info("Módulo de PDF em reestruturação para suportar a nova matriz de gráficos em alta resolução.")
+
+# --- SISTEMA DE PROTEÇÃO GLOBAL CONTRA TELA BRANCA (FAIL-SAFE) ---
+# Se o aplicativo se perder na navegação, este escudo força o retorno à tela de pacientes.
+paginas_validas = ['login', 'dados_paciente', 'selecao_membro', 'painel_clinico']
+if st.session_state.get('pagina') not in paginas_validas:
+    st.session_state.pagina = 'dados_paciente'
+    st.rerun()
 
 
