@@ -799,28 +799,27 @@ elif st.session_state.pagina == 'painel_clinico':
     elif menu == "Painel Analítico 📊":
         p_sel = st.session_state.paciente
         
-        # --- A. RESGATE DO CADASTRO (HMA E IDADE) ---
+        # --- A. RESGATE DO CADASTRO ---
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
             registro_p = df_cad[df_cad['Nome'].str.strip() == p_sel].iloc[-1]
-            hist_clinica = registro_p.get('Historia', 'Histórico não cadastrado.')
+            hist_clinica = registro_p.get('Diagnostico_Rapido', registro_p.get('Historia', 'Sem HMA base'))
             idade_p = int(float(registro_p.get('Idade', 0))) if pd.notna(registro_p.get('Idade')) else "N/A"
+            dx_rapido_base = registro_p.get('Diagnostico_Rapido', 'Não especificado')
         except:
-            hist_clinica = "Histórico não disponível."; idade_p = "-"
+            hist_clinica = "Não disponível."; idade_p = "-"; dx_rapido_base = "-"
 
-        # --- B. RESGATE DA AVALIAÇÃO BASE (TESTES E FORÇA) ---
+        # --- B. RESGATE DA AVALIAÇÃO BASE (TESTES E FLAGS) ---
         try:
             df_av = conn.read(worksheet="Avaliacao_Inicial", ttl=0)
             av_p = df_av[df_av['Paciente'].str.strip() == p_sel].iloc[-1]
             av_data = av_p.get('Data_Avaliacao', 'N/A')
-            av_quad = av_p.get('Quadriceps_Forca', 'Não testado')
-            av_isq = av_p.get('Isquio_Forca', 'Não testado')
-            av_glut = av_p.get('Quadril_Forca', 'Não testado')
-            av_agac = av_p.get('Agachamento_Uni', 'Não avaliado')
-            av_step = av_p.get('Step_Down_Qualidade', 'Não avaliado')
+            av_qp = av_p.get('QP', 'Não registrada')
+            av_classdor = av_p.get('Class_Dor', 'Não avaliada')
+            av_red = av_p.get('Red_Flags', 'Nenhuma')
+            av_derrame = av_p.get('Derrame', 'Não avaliado')
             av_tlig = av_p.get('Testes_Ligamentares', '')
             av_tmen = av_p.get('Testes_Meniscais', '')
-            av_tfp = av_p.get('Testes_Femoropatelar', '')
             tem_av = True
         except:
             tem_av = False
@@ -829,32 +828,32 @@ elif st.session_state.pagina == 'painel_clinico':
 
         # 1. HEADER DO PACIENTE
         st.markdown(f"""
-            <div style='background-color: #ffffff; border: 1px solid #e9ecef; border-left: 5px solid {CORES_GENUA['primaria']}; padding: 20px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+            <div style='background-color: #ffffff; border: 1px solid #e9ecef; border-left: 5px solid {CORES_GENUA['primaria']}; padding: 20px; border-radius: 8px; margin-bottom: 15px;'>
                 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'>
                     <h3 style='margin: 0; color: {CORES_GENUA['primaria']}; font-weight: 700;'>👤 {p_sel}</h3>
                     <span style='background-color: #f1f3f5; color: {CORES_GENUA['primaria']}; padding: 6px 15px; border-radius: 20px; font-weight: 600;'>{idade_p} anos</span>
                 </div>
-                <p style='margin: 0; color: #495057;'><strong>HMA:</strong> {hist_clinica}</p>
+                <p style='margin: 0; color: #495057;'><strong>Dx Triagem:</strong> {dx_rapido_base}</p>
             </div>
         """, unsafe_allow_html=True)
 
-        # 2. CARD DE AVALIAÇÃO FÍSICA (Expander para não poluir a tela)
+        # 2. CARD DE AVALIAÇÃO FÍSICA
         if tem_av:
             with st.expander(f"📋 Consultar Ficha de Avaliação Base (Data: {av_data})"):
                 c_av1, c_av2 = st.columns(2)
                 with c_av1:
-                    st.markdown("**💪 Força Muscular:**")
-                    st.markdown(f"- Quadríceps: {av_quad}\n- Isquiotibiais: {av_isq}\n- Glúteo Médio: {av_glut}")
-                    st.markdown("**⚙️ Biomecânica Dinâmica:**")
-                    st.markdown(f"- Agachamento Unipodal: {av_agac}\n- Step Down: {av_step}")
+                    st.markdown("**🗣️ Anamnese e Dor:**")
+                    st.markdown(f"- **QP:** {av_qp}")
+                    st.markdown(f"- **Tipo de Dor:** {av_classdor}")
+                    st.markdown(f"- **Red Flags:** {av_red}")
                 with c_av2:
-                    st.markdown("**🔬 Testes Ortopédicos (Positivos):**")
-                    st.markdown(f"- Ligamentares: {av_tlig if av_tlig else 'Nenhum achado'}")
-                    st.markdown(f"- Meniscais: {av_tmen if av_tmen else 'Nenhum achado'}")
-                    st.markdown(f"- Femoropatelar: {av_tfp if av_tfp else 'Nenhum achado'}")
+                    st.markdown("**🔬 Exame Físico e Testes:**")
+                    st.markdown(f"- **Derrame Articular:** {av_derrame}")
+                    st.markdown(f"- **Ligamentares:** {av_tlig if av_tlig and av_tlig != 'Nenhum' else 'Nenhum achado'}")
+                    st.markdown(f"- **Meniscais:** {av_tmen if av_tmen and av_tmen != 'Nenhum' else 'Nenhum achado'}")
         else:
             st.info("⚠️ Nenhuma Avaliação Inicial rica registrada no sistema para este paciente.")
-
+        
         st.markdown("<br>", unsafe_allow_html=True)
 
         # --- C. MOTOR DE EVOLUÇÃO (CHECK-INS) ---
