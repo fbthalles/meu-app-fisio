@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import altair as alt
 import numpy as np
-from fpdf import FPDF
+from fpdf import FPDFhttps://github.com/fbthalles/meu-app-fisio/blob/main/streamlit_app.py
 from PIL import Image
 import matplotlib.pyplot as plt
 import io
@@ -495,7 +495,7 @@ elif st.session_state.pagina == 'dados_paciente':
         
     paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
     
-    if paciente == "+ if paciente == "+ Novo Paciente":
+    if paciente == "+ Novo Paciente":
         with st.container():
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação do Paciente</h4>", unsafe_allow_html=True)
             nome = st.text_input("Nome Completo *")
