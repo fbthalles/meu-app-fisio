@@ -798,10 +798,10 @@ elif st.session_state.pagina == 'painel_clinico':
                 with c_p2: godet = st.radio("Sinal de Godet (Edema)", ["Negativo", "Positivo"])
                 with c_p3: temp = st.radio("Temperatura", ["Normal", "Aumentada", "Diminuída"])
 
-               st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Testes Especiais Ortopédicos (Positivos)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Testes Especiais Ortopédicos (Positivos)</h4>", unsafe_allow_html=True)
                 t_lig = st.multiselect("Testes Ligamentares", ["Nenhum", "Lachman", "Gaveta Anterior", "Gaveta Posterior", "Estresse Valgo", "Estresse Varo", "Pivot Shift", "Dial Test"], key="t_lig_unico")
                 t_men = st.multiselect("Testes Meniscais", ["Nenhum", "McMurray", "Apley"], key="t_men_unico")
-                t_pat = st.multiselect("Testes Patelar", ["Nenhum", "Sinal de Clarke", "Apreensão Patelar", "Decline Squat (Tendinopatia)", "Teste de Noble (Trato Iliotibial)"], key="t_pat_unico")
+                t_pat = st.multiselect("Testes Femoropatelar", ["Nenhum", "Sinal de Clarke", "Apreensão Patelar", "Decline Squat (Tendinopatia)", "Teste de Noble (Trato Iliotibial)"], key="t_pat_unico")
 
             with t_funcional:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
