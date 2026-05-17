@@ -533,22 +533,18 @@ elif st.session_state.pagina == 'dados_paciente':
                                 "Diagnostico_Rapido": dx_rapido, "Historia": "" 
                             }
                             
-                            # CORREÇÃO DEFINITIVA: Método Nativo NoSQL do Firebase. 
-                            # Ignora conversões de tabelas Pandas e injeta o documento diretamente na coleção.
+                            # INJEÇÃO DIRETA NO FIREBASE
                             db.collection("Cadastro").add(novo_cad)
                             
-                            # Atualiza a memória RAM do aplicativo
                             st.session_state.paciente = nome
                             st.session_state.membro_ativo = "Joelho" 
                             
                             st.success("✅ Paciente registrado com sucesso!")
-                            
-                            # Redirecionamento automático
                             st.session_state.pagina = 'painel_clinico'
                             st.rerun()
                             
                         except Exception as e:
-                            st.error(f"❌ Erro ao comunicar com o Firebase: {e}")
+                            st.error(f"❌ Erro crítico ao comunicar com o banco de dados: {e}")
     else:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Abrir Prontuário", use_container_width=True, type="primary"):
@@ -914,13 +910,13 @@ elif st.session_state.pagina == 'painel_clinico':
                         "Profissional_ID": st.session_state.get("user_email", "admin")
                     }
                     
-                    df_av = conn.read(worksheet="Avaliacao_Inicial", ttl=0)
-                    nova_linha_av = pd.DataFrame([dados_avaliacao])
-                    if df_av.empty: df_av = nova_linha_av
-                    else: df_av = pd.concat([df_av, nova_linha_av], ignore_index=True)
-                        
-                    conn.update(worksheet="Avaliacao_Inicial", data=df_av)
-                    st.success("✅ Avaliação Inicial registrada com sucesso!")
+                    with st.spinner("🔄 Gravando avaliação clínica complexa na nuvem..."):
+                        try:
+                            # INJEÇÃO DIRETA NO FIREBASE
+                            db.collection("Avaliacao_Inicial").add(dados_avaliacao)
+                            st.success("✅ Avaliação Inicial registrada e blindada com sucesso!")
+                        except Exception as e:
+                            st.error(f"❌ Falha de sincronização na avaliação: {e}")
 
     # --- MÓDULO 2: CHECK-IN DIÁRIO (EXCLUSIVO JOELHO) ---
     elif menu == "Check-in Diário 📝":
@@ -955,10 +951,13 @@ elif st.session_state.pagina == 'painel_clinico':
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
-                df = conn.read(worksheet="Evolucao", ttl=0).dropna(how="all")
-                nova_linha = pd.DataFrame([dados_sessao])
-                conn.update(worksheet="Evolucao", data=pd.concat([df, nova_linha], ignore_index=True))
-                st.success(f"Dados do Joelho registrados com sucesso!")
+                with st.spinner("🔄 Sincronizando dados evolutivos..."):
+                    try:
+                        # INJEÇÃO DIRETA NO FIREBASE
+                        db.collection("Evolucao").add(dados_sessao)
+                        st.success("✅ Evolução do Joelho registrada com sucesso!")
+                    except Exception as e:
+                        st.error(f"❌ Falha ao gravar a sessão: {e}")
                 
         st.write("---")
         with st.expander("⚖️ Conformidade LGPD e Privacidade"):
