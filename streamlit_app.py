@@ -918,7 +918,7 @@ elif st.session_state.pagina == 'painel_clinico':
 
     # --- MÓDULO 2: CHECK-IN DIÁRIO (EXCLUSIVO JOELHO) ---
     elif menu == "Check-in Diário 📝":
-        with st.form(key="form_checkin_diario_firebase", clear_on_submit=True):
+        with st.container():
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Quadro Sistêmico Universal</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1: dor = st.slider("💥 Dor atual (EVA 0-10)", 0, 10, 0)
@@ -948,10 +948,10 @@ elif st.session_state.pagina == 'painel_clinico':
             })
 
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("✅ REGISTRAR SESSÃO", use_container_width=True):
+            if st.button("✅ REGISTRAR SESSÃO", use_container_width=True, type="primary"):
                 with st.spinner("🔄 Sincronizando dados evolutivos..."):
                     try:
-                        # INJEÇÃO DIRETA NO FIREBASE
+                        # Injeção Imediata
                         db.collection("Evolucao").add(dados_sessao)
                         st.success("✅ Evolução do Joelho registrada com sucesso!")
                     except Exception as e:
