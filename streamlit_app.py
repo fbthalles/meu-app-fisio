@@ -710,13 +710,19 @@ elif st.session_state.pagina == 'painel_clinico':
                     st.session_state.last_click = None
                 
                 c_mapa1, c_mapa2 = st.columns([1.3, 1.7])
+                
                 with c_mapa1:
                     try:
-                        from PIL import ImageDraw
+                        from PIL import ImageDraw, Image
                         from streamlit_image_coordinates import streamlit_image_coordinates
                         
-                        # Carrega a imagem base local mapeada na pasta do projeto
+                        # Carrega a imagem base local
                         img_base = Image.open("mapa_joelho.png").convert("RGB")
+                        
+                        # TRAVA DE SEGURANÇA GEOMÉTRICA (Evita o mapa gigante)
+                        # O método thumbnail reduz a imagem para caber num quadro de 350px de largura, mantendo a proporção original perfeita
+                        img_base.thumbnail((350, 600))
+                        
                         draw = ImageDraw.Draw(img_base)
                         
                         # Renderiza todos os pontos vermelhos salvos no histórico da sessão atual
@@ -724,10 +730,10 @@ elif st.session_state.pagina == 'painel_clinico':
                             x, y = pt["x"], pt["y"]
                             draw.ellipse([(x-6, y-6), (x+6, y+6)], fill="#dc3545", outline="white", width=2)
                         
-                        # Componente interativo que captura as coordenadas do clique do mouse
+                        # Componente interativo
                         value = streamlit_image_coordinates(img_base, key="mapa_interativo_joelho")
                         
-                        # Protocolo de validação anti-looping para novos cliques
+                        # Protocolo de validação anti-looping
                         if value is not None and value != st.session_state.last_click:
                             st.session_state.last_click = value
                             st.session_state.pontos_dor.append({"x": value["x"], "y": value["y"]})
@@ -740,7 +746,6 @@ elif st.session_state.pagina == 'painel_clinico':
                             
                     except ModuleNotFoundError:
                         st.warning("⚠️ Instalação necessária: adicione 'streamlit-image-coordinates' ao seu arquivo requirements.txt.")
-                        st.image("mapa_joelho.png", caption="Zonas Articulares", use_container_width=True)
                     except FileNotFoundError:
                         st.warning("⚠️ Arquivo 'mapa_joelho.png' não encontrado na pasta raiz do projeto.")
                         
