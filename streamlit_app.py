@@ -741,13 +741,23 @@ elif st.session_state.pagina == 'painel_clinico':
                         st.warning("⚠️ Arquivo 'mapa_joelho.png' não encontrado na pasta raiz.")
                         
                 with c_mapa2:
-                    zonas_dor = st.multiselect("Localização Apontada (Selecione 1 ou mais) *", 
-                        ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], default=["Nenhuma"])
+                    zonas_dor = st.multiselect(
+                        "Localização Apontada (Selecione 1 ou mais) *", 
+                        ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], 
+                        default=["Nenhuma"],
+                        key="seletor_zonas_dor_unico" # Identidade blindada
+                    )
                     
-                    # Processamento puramente em background (invisível na interface do usuário)
+                    # Processamento invisível das coordenadas numéricas
                     coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
                     
-                    mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva particularidades anatômicas da dor constatada...", height=150)
+                    mapa_dor = st.text_area(
+                        "Descrição Detalhada / Outras Regiões *", 
+                        value="Nenhuma", 
+                        placeholder="Descreva particularidades anatômicas da dor constatada...", 
+                        height=150,
+                        key="texto_mapa_dor_unico" # Identidade blindada
+                    )
                     
                     # Variável de coordenadas roda de forma invisível no sistema agora
                     coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
