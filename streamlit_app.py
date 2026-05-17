@@ -720,7 +720,6 @@ elif st.session_state.pagina == 'painel_clinico':
                         img_base = Image.open("mapa_joelho.png").convert("RGB")
                         
                         # TRAVA DE SEGURANÇA GEOMÉTRICA (Evita o mapa gigante)
-                        # O método thumbnail reduz a imagem para caber num quadro de 350px de largura, mantendo a proporção original perfeita
                         img_base.thumbnail((350, 600))
                         
                         draw = ImageDraw.Draw(img_base)
@@ -739,7 +738,8 @@ elif st.session_state.pagina == 'painel_clinico':
                             st.session_state.pontos_dor.append({"x": value["x"], "y": value["y"]})
                             st.rerun()
                             
-                        if st.button("❌ Limpar Marcações", use_container_width=True):
+                        # CORREÇÃO APLICADA: Tipagem obrigatória para botões dentro de formulários
+                        if st.form_submit_button("❌ Limpar Marcações", use_container_width=True):
                             st.session_state.pontos_dor = []
                             st.session_state.last_click = None
                             st.rerun()
