@@ -694,7 +694,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 trat_previos = st.text_area("Tratamentos Anteriores", placeholder="Intervenções médicas e fisioterapêuticas prévias...")
 
 
-            with t_dor:
+           with t_dor:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Classificação e Origem</h4>", unsafe_allow_html=True)
                 c_dor1, c_dor2 = st.columns(2)
                 with c_dor1: class_dor = st.selectbox("Classificação da Dor *", ["Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)", "Não Aplicável"])
@@ -707,6 +707,9 @@ elif st.session_state.pagina == 'painel_clinico':
                     st.session_state.pontos_dor = []
                 if "last_click" not in st.session_state:
                     st.session_state.last_click = None
+                # NOVO: Controlador de versão do mapa para destruir o cache do componente
+                if "map_key" not in st.session_state:
+                    st.session_state.map_key = 0
                 
                 c_mapa1, c_mapa2 = st.columns([1.3, 1.7])
                 with c_mapa1:
@@ -722,8 +725,8 @@ elif st.session_state.pagina == 'painel_clinico':
                             x, y = pt["x"], pt["y"]
                             draw.ellipse([(x-6, y-6), (x+6, y+6)], fill="#dc3545", outline="white", width=2)
                         
-                        # Captura das coordenadas de forma estritamente silenciosa (sem st.write ou exibição externa)
-                        value = streamlit_image_coordinates(img_base, key="mapa_interativo_joelho")
+                        # A Chave Dinâmica impede o "Ghost Click"
+                        value = streamlit_image_coordinates(img_base, key=f"mapa_interativo_joelho_{st.session_state.map_key}")
                         
                         if value is not None and value != st.session_state.last_click:
                             st.session_state.last_click = value
@@ -733,6 +736,8 @@ elif st.session_state.pagina == 'painel_clinico':
                         if st.button("❌ Limpar Marcações", use_container_width=True):
                             st.session_state.pontos_dor = []
                             st.session_state.last_click = None
+                            # Incrementar a chave destrói o mapa atual e cria um novo em folha
+                            st.session_state.map_key += 1
                             st.rerun()
                             
                     except ModuleNotFoundError:
@@ -745,10 +750,9 @@ elif st.session_state.pagina == 'painel_clinico':
                         "Localização Apontada (Selecione 1 ou mais) *", 
                         ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], 
                         default=["Nenhuma"],
-                        key="seletor_zonas_dor_unico" # Identidade blindada
+                        key="seletor_zonas_dor_unico"
                     )
                     
-                    # Processamento invisível das coordenadas numéricas
                     coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
                     
                     mapa_dor = st.text_area(
@@ -756,11 +760,8 @@ elif st.session_state.pagina == 'painel_clinico':
                         value="Nenhuma", 
                         placeholder="Descreva particularidades anatômicas da dor constatada...", 
                         height=150,
-                        key="texto_mapa_dor_unico" # Identidade blindada
+                        key="texto_mapa_dor_unico"
                     )
-                    
-                    # Variável de coordenadas roda de forma invisível no sistema agora
-                    coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
                     
             with t_flags:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação de Risco e Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
