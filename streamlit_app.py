@@ -764,11 +764,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     
                     mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva particularidades anatômicas da dor constatada...", height=150)
                     
-                    # Converte a matriz de coordenadas em texto legível para gravação direta no banco de dados
-                    coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
-                    st.text_input("Coordenadas Clínicas (Geradas Automaticamente)", value=coordenadas_texto, disabled=True)
                     
-                    mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva particularidades anatômicas da dor constatada...")
             with t_flags:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação de Risco e Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
                 red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta para Encaminhamento) *", 
