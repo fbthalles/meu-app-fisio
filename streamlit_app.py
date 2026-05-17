@@ -523,7 +523,7 @@ elif st.session_state.pagina == 'dados_paciente':
                 if nome.strip() == "":
                     st.error("⚠️ O Nome é obrigatório para abrir o prontuário.")
                 else:
-                    with st.spinner("🔄 Conectando ao banco de dados e gravando..."):
+                    with st.spinner("🔄 Gravando prontuário na nuvem segura..."):
                         try:
                             idade_calc = (datetime.now().date() - dt_nasc).days // 365
                             novo_cad = {
@@ -533,31 +533,22 @@ elif st.session_state.pagina == 'dados_paciente':
                                 "Diagnostico_Rapido": dx_rapido, "Historia": "" 
                             }
                             
-                            # Leitura forçada do banco para evitar sobreposição de cache
-                            df_banco_cad = conn.read(worksheet="Cadastro", ttl=0)
-                            nova_linha = pd.DataFrame([novo_cad])
+                            # CORREÇÃO DEFINITIVA: Método Nativo NoSQL do Firebase. 
+                            # Ignora conversões de tabelas Pandas e injeta o documento diretamente na coleção.
+                            db.collection("Cadastro").add(novo_cad)
                             
-                            if df_banco_cad.empty: 
-                                df_final = nova_linha
-                            else: 
-                                df_final = pd.concat([df_banco_cad, nova_linha], ignore_index=True)
-                            
-                            # Correção Crítica: O uso estritamente explícito dos parâmetros worksheet= e data=
-                            conn.update(worksheet="Cadastro", data=df_final)
-                            
-                            # Atualiza as variáveis globais de sessão
+                            # Atualiza a memória RAM do aplicativo
                             st.session_state.paciente = nome
                             st.session_state.membro_ativo = "Joelho" 
                             
                             st.success("✅ Paciente registrado com sucesso!")
                             
-                            # Transição segura de página (rota limpa)
+                            # Redirecionamento automático
                             st.session_state.pagina = 'painel_clinico'
                             st.rerun()
                             
                         except Exception as e:
-                            # Se houver qualquer falha na nuvem, o erro exato será exposto aqui
-                            st.error(f"❌ Erro crítico ao comunicar com o banco de dados: {e}")
+                            st.error(f"❌ Erro ao comunicar com o Firebase: {e}")
     else:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Abrir Prontuário", use_container_width=True, type="primary"):
