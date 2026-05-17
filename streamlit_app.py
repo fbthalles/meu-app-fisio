@@ -501,7 +501,17 @@ elif st.session_state.pagina == 'dados_paciente':
             nome = st.text_input("Nome Completo *")
             
             c_cad1, c_cad2, c_cad3 = st.columns(3)
-            with c_cad1: dt_nasc = st.date_input("Data de Nascimento", format="DD/MM/YYYY", max_value=datetime.today())
+            with c_cad1: 
+                # Define um valor padrão estável e expande o limite mínimo para até 100 anos atrás
+                data_padrao = datetime(2000, 1, 1)
+                data_minima = datetime(datetime.now().year - 100, 1, 1)
+                dt_nasc = st.date_input(
+                    "Data de Nascimento *", 
+                    value=data_padrao,
+                    min_value=data_minima,
+                    max_value=datetime.today(),
+                    format="DD/MM/YYYY"
+                )
             with c_cad2: cpf = st.text_input("CPF")
             with c_cad3: telefone = st.text_input("Telefone (WhatsApp)")
             
