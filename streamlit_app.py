@@ -521,24 +521,43 @@ elif st.session_state.pagina == 'dados_paciente':
             st.markdown("<br>", unsafe_allow_html=True)
             if st.form_submit_button("💾 Salvar Cadastro", use_container_width=True):
                 if nome.strip() == "":
-                    st.error("O Nome é obrigatório.")
+                    st.error("⚠️ O Nome é obrigatório para abrir o prontuário.")
                 else:
-                    idade_calc = (datetime.now().date() - dt_nasc).days // 365
-                    novo_cad = {
-                        "Nome": nome, "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
-                        "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
-                        "Email": email, "Cidade_Estado": cidade, "Ocupacao": ocupacao, 
-                        "Diagnostico_Rapido": dx_rapido, "Historia": "" 
-                    }
-                    
-                    df_banco_cad = conn.read("Cadastro", ttl=0)
-                    if df_banco_cad.empty: conn.update("Cadastro", pd.DataFrame([novo_cad]))
-                    else: conn.update("Cadastro", pd.concat([df_banco_cad, pd.DataFrame([novo_cad])], ignore_index=True))
-                    
-                    st.session_state.paciente = nome
-                    st.session_state.membro_ativo = "Joelho" 
-                    st.success("✅ Paciente registrado com sucesso!")
-                    mudar_pagina('painel_clinico')
+                    with st.spinner("🔄 Conectando ao banco de dados e gravando..."):
+                        try:
+                            idade_calc = (datetime.now().date() - dt_nasc).days // 365
+                            novo_cad = {
+                                "Nome": nome, "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
+                                "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
+                                "Email": email, "Cidade_Estado": cidade, "Ocupacao": ocupacao, 
+                                "Diagnostico_Rapido": dx_rapido, "Historia": "" 
+                            }
+                            
+                            # Leitura forçada do banco para evitar sobreposição de cache
+                            df_banco_cad = conn.read(worksheet="Cadastro", ttl=0)
+                            nova_linha = pd.DataFrame([novo_cad])
+                            
+                            if df_banco_cad.empty: 
+                                df_final = nova_linha
+                            else: 
+                                df_final = pd.concat([df_banco_cad, nova_linha], ignore_index=True)
+                            
+                            # Correção Crítica: O uso estritamente explícito dos parâmetros worksheet= e data=
+                            conn.update(worksheet="Cadastro", data=df_final)
+                            
+                            # Atualiza as variáveis globais de sessão
+                            st.session_state.paciente = nome
+                            st.session_state.membro_ativo = "Joelho" 
+                            
+                            st.success("✅ Paciente registrado com sucesso!")
+                            
+                            # Transição segura de página (rota limpa)
+                            st.session_state.pagina = 'painel_clinico'
+                            st.rerun()
+                            
+                        except Exception as e:
+                            # Se houver qualquer falha na nuvem, o erro exato será exposto aqui
+                            st.error(f"❌ Erro crítico ao comunicar com o banco de dados: {e}")
     else:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Abrir Prontuário", use_container_width=True, type="primary"):
