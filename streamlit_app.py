@@ -722,6 +722,7 @@ elif st.session_state.pagina == 'painel_clinico':
                             x, y = pt["x"], pt["y"]
                             draw.ellipse([(x-6, y-6), (x+6, y+6)], fill="#dc3545", outline="white", width=2)
                         
+                        # Captura das coordenadas de forma estritamente silenciosa (sem st.write ou exibição externa)
                         value = streamlit_image_coordinates(img_base, key="mapa_interativo_joelho")
                         
                         if value is not None and value != st.session_state.last_click:
@@ -729,7 +730,6 @@ elif st.session_state.pagina == 'painel_clinico':
                             st.session_state.pontos_dor.append({"x": value["x"], "y": value["y"]})
                             st.rerun()
                             
-                        # Botão corrigido para fora do formulário
                         if st.button("❌ Limpar Marcações", use_container_width=True):
                             st.session_state.pontos_dor = []
                             st.session_state.last_click = None
@@ -743,6 +743,11 @@ elif st.session_state.pagina == 'painel_clinico':
                 with c_mapa2:
                     zonas_dor = st.multiselect("Localização Apontada (Selecione 1 ou mais) *", 
                         ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], default=["Nenhuma"])
+                    
+                    # Processamento puramente em background (invisível na interface do usuário)
+                    coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
+                    
+                    mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva particularidades anatômicas da dor constatada...", height=150)
                     
                     # Variável de coordenadas roda de forma invisível no sistema agora
                     coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
