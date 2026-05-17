@@ -390,9 +390,37 @@ def create_pdf(p_name, hist, metrics, imgs):
 import json
 import firebase_admin
 from firebase_admin import credentials, firestore
+import re
 
 if not firebase_admin._apps:
-    cred_dict = json.loads(st.secrets["FIREBASE_JSON"])
+    try:
+        # Tenta carregar o JSON de forma tradicional
+        cred_dict = json.loads(st.secrets["FIREBASE_JSON"])
+    except Exception as e:
+        # MECANISMO DE AUTOCURA INTERNO
+        # Se houver quebras de linha corrompidas no Secrets, o sistema reconstrói o dicionário nativamente.
+        raw_text = st.secrets["FIREBASE_JSON"]
+        
+        proj_id_match = re.search(r'"project_id":\s*"([^"]+)"', raw_text)
+        email_match = re.search(r'"client_email":\s*"([^"]+)"', raw_text)
+        pk_match = re.search(r'"private_key":\s*"(.*?)"', raw_text, re.DOTALL)
+        
+        if proj_id_match and email_match and pk_match:
+            pk_content = pk_match.group(1).replace("\\n", "\n")
+            while "\n\n" in pk_content:
+                pk_content = pk_content.replace("\n\n", "\n")
+                
+            cred_dict = {
+                "type": "service_account",
+                "project_id": proj_id_match.group(1),
+                "private_key": pk_content.strip(),
+                "client_email": email_match.group(1),
+                "token_uri": "https://oauth2.googleapis.com/token"
+            }
+        else:
+            st.error("❌ Erro crítico: As credenciais do Firebase contidas no Secrets estão ilegíveis.")
+            st.stop()
+
     cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
     
