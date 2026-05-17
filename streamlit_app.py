@@ -502,25 +502,20 @@ elif st.session_state.pagina == 'dados_paciente':
             
             c_cad1, c_cad2, c_cad3 = st.columns(3)
             with c_cad1: 
-                # Define um valor padrão estável e expande o limite mínimo para até 100 anos atrás
+                # Proteção e expansão da Data de Nascimento já integradas aqui
                 data_padrao = datetime(2000, 1, 1)
                 data_minima = datetime(datetime.now().year - 100, 1, 1)
-                dt_nasc = st.date_input(
-                    "Data de Nascimento *", 
-                    value=data_padrao,
-                    min_value=data_minima,
-                    max_value=datetime.today(),
-                    format="DD/MM/YYYY"
-                )
+                dt_nasc = st.date_input("Data de Nascimento *", value=data_padrao, min_value=data_minima, max_value=datetime.today(), format="DD/MM/YYYY")
             with c_cad2: cpf = st.text_input("CPF")
             with c_cad3: telefone = st.text_input("Telefone (WhatsApp)")
             
             c_cad4, c_cad5, c_cad6 = st.columns(3)
             with c_cad4: email = st.text_input("E-mail")
             with c_cad5: cidade = st.text_input("Cidade e Estado")
+            # A variável 'ocupacao' blindada e corretamente declarada
             with c_cad6: ocupacao = st.text_input("Atividade Ocupacional")
             
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Clínico (Triagem)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Rápido (Triagem)</h4>", unsafe_allow_html=True)
             dx_rapido = st.text_input("Diagnóstico Clínico/Médico", placeholder="Ex: LCA, Condropatia, Tendinopatia...")
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -532,7 +527,7 @@ elif st.session_state.pagina == 'dados_paciente':
                     novo_cad = {
                         "Nome": nome, "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
                         "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
-                        "Email": email, "Cidade_Estado": cidade, "Ocupação": ocupação, 
+                        "Email": email, "Cidade_Estado": cidade, "Ocupacao": ocupacao, 
                         "Diagnostico_Rapido": dx_rapido, "Historia": "" 
                     }
                     
@@ -541,9 +536,9 @@ elif st.session_state.pagina == 'dados_paciente':
                     else: conn.update("Cadastro", pd.concat([df_banco_cad, pd.DataFrame([novo_cad])], ignore_index=True))
                     
                     st.session_state.paciente = nome
-                    st.session_state.membro_ativo = "Joelho" # <-- FORÇA O FOCO NO MVP
+                    st.session_state.membro_ativo = "Joelho" 
                     st.success("✅ Paciente registrado com sucesso!")
-                    mudar_pagina('painel_clinico') # <-- ROTEAMENTO DIRETO
+                    mudar_pagina('painel_clinico')
     else:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Abrir Prontuário", use_container_width=True, type="primary"):
