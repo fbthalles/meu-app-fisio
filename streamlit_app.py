@@ -694,7 +694,9 @@ elif st.session_state.pagina == 'painel_clinico':
                 trat_previos = st.text_area("Tratamentos Anteriores", placeholder="Intervenções médicas e fisioterapêuticas prévias...")
 
 
-           with t_dor:
+           File "/mount/src/meu-app-fisio/streamlit_app.py", line 697
+               
+             with t_dor:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Classificação e Origem</h4>", unsafe_allow_html=True)
                 c_dor1, c_dor2 = st.columns(2)
                 with c_dor1: class_dor = st.selectbox("Classificação da Dor *", ["Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)", "Não Aplicável"])
@@ -712,7 +714,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     st.session_state.map_key = 0
                 
                 c_mapa1, c_mapa2 = st.columns([1.3, 1.7])
-            with c_mapa1:
+                with c_mapa1:
                     try:
                         from PIL import ImageDraw, Image
                         from streamlit_image_coordinates import streamlit_image_coordinates
