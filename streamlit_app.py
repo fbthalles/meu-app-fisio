@@ -712,7 +712,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     st.session_state.map_key = 0
                 
                 c_mapa1, c_mapa2 = st.columns([1.3, 1.7])
-                with c_mapa1:
+            with c_mapa1:
                     try:
                         from PIL import ImageDraw, Image
                         from streamlit_image_coordinates import streamlit_image_coordinates
