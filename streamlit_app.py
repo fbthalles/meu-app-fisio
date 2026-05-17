@@ -875,7 +875,7 @@ elif st.session_state.pagina == 'painel_clinico':
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.form_submit_button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True):
+            if st.button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True, type="primary"):
                 # Adicionamos 'laudo_exames' na validação rigorosa
                 campos_texto = [qp, hma, sinais_sintomas, fat_alivio, fat_piora, trat_previos, mapa_dor, laudo_exames]
                 if any(campo.strip() == "" for campo in campos_texto):
