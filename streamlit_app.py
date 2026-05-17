@@ -677,7 +677,7 @@ elif st.session_state.pagina == 'painel_clinico':
     if menu == "Avaliação Inicial 🔎":
         st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
 
-        with st.form(key="form_avaliacao_inicial_firebase"):
+        with st.container():
             # Estrutura expandida com as duas novas abas
             t_anamnese, t_dor, t_flags, t_fisico, t_funcional, t_exames, t_quest = st.tabs(["🗣️ Anamnese", "💥 Dor", "🚩 Bandeiras", "📐 Físico", "🏃 Funcional", "🩻 Exames", "📋 Questionários"])
             
@@ -703,55 +703,51 @@ elif st.session_state.pagina == 'painel_clinico':
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Mapa Anatômico da Dor Interativo</h4>", unsafe_allow_html=True)
                 st.info("🎯 Clique diretamente na imagem do joelho abaixo para marcar os pontos exatos de dor do paciente. Cada clique gerará um marcador vermelho.")
                 
-                # Inicialização segura dos estados de controle do mapa na sessão
                 if "pontos_dor" not in st.session_state:
                     st.session_state.pontos_dor = []
                 if "last_click" not in st.session_state:
                     st.session_state.last_click = None
                 
                 c_mapa1, c_mapa2 = st.columns([1.3, 1.7])
-                
                 with c_mapa1:
                     try:
                         from PIL import ImageDraw, Image
                         from streamlit_image_coordinates import streamlit_image_coordinates
                         
-                        # Carrega a imagem base local
                         img_base = Image.open("mapa_joelho.png").convert("RGB")
-                        
-                        # TRAVA DE SEGURANÇA GEOMÉTRICA (Evita o mapa gigante)
                         img_base.thumbnail((350, 600))
-                        
                         draw = ImageDraw.Draw(img_base)
                         
-                        # Renderiza todos os pontos vermelhos salvos no histórico da sessão atual
                         for pt in st.session_state.pontos_dor:
                             x, y = pt["x"], pt["y"]
                             draw.ellipse([(x-6, y-6), (x+6, y+6)], fill="#dc3545", outline="white", width=2)
                         
-                        # Componente interativo
                         value = streamlit_image_coordinates(img_base, key="mapa_interativo_joelho")
                         
-                        # Protocolo de validação anti-looping
                         if value is not None and value != st.session_state.last_click:
                             st.session_state.last_click = value
                             st.session_state.pontos_dor.append({"x": value["x"], "y": value["y"]})
                             st.rerun()
                             
-                        # CORREÇÃO APLICADA: Tipagem obrigatória para botões dentro de formulários
-                        if st.form_submit_button("❌ Limpar Marcações", use_container_width=True):
+                        # Botão corrigido para fora do formulário
+                        if st.button("❌ Limpar Marcações", use_container_width=True):
                             st.session_state.pontos_dor = []
                             st.session_state.last_click = None
                             st.rerun()
                             
                     except ModuleNotFoundError:
-                        st.warning("⚠️ Instalação necessária: adicione 'streamlit-image-coordinates' ao seu arquivo requirements.txt.")
+                        st.warning("⚠️ Instalação necessária: adicione 'streamlit-image-coordinates' ao requirements.txt.")
                     except FileNotFoundError:
-                        st.warning("⚠️ Arquivo 'mapa_joelho.png' não encontrado na pasta raiz do projeto.")
+                        st.warning("⚠️ Arquivo 'mapa_joelho.png' não encontrado na pasta raiz.")
                         
                 with c_mapa2:
                     zonas_dor = st.multiselect("Localização Apontada (Selecione 1 ou mais) *", 
                         ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], default=["Nenhuma"])
+                    
+                    # Variável de coordenadas roda de forma invisível no sistema agora
+                    coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
+                    
+                    mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva particularidades anatômicas da dor constatada...", height=150)
                     
                     # Converte a matriz de coordenadas em texto legível para gravação direta no banco de dados
                     coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
