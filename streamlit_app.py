@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import altair as alt
 import numpy as np
-from fpdf import FPDFhttps://github.com/fbthalles/meu-app-fisio/blob/main/streamlit_app.py
+from fpdf import FPDF
 from PIL import Image
 import matplotlib.pyplot as plt
 import io
