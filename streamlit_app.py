@@ -693,24 +693,66 @@ elif st.session_state.pagina == 'painel_clinico':
                 
                 trat_previos = st.text_area("Tratamentos Anteriores", placeholder="Intervenções médicas e fisioterapêuticas prévias...")
 
+
             with t_dor:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Classificação e Origem</h4>", unsafe_allow_html=True)
                 c_dor1, c_dor2 = st.columns(2)
                 with c_dor1: class_dor = st.selectbox("Classificação da Dor *", ["Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)", "Não Aplicável"])
                 with c_dor2: origem_dor = st.selectbox("Origem *", ["Traumática", "Insidiosa / Sobrecarga", "Pós-operatória", "Degenerativa", "Não Aplicável"])
                 
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Mapa Anatômico da Dor</h4>", unsafe_allow_html=True)
-                st.info("Observe a referência visual e selecione as zonas de dor correspondentes.")
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Mapa Anatômico da Dor Interativo</h4>", unsafe_allow_html=True)
+                st.info("🎯 Clique diretamente na imagem do joelho abaixo para marcar os pontos exatos de dor do paciente. Cada clique gerará um marcador vermelho.")
                 
-                c_mapa1, c_mapa2 = st.columns([1, 2])
+                # Inicialização segura dos estados de controle do mapa na sessão
+                if "pontos_dor" not in st.session_state:
+                    st.session_state.pontos_dor = []
+                if "last_click" not in st.session_state:
+                    st.session_state.last_click = None
+                
+                c_mapa1, c_mapa2 = st.columns([1.3, 1.7])
                 with c_mapa1:
-                    # Inserindo uma imagem clínica de referência para o Joelho
-                    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Knee_diagram.svg/400px-Knee_diagram.svg.png", caption="Zonas Articulares", use_container_width=True)
+                    try:
+                        from PIL import ImageDraw
+                        from streamlit_image_coordinates import streamlit_image_coordinates
+                        
+                        # Carrega a imagem base local mapeada na pasta do projeto
+                        img_base = Image.open("mapa_joelho.png").convert("RGB")
+                        draw = ImageDraw.Draw(img_base)
+                        
+                        # Renderiza todos os pontos vermelhos salvos no histórico da sessão atual
+                        for pt in st.session_state.pontos_dor:
+                            x, y = pt["x"], pt["y"]
+                            draw.ellipse([(x-6, y-6), (x+6, y+6)], fill="#dc3545", outline="white", width=2)
+                        
+                        # Componente interativo que captura as coordenadas do clique do mouse
+                        value = streamlit_image_coordinates(img_base, key="mapa_interativo_joelho")
+                        
+                        # Protocolo de validação anti-looping para novos cliques
+                        if value is not None and value != st.session_state.last_click:
+                            st.session_state.last_click = value
+                            st.session_state.pontos_dor.append({"x": value["x"], "y": value["y"]})
+                            st.rerun()
+                            
+                        if st.button("❌ Limpar Marcações", use_container_width=True):
+                            st.session_state.pontos_dor = []
+                            st.session_state.last_click = None
+                            st.rerun()
+                            
+                    except ModuleNotFoundError:
+                        st.warning("⚠️ Instalação necessária: adicione 'streamlit-image-coordinates' ao seu arquivo requirements.txt.")
+                        st.image("mapa_joelho.png", caption="Zonas Articulares", use_container_width=True)
+                    except FileNotFoundError:
+                        st.warning("⚠️ Arquivo 'mapa_joelho.png' não encontrado na pasta raiz do projeto.")
+                        
                 with c_mapa2:
                     zonas_dor = st.multiselect("Localização Apontada (Selecione 1 ou mais) *", 
                         ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], default=["Nenhuma"])
-                    mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva se houver dor em outra região (Lombar, Tornozelo), ou mantenha 'Nenhuma'.")
-
+                    
+                    # Converte a matriz de coordenadas em texto legível para gravação direta no banco de dados
+                    coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
+                    st.text_input("Coordenadas Clínicas (Geradas Automaticamente)", value=coordenadas_texto, disabled=True)
+                    
+                    mapa_dor = st.text_area("Descrição Detalhada / Outras Regiões *", value="Nenhuma", placeholder="Descreva particularidades anatômicas da dor constatada...")
             with t_flags:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação de Risco e Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
                 red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta para Encaminhamento) *", 
