@@ -487,15 +487,17 @@ if st.session_state.pagina == 'login':
 elif st.session_state.pagina == 'dados_paciente':
     st.header("👤 Gestão de Pacientes")
     
+    # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação Pandas)
     try:
-        df_cad = conn.read("Cadastro", ttl=0)
-        lista = df_cad['Nome'].dropna().unique().tolist() if not df_cad.empty else []
+        docs = db.collection("Cadastro").stream()
+        lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
     except:
         lista = []
         
     paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
     
     if paciente == "+ Novo Paciente":
+        # 2. CONTAINER LIVRE (Sem camisas de força de formulários)
         with st.container():
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação do Paciente</h4>", unsafe_allow_html=True)
             nome = st.text_input("Nome Completo *")
@@ -517,38 +519,39 @@ elif st.session_state.pagina == 'dados_paciente':
             dx_rapido = st.text_input("Diagnóstico Clínico/Médico", placeholder="Ex: LCA, Condropatia, Tendinopatia...")
             
             st.markdown("<br>", unsafe_allow_html=True)
+            
+            # 3. BOTÃO REATIVO DE COMUNICAÇÃO NATIVA
             if st.button("💾 Salvar Cadastro", use_container_width=True, type="primary"):
                 if nome.strip() == "":
                     st.error("⚠️ O Nome é obrigatório para abrir o prontuário.")
                 else:
-                    with st.spinner("🔄 Gravando prontuário na nuvem segura..."):
+                    with st.spinner("🔄 Injetando dados diretamente no núcleo do Firebase..."):
                         try:
                             idade_calc = (datetime.now().date() - dt_nasc).days // 365
                             novo_cad = {
-                                "Nome": nome, "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
+                                "Nome": nome.strip(), "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
                                 "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
                                 "Email": email, "Cidade_Estado": cidade, "Ocupacao": ocupacao, 
                                 "Diagnostico_Rapido": dx_rapido, "Historia": "" 
                             }
                             
-                            # Injeção Imediata (Sem bloqueios do framework)
+                            # O COMANDO DE SALVAMENTO ABSOLUTO
                             db.collection("Cadastro").add(novo_cad)
                             
-                            st.session_state.paciente = nome
+                            st.session_state.paciente = nome.strip()
                             st.session_state.membro_ativo = "Joelho" 
-                            
-                            st.success("✅ Paciente registrado com sucesso!")
                             st.session_state.pagina = 'painel_clinico'
                             st.rerun()
                             
                         except Exception as e:
-                            st.error(f"❌ Erro crítico ao comunicar com o banco de dados: {e}")
+                            st.error(f"❌ Falha crítica reportada pelo servidor: {e}")
     else:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Abrir Prontuário", use_container_width=True, type="primary"):
             st.session_state.paciente = paciente
-            st.session_state.membro_ativo = "Joelho" # <-- FORÇA O FOCO NO MVP
-            mudar_pagina('painel_clinico') # <-- ROTEAMENTO DIRETO
+            st.session_state.membro_ativo = "Joelho"
+            st.session_state.pagina = 'painel_clinico'
+            st.rerun()
 
 # PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
