@@ -495,14 +495,13 @@ elif st.session_state.pagina == 'dados_paciente':
         
     paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
     
-    if paciente == "+ Novo Paciente":
-        with st.form("cad_novo"):
+    if paciente == "+ if paciente == "+ Novo Paciente":
+        with st.container():
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação do Paciente</h4>", unsafe_allow_html=True)
             nome = st.text_input("Nome Completo *")
             
             c_cad1, c_cad2, c_cad3 = st.columns(3)
             with c_cad1: 
-                # Proteção e expansão da Data de Nascimento já integradas aqui
                 data_padrao = datetime(2000, 1, 1)
                 data_minima = datetime(datetime.now().year - 100, 1, 1)
                 dt_nasc = st.date_input("Data de Nascimento *", value=data_padrao, min_value=data_minima, max_value=datetime.today(), format="DD/MM/YYYY")
@@ -512,14 +511,13 @@ elif st.session_state.pagina == 'dados_paciente':
             c_cad4, c_cad5, c_cad6 = st.columns(3)
             with c_cad4: email = st.text_input("E-mail")
             with c_cad5: cidade = st.text_input("Cidade e Estado")
-            # A variável 'ocupacao' blindada e corretamente declarada
             with c_cad6: ocupacao = st.text_input("Atividade Ocupacional")
             
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Rápido (Triagem)</h4>", unsafe_allow_html=True)
             dx_rapido = st.text_input("Diagnóstico Clínico/Médico", placeholder="Ex: LCA, Condropatia, Tendinopatia...")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("💾 Salvar Cadastro", use_container_width=True):
+            if st.button("💾 Salvar Cadastro", use_container_width=True, type="primary"):
                 if nome.strip() == "":
                     st.error("⚠️ O Nome é obrigatório para abrir o prontuário.")
                 else:
@@ -533,7 +531,7 @@ elif st.session_state.pagina == 'dados_paciente':
                                 "Diagnostico_Rapido": dx_rapido, "Historia": "" 
                             }
                             
-                            # INJEÇÃO DIRETA NO FIREBASE
+                            # Injeção Imediata (Sem bloqueios do framework)
                             db.collection("Cadastro").add(novo_cad)
                             
                             st.session_state.paciente = nome
