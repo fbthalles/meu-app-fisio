@@ -595,7 +595,7 @@ elif st.session_state.pagina == 'painel_clinico':
         st.rerun()
             
         # Expansor de Navegação Rápida
-            with st.expander("🔄 Trocar Paciente Ativo"):
+        with st.expander("🔄 Trocar Paciente Ativo"):
                 try:
                     df_lista_pacientes = conn.read("Cadastro", ttl=0)
                     if not df_lista_pacientes.empty:
