@@ -806,43 +806,127 @@ elif st.session_state.pagina == 'painel_clinico':
                     placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
 
             with t_quest:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Escala Funcional (LEFS - Adaptada para Joelho)</h4>", unsafe_allow_html=True)
-                st.caption("Selecione o grau de dificuldade do paciente para as seguintes atividades hoje (0 = Incapaz, 4 = Sem dificuldade):")
-                
-                opcoes_resp = {"Incapaz / Extrema Dificuldade": 0, "Muita Dificuldade": 1, "Dificuldade Moderada": 2, "Um Pouco de Dificuldade": 3, "Nenhuma Dificuldade": 4}
-                perguntas_lefs = [
-                    "1. Agachar ou ajoelhar", "2. Andar 2 quarteirões", "3. Subir um lance de escadas", 
-                    "4. Descer um lance de escadas", "5. Ficar em pé por 1 hora", "6. Correr em terreno plano",
-                    "7. Fazer trabalho pesado", "8. Mudança rápida de direção (Corte)"
-                ]
-                
-                score_lefs = 0
-                c_q1, c_q2 = st.columns(2)
-                for i, p in enumerate(perguntas_lefs):
-                    col = c_q1 if i < 4 else c_q2
-                    with col:
-                        # O Streamlit guarda a resposta e somamos o valor correspondente (0 a 4)
-                        resp = st.selectbox(p, list(opcoes_resp.keys()), key=f"lefs_{i}")
-                        score_lefs += opcoes_resp[resp]
-                
-                score_max = len(perguntas_lefs) * 4
-                pct_funcional = (score_lefs / score_max) * 100
-                
-                # Motor de Interpretação Automática
-                if pct_funcional < 30: interp = "🚨 Função Muito Ruim (Alta dependência mecânica / Fase Aguda)"
-                elif pct_funcional < 60: interp = "🟡 Função Regular (Limitação funcional moderada)"
-                elif pct_funcional < 85: interp = "🟢 Função Boa (Independência nas AVDs)"
-                else: interp = "⭐ Função Excelente (Apto para transição desportiva)"
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Bateria de Questionários Funcionais (PBE)</h4>", unsafe_allow_html=True)
+                st.caption("Expanda o questionário desejado. A pontuação e a interpretação clínica são geradas em tempo real. Preencha apenas as escalas adequadas ao fenótipo do paciente atual.")
+
+                # --- 1. LEFS (Geral) ---
+                with st.expander("📝 LEFS (Escala Funcional da Extremidade Inferior)"):
+                    opcoes_lefs = {"Incapaz / Extrema Dificuldade": 0, "Muita Dificuldade": 1, "Dificuldade Moderada": 2, "Um Pouco de Dificuldade": 3, "Nenhuma Dificuldade": 4}
+                    perguntas_lefs = ["1. Agachar ou ajoelhar", "2. Andar 2 quarteirões", "3. Subir um lance de escadas", "4. Descer um lance de escadas", "5. Ficar em pé por 1 hora", "6. Correr em terreno plano", "7. Fazer trabalho pesado", "8. Mudança rápida de direção (Corte)"]
+                    score_lefs = 0
+                    c_l1, c_l2 = st.columns(2)
+                    for i, p in enumerate(perguntas_lefs):
+                        with (c_l1 if i < 4 else c_l2): score_lefs += opcoes_lefs[st.selectbox(p, list(opcoes_lefs.keys()), key=f"lefs_{i}")]
                     
-                st.info(f"📊 **Resultado Automático:** {score_lefs}/{score_max} pontos ({pct_funcional:.1f}%) — **Interpretação:** {interp}")
-            
+                    pct_lefs = (score_lefs / 32) * 100
+                    interp_lefs = "🚨 Função Muito Ruim" if pct_lefs < 30 else "🟡 Função Regular" if pct_lefs < 60 else "🟢 Função Boa" if pct_lefs < 85 else "⭐ Função Excelente"
+                    st.info(f"📊 **Resultado LEFS:** {score_lefs}/32 pontos ({pct_lefs:.1f}%) — **Interpretação:** {interp_lefs}")
+
+                # --- 2. VISA-P (Tendinopatia Patelar) ---
+                with st.expander("🎯 VISA-P (Tendinopatia Patelar)"):
+                    st.caption("Responda de 0 (Dor máxima / Incapaz) a 10 (Sem dor / Perfeito). O questionário soma 100 pontos.")
+                    score_visap = 0
+                    c_v1, c_v2 = st.columns(2)
+                    with c_v1:
+                        score_visap += st.slider("1. Dor ao ficar sentado", 0, 10, 10, key="vp1")
+                        score_visap += st.slider("2. Dor ao descer escadas", 0, 10, 10, key="vp2")
+                        score_visap += st.slider("3. Dor ao esticar ativamente o joelho", 0, 10, 10, key="vp3")
+                        score_visap += st.slider("4. Dor ao fazer um afundo (lunge)", 0, 10, 10, key="vp4")
+                    with c_v2:
+                        score_visap += st.slider("5. Problemas para agachar", 0, 10, 10, key="vp5")
+                        score_visap += st.slider("6. Dor durante/após salto ou esporte", 0, 10, 10, key="vp6")
+                        
+                        p7 = st.selectbox("7. Esporte Atual", ["Não consegue (0 pts)", "Modificado/Menos frequente (4 pts)", "Competindo com dor (7 pts)", "Competindo sem dor (10 pts)"], key="vp7")
+                        score_visap += 0 if "0 pts" in p7 else 4 if "4 pts" in p7 else 7 if "7 pts" in p7 else 10
+                        
+                        p8 = st.selectbox("8. Tempo de dor no esporte", ["Incapaz (0 pts)", "Para aos 15 min (7 pts)", "Dor após o esporte (15 pts)", "Sem dor (30 pts)"], key="vp8")
+                        score_visap += 0 if "0 pts" in p8 else 7 if "7 pts" in p8 else 15 if "15 pts" in p8 else 30
+
+                    interp_visap = "🚨 Tendinopatia Severa/Aguda" if score_visap < 50 else "🟡 Fase Reativa" if score_visap < 80 else "🟢 Remodelamento/Alta"
+                    st.info(f"📊 **Resultado VISA-P:** {score_visap}/100 pontos — **Interpretação:** {interp_visap}")
+
+                # --- 3. LYSHOLM (Ligamentar e Meniscal) ---
+                with st.expander("🦵 Escala de Lysholm (Ligamentar e Meniscal)"):
+                    c_ly1, c_ly2 = st.columns(2)
+                    score_lysholm = 0
+                    with c_ly1:
+                        score_lysholm += int(st.selectbox("Mancar", ["5 - Nenhum", "3 - Leve ou Periódico", "0 - Grave ou Constante"]).split(" -")[0])
+                        score_lysholm += int(st.selectbox("Apoio", ["5 - Nenhum (Não precisa)", "2 - Usa bengala/muleta", "0 - Impossível apoiar"]).split(" -")[0])
+                        score_lysholm += int(st.selectbox("Travamento", ["15 - Nenhum", "10 - Sensação de travamento", "6 - Ocasional", "2 - Frequente", "0 - Articulação travada"]).split(" -")[0])
+                        score_lysholm += int(st.selectbox("Instabilidade", ["25 - Nunca cede", "20 - Raramente", "15 - Frequente no esporte", "10 - Ocasional em AVDs", "5 - Frequente em AVDs", "0 - A cada passo"]).split(" -")[0])
+                    with c_ly2:
+                        score_lysholm += int(st.selectbox("Dor", ["25 - Nenhuma", "20 - Inconstante ou Leve", "15 - Durante esporte pesado", "10 - Durante esporte leve", "5 - Após andar 2km", "0 - Constante"]).split(" -")[0])
+                        score_lysholm += int(st.selectbox("Inchaço", ["10 - Nenhum", "6 - Após esforço intenso", "2 - Após AVDs", "0 - Constante"]).split(" -")[0])
+                        score_lysholm += int(st.selectbox("Subir Escadas", ["10 - Sem problemas", "6 - Levemente prejudicado", "2 - Um degrau por vez", "0 - Impossível"]).split(" -")[0])
+                        score_lysholm += int(st.selectbox("Agachamento", ["5 - Sem problemas", "4 - Levemente prejudicado", "2 - Não passa de 90 graus", "0 - Impossível"]).split(" -")[0])
+                    
+                    interp_lysholm = "🚨 Ruim (Instabilidade Severa)" if score_lysholm < 65 else "🟡 Regular" if score_lysholm < 84 else "🟢 Bom" if score_lysholm < 95 else "⭐ Excelente"
+                    st.info(f"📊 **Resultado Lysholm:** {score_lysholm}/100 pontos — **Interpretação:** {interp_lysholm}")
+
+                # --- 4. WOMAC (Osteoartrite) ---
+                with st.expander("🦴 Índice WOMAC (Osteoartrite)"):
+                    st.caption("Responda de 0 (Nenhuma) a 4 (Muito Intensa). O sistema inverterá o cálculo automaticamente para % (100% = Excelente, 0% = Severo).")
+                    w_op = {"Nenhuma": 0, "Leve": 1, "Moderada": 2, "Intensa": 3, "Muito Intensa": 4}
+                    score_womac = 0
+                    
+                    c_w1, c_w2, c_w3 = st.columns(3)
+                    with c_w1:
+                        st.markdown("**Dor (5 itens)**")
+                        for p in ["Andar", "Subir escadas", "Deitar (Noturna)", "Sentar/Repouso", "Ficar em pé"]: score_womac += w_op[st.selectbox(p, list(w_op.keys()), key=f"wd_{p}")]
+                    with c_w2:
+                        st.markdown("**Rigidez (2 itens)**")
+                        for p in ["Ao acordar", "Durante o dia"]: score_womac += w_op[st.selectbox(p, list(w_op.keys()), key=f"wr_{p}")]
+                    with c_w3:
+                        st.markdown("**Função - AVDs (17 itens condensados em 8 chaves)**")
+                        for p in ["Descer escadas", "Levantar da cadeira", "Ficar em pé", "Entrar/Sair do carro", "Calçar meias", "Sair da cama", "Banho", "Tarefa doméstica"]: score_womac += w_op[st.selectbox(p, list(w_op.keys()), key=f"wf_{p}")]
+                    
+                    max_w = (5 + 2 + 8) * 4
+                    pct_womac = 100 - ((score_womac / max_w) * 100) # Invertido para que 100% seja o melhor
+                    interp_womac = "🚨 Artrose Severa Limitante" if pct_womac < 30 else "🟡 Artrose Moderada" if pct_womac < 70 else "🟢 Artrose Leve" if pct_womac < 90 else "⭐ Excelente (Sem impacto)"
+                    st.info(f"📊 **Resultado WOMAC:** Pontos Brutos: {score_womac} | **Funcionalidade Normalizada: {pct_womac:.1f}%** — {interp_womac}")
+
+                # --- 5. KOOS (Avaliação Geral do Joelho) ---
+                with st.expander("🟢 Score KOOS (O.A. e Lesões Gerais)"):
+                    st.caption("O KOOS original tem 42 perguntas. Para agilidade clínica sem perda matemática, defina a média de intensidade relatada pelo paciente em cada domínio (0 = Extremo, 4 = Nenhum).")
+                    koos_op = {"Extremo / Sempre": 0, "Severo / Frequente": 1, "Moderado": 2, "Leve / Raro": 3, "Nenhum / Nunca": 4}
+                    c_k1, c_k2 = st.columns(2)
+                    score_koos = 0
+                    with c_k1:
+                        score_koos += koos_op[st.selectbox("Sintomas e Inchaço (Média)", list(koos_op.keys()), index=4, key="k1")]
+                        score_koos += koos_op[st.selectbox("Nível de Dor (Média)", list(koos_op.keys()), index=4, key="k2")]
+                        score_koos += koos_op[st.selectbox("Atividades Diárias - AVDs (Média)", list(koos_op.keys()), index=4, key="k3")]
+                    with c_k2:
+                        score_koos += koos_op[st.selectbox("Esportes e Recreação (Média)", list(koos_op.keys()), index=4, key="k4")]
+                        score_koos += koos_op[st.selectbox("Qualidade de Vida (Média)", list(koos_op.keys()), index=4, key="k5")]
+                    
+                    pct_koos = (score_koos / 20) * 100
+                    interp_koos = "🚨 Risco Funcional (Fase Aguda)" if pct_koos < 40 else "🟡 Limitação Moderada" if pct_koos < 80 else "🟢 Alta Performance"
+                    st.info(f"📊 **Resultado KOOS (Score Agregado): {pct_koos:.1f}%** — **Interpretação:** {interp_koos}")
+
+                # --- 6. IKDC (Subjetivo Geral) ---
+                with st.expander("✚ IKDC Subjetivo"):
+                    st.caption("Como a matemática do IKDC cruza múltiplos formatos, utilize os blocos principais para gerar o percentual bruto automático.")
+                    c_ik1, c_ik2 = st.columns(2)
+                    with c_ik1:
+                        ik_dor = st.slider("Nível da Pior Dor (0=Pior, 10=Nenhuma)", 0, 10, 10, key="ik1")
+                        ik_freq = st.selectbox("Frequência da Dor", ["Constante (0 pts)", "Diária (2 pts)", "Semanal (4 pts)", "Rara (7 pts)", "Nenhuma (10 pts)"], key="ik2")
+                        ik_pts_freq = 0 if "0 pts" in ik_freq else 2 if "2 pts" in ik_freq else 4 if "4 pts" in ik_freq else 7 if "7 pts" in ik_freq else 10
+                    with c_ik2:
+                        ik_func = st.slider("Função do Joelho Antes da Lesão (0-10)", 0, 10, 10, key="ik3")
+                        ik_func_atual = st.slider("Função do Joelho Atual (0-10)", 0, 10, 5, key="ik4")
+                    
+                    # Aproximação proporcional algorítmica baseada nos domínios do IKDC
+                    score_ikdc = min(100, ((ik_dor + ik_pts_freq + (ik_func_atual*2)) / 40) * 100)
+                    interp_ikdc = "🚨 Baixa Função Subjetiva" if score_ikdc < 60 else "🟡 Desempenho Moderado" if score_ikdc < 85 else "🟢 Excelente Desempenho"
+                    st.info(f"📊 **Resultado IKDC Algorítmico: {score_ikdc:.1f}%** — **Interpretação:** {interp_ikdc}")
+
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # --- MOTOR DE SALVAMENTO ATUALIZADO (Captura todos os Questionários) ---
             if st.button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True, type="primary"):
-                # Adicionamos 'laudo_exames' na validação rigorosa
                 campos_texto = [qp, hma, sinais_sintomas, fat_alivio, fat_piora, trat_previos, mapa_dor, laudo_exames]
                 if any(campo.strip() == "" for campo in campos_texto):
-                    st.error("⚠️ ERRO: Todos os campos abertos são obrigatórios. Se não houver dado clínico, preencha com 'Nenhum' ou 'N/A'.")
+                    st.error("⚠️ ERRO: Todos os campos abertos são obrigatórios. Se não houver dado clínico, preencha com 'Nenhum'.")
                 else:
                     dados_avaliacao = {
                         "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
@@ -861,14 +945,20 @@ elif st.session_state.pagina == 'painel_clinico':
                         "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, "Flexibilidade": ", ".join(flexibilidade),
                         "CM_Agachamento": cm_agac, "Dor_Agachamento": dor_agac,
                         "CM_Step": cm_step, "Dor_Step": dor_step, "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
-                        "Exames_Apresentados": ", ".join(tipos_exames), "Laudo_Exames": laudo_exames, # <- Novos dados de Exame
-                        "Score_LEFS_Pts": score_lefs, "Score_LEFS_Pct": pct_funcional, "Interpretacao_LEFS": interp, # <- Novos dados do Questionário
+                        "Exames_Apresentados": ", ".join(tipos_exames), "Laudo_Exames": laudo_exames,
+                        
+                        # NOVOS DADOS DA BATERIA DE QUESTIONÁRIOS
+                        "LEFS_Pct": pct_lefs, "Interpretacao_LEFS": interp_lefs,
+                        "VISA_P_Pts": score_visap, "Interpretacao_VISA_P": interp_visap,
+                        "Lysholm_Pts": score_lysholm, "Interpretacao_Lysholm": interp_lysholm,
+                        "WOMAC_Pct": pct_womac, "Interpretacao_WOMAC": interp_womac,
+                        "KOOS_Pct": pct_koos, "IKDC_Pct": score_ikdc,
+                        
                         "Profissional_ID": st.session_state.get("user_email", "admin")
                     }
                     
                     with st.spinner("🔄 Gravando avaliação clínica complexa na nuvem..."):
                         try:
-                            # INJEÇÃO DIRETA NO FIREBASE
                             db.collection("Avaliacao_Inicial").add(dados_avaliacao)
                             st.success("✅ Avaliação Inicial registrada e blindada com sucesso!")
                         except Exception as e:
