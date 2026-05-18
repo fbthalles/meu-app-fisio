@@ -583,53 +583,52 @@ elif st.session_state.pagina == 'dados_paciente':
 
 # PAGINA 4: PAINEL CLÍNICO (UX ESTILO APP NATIVO)
 elif st.session_state.pagina == 'painel_clinico':
+    paciente_alvo = st.session_state.get('paciente_alvo', False)
+    
     # 1. Menu Lateral Limpo e Unificado
     with st.sidebar:
-        if not st.session_state.get('paciente_alvo', False): 
+        if not paciente_alvo: 
             st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']}; text-align: center;'>👤 {st.session_state.paciente}</h3>", unsafe_allow_html=True)
             
-           # Botão de retorno seguro
-    if st.button("⬅️ Voltar aos Pacientes", type="secondary"):
-        st.session_state.pagina = 'dados_paciente'
-        st.session_state.paciente = None  # Limpa o paciente ativo da memória
-        st.rerun()
-            
-        # Expansor de Navegação Rápida
-        with st.expander("🔄 Trocar Paciente Ativo"):
-            try:
-                # Atualizado para ler nativamente do Firebase Firestore
-                docs = db.collection("Cadastro").stream()
-                todos_pacientes = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
-                
-                if todos_pacientes:
-                    idx_atual = todos_pacientes.index(st.session_state.paciente) if st.session_state.get('paciente') in todos_pacientes else 0
-                    paciente_selecionado = st.selectbox("Selecione:", todos_pacientes, index=idx_atual, label_visibility="collapsed")
-                    if st.button("Carregar Prontuário", use_container_width=True):
-                        st.session_state.paciente = paciente_selecionado
-                        st.session_state.pagina = 'painel_clinico'
-                        st.rerun()
-                else:
-                    st.caption("Nenhum paciente encontrado.")
-            except Exception as e:
-                st.caption("Erro ao carregar lista de pacientes.")
+            # Expansor de Navegação Rápida
+            with st.expander("🔄 Trocar Paciente Ativo"):
+                try:
+                    docs = db.collection("Cadastro").stream()
+                    todos_pacientes = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
+                    
+                    if todos_pacientes:
+                        idx_atual = todos_pacientes.index(st.session_state.paciente) if st.session_state.get('paciente') in todos_pacientes else 0
+                        paciente_selecionado = st.selectbox("Selecione:", todos_pacientes, index=idx_atual, label_visibility="collapsed")
+                        if st.button("Carregar Prontuário", use_container_width=True):
+                            st.session_state.paciente = paciente_selecionado
+                            st.session_state.pagina = 'painel_clinico'
+                            st.rerun()
+                    else:
+                        st.caption("Nenhum paciente encontrado.")
+                except Exception as e:
+                    st.caption("Erro ao carregar lista de pacientes.")
 
-        st.markdown("---")
-        menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
-    else:
-        menu = "Painel Analítico 📊"
-
- 
+            st.markdown("---")
+            # MENU COMPLETO E PROTEGIDO
+            menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
+        else:
+            menu = "Painel Analítico 📊"
 
     # 2. App Header (Barra Superior de Navegação Nativa)
     if not paciente_alvo:
         c_back, c_title, c_vazio = st.columns([1, 4, 1])
         with c_back:
-            # Botão Voltar utilizando o novo estilo CSS "secondary" transparente
-            if st.button("⬅️ Voltar", type="secondary", use_container_width=False, help="Voltar para seleção de região"):
-                mudar_pagina('selecao_membro')
+            # BOTÃO VOLTAR COM ROTA CORRIGIDA
+            if st.button("⬅️ Voltar", type="secondary", use_container_width=False, help="Voltar para seleção de pacientes"):
+                st.session_state.pagina = 'dados_paciente'
+                st.session_state.paciente = None
+                st.rerun()
         with c_title:
-            st.markdown(f"<h3 style='text-align: center; color: {CORES_GENUA['primaria']}; margin-top: 5px; font-size: 1.6rem;'>{st.session_state.membro_ativo}</h3>", unsafe_allow_html=True)
+            membro = st.session_state.get('membro_ativo', 'Joelho')
+            st.markdown(f"<h3 style='text-align: center; color: {CORES_GENUA['primaria']}; margin-top: 5px; font-size: 1.6rem;'>{membro}</h3>", unsafe_allow_html=True)
         st.markdown("<hr style='margin-top: -5px; margin-bottom: 25px;'>", unsafe_allow_html=True)
+
+    # --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
 
     # --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
     if menu == "Avaliação Inicial 🔎":
