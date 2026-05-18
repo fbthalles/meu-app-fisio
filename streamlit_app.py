@@ -608,7 +608,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 except:
                     st.caption("Nenhum paciente extra encontrado.")
 
-            st.markdown("---")
+        st.markdown("---")
             menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
         else:
             menu = "Painel Analítico 📊"
