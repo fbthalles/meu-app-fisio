@@ -543,8 +543,8 @@ elif st.session_state.pagina == 'dados_paciente':
             with c_cad5: cidade = st.text_input("Cidade e Estado")
             with c_cad6: ocupacao = st.text_input("Atividade Ocupacional")
             
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Rápido (Triagem)</h4>", unsafe_allow_html=True)
-            dx_rapido = st.text_input("Diagnóstico Clínico/Médico", placeholder="Ex: LCA, Condropatia, Tendinopatia...")
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Clinico (Triagem)</h4>", unsafe_allow_html=True)
+            dx_clinico = st.text_input("Diagnóstico Clínico/Médico", placeholder="Ex: LCA, Condropatia, Tendinopatia...")
             
             st.markdown("<br>", unsafe_allow_html=True)
             
