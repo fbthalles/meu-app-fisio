@@ -596,22 +596,27 @@ elif st.session_state.pagina == 'painel_clinico':
             
         # Expansor de Navegação Rápida
         with st.expander("🔄 Trocar Paciente Ativo"):
-                try:
-                    df_lista_pacientes = conn.read("Cadastro", ttl=0)
-                    if not df_lista_pacientes.empty:
-                        todos_pacientes = df_lista_pacientes['Nome'].unique().tolist()
-                        idx_atual = todos_pacientes.index(st.session_state.paciente) if st.session_state.paciente in todos_pacientes else 0
-                        paciente_selecionado = st.selectbox("Selecione:", todos_pacientes, index=idx_atual, label_visibility="collapsed")
-                        if st.button("Carregar Prontuário", use_container_width=True):
-                            st.session_state.paciente = paciente_selecionado
-                            st.rerun()
-                except:
-                    st.caption("Nenhum paciente extra encontrado.")
+            try:
+                # Atualizado para ler nativamente do Firebase Firestore
+                docs = db.collection("Cadastro").stream()
+                todos_pacientes = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
+                
+                if todos_pacientes:
+                    idx_atual = todos_pacientes.index(st.session_state.paciente) if st.session_state.get('paciente') in todos_pacientes else 0
+                    paciente_selecionado = st.selectbox("Selecione:", todos_pacientes, index=idx_atual, label_visibility="collapsed")
+                    if st.button("Carregar Prontuário", use_container_width=True):
+                        st.session_state.paciente = paciente_selecionado
+                        st.session_state.pagina = 'painel_clinico'
+                        st.rerun()
+                else:
+                    st.caption("Nenhum paciente encontrado.")
+            except Exception as e:
+                st.caption("Erro ao carregar lista de pacientes.")
 
         st.markdown("---")
-            menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
-        else:
-            menu = "Painel Analítico 📊"
+        menu = st.radio("MÓDULOS DE ATENDIMENTO", ["Avaliação Inicial 🔎", "Check-in Diário 📝", "Painel Analítico 📊"])
+    else:
+        menu = "Painel Analítico 📊"
 
  
 
