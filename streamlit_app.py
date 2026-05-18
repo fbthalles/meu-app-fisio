@@ -1214,10 +1214,19 @@ elif st.session_state.pagina == 'painel_clinico':
         if st.button("⚙️ GERAR RELATÓRIO EM PDF", use_container_width=True):
             with st.spinner("Compilando prontuário e gerando PDF..."):
                 try:
+                    # 1. BUSCA NATIVA E SEGURA DOS DADOS NA NUVEM
+                    docs_aval = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
+                    lista_aval = [doc.to_dict() for doc in docs_aval]
+                    dados_aval = lista_aval[-1] if lista_aval else {} # Pega a avaliação mais recente
+                    
+                    docs_evo = db.collection("Evolucao").where("Paciente", "==", st.session_state.paciente).stream()
+                    historico = [doc.to_dict() for doc in docs_evo]
+                    
+                    # 2. GERAÇÃO DO PDF
                     pdf = FPDF()
                     pdf.add_page()
                     
-                    # 1. Cabeçalho da Clínica
+                    # Cabeçalho da Clínica
                     pdf.set_font('Arial', 'B', 16)
                     pdf.set_text_color(16, 62, 85) # Azul Genua
                     pdf.cell(0, 10, 'GENUA - Inteligencia Clinica Integrada', 0, 1, 'C')
@@ -1226,7 +1235,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     pdf.cell(0, 5, 'Relatorio de Evolucao Fisioterapeutica', 0, 1, 'C')
                     pdf.ln(10)
                     
-                    # 2. Identificação
+                    # Identificação
                     pdf.set_font('Arial', 'B', 12)
                     pdf.set_text_color(0, 0, 0)
                     pdf.cell(0, 8, f"Paciente: {st.session_state.paciente}", 0, 1)
@@ -1235,60 +1244,58 @@ elif st.session_state.pagina == 'painel_clinico':
                     pdf.cell(0, 6, f"Data de Emissao: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
                     pdf.ln(5)
                     
-                    # 3. Resumo da Avaliação Inicial
+                    # Resumo da Avaliação Inicial
                     if dados_aval:
                         pdf.set_font('Arial', 'B', 11)
                         pdf.set_fill_color(240, 240, 240)
                         pdf.cell(0, 8, ' MARCOS DA AVALIACAO INICIAL', 0, 1, fill=True)
                         pdf.set_font('Arial', '', 10)
                         
-                        # Limpeza de acentos nativa para evitar quebra no PDF
-                        qp_texto = dados_aval.get("QP", "N/A").encode('ascii', 'ignore').decode('ascii')
+                        # Limpeza de acentos nativa para evitar quebra no gerador FPDF
+                        qp_texto = str(dados_aval.get("QP", "N/A")).encode('ascii', 'ignore').decode('ascii')
                         pdf.multi_cell(0, 6, f"Queixa Principal: {qp_texto}")
                         
-                        # Injeção Automática dos Questionários (Se existirem)
                         pdf.ln(3)
                         pdf.set_font('Arial', 'B', 10)
                         pdf.cell(0, 6, 'Scores Funcionais (PBE):', 0, 1)
                         pdf.set_font('Arial', '', 10)
                         
-                        if dados_aval.get('LEFS_Pct', 0) > 0: 
-                            pdf.cell(0, 6, f"- LEFS: {dados_aval.get('LEFS_Pct', 0):.1f}% ({dados_aval.get('Interpretacao_LEFS', '')})", 0, 1)
-                        if dados_aval.get('WOMAC_Pct', 0) > 0: 
-                            pdf.cell(0, 6, f"- WOMAC: {dados_aval.get('WOMAC_Pct', 0):.1f}%", 0, 1)
-                        if dados_aval.get('VISA_P_Pts', 0) > 0: 
-                            pdf.cell(0, 6, f"- VISA-P: {dados_aval.get('VISA_P_Pts', 0)} pts", 0, 1)
-                        if dados_aval.get('Lysholm_Pts', 0) > 0: 
-                            pdf.cell(0, 6, f"- Lysholm: {dados_aval.get('Lysholm_Pts', 0)} pts", 0, 1)
+                        # Injeção Automática dos Questionários (Se existirem)
+                        if float(dados_aval.get('LEFS_Pct', 0)) > 0: 
+                            pdf.cell(0, 6, f"- LEFS: {float(dados_aval.get('LEFS_Pct', 0)):.1f}% ({dados_aval.get('Interpretacao_LEFS', '')})", 0, 1)
+                        if float(dados_aval.get('WOMAC_Pct', 0)) > 0: 
+                            pdf.cell(0, 6, f"- WOMAC: {float(dados_aval.get('WOMAC_Pct', 0)):.1f}%", 0, 1)
+                        if float(dados_aval.get('VISA_P_Pts', 0)) > 0: 
+                            pdf.cell(0, 6, f"- VISA-P: {float(dados_aval.get('VISA_P_Pts', 0))} pts", 0, 1)
+                        if float(dados_aval.get('Lysholm_Pts', 0)) > 0: 
+                            pdf.cell(0, 6, f"- Lysholm: {float(dados_aval.get('Lysholm_Pts', 0))} pts", 0, 1)
                     
-                    # 4. Histórico Evolutivo
+                    # Histórico Evolutivo
                     pdf.ln(5)
                     pdf.set_font('Arial', 'B', 11)
                     pdf.cell(0, 8, ' HISTORICO DE EVOLUCAO CLINICA', 0, 1, fill=True)
                     pdf.set_font('Arial', '', 9)
                     
                     if historico:
-                        # Pega as 15 sessões mais recentes para o Laudo
                         for ev in historico[:15]: 
-                            linha = f"Data: {ev.get('Data', 'N/A')[:10]}  |  Dor (EVA): {ev.get('Dor', '-')}/10  |  Flexao: {ev.get('Flexao', '-')} graus  |  Carga: {ev.get('Agachamento', '-')}"
+                            linha = f"Data: {str(ev.get('Data', 'N/A'))[:10]}  |  Dor (EVA): {ev.get('Dor', '-')}/10  |  Flexao: {ev.get('Flexao', '-')} graus  |  Carga: {ev.get('Agachamento', '-')}"
                             pdf.cell(0, 6, linha, 0, 1)
                     else:
                         pdf.cell(0, 6, "Nenhum registro evolutivo diario encontrado.", 0, 1)
                         
-                    # 5. Assinatura Fisioterapeuta
+                    # Assinatura Fisioterapeuta
                     pdf.ln(20)
                     pdf.set_font('Arial', 'B', 10)
                     pdf.cell(0, 6, '___________________________________________________', 0, 1, 'C')
                     prof = st.session_state.get('user_email', 'Fisioterapeuta Responsavel')
                     pdf.cell(0, 6, prof, 0, 1, 'C')
 
-                    # Processamento de Saída Segura para o Streamlit
+                    # Processamento de Saída Segura
                     try:
                         pdf_bytes = pdf.output(dest='S').encode('latin-1')
                     except:
                         pdf_bytes = bytes(pdf.output())
                     
-                    # Renderiza o Botão Nativo de Download
                     st.download_button(
                         label="📥 BAIXAR LAUDO EM PDF",
                         data=pdf_bytes,
@@ -1300,7 +1307,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     st.success("✅ Laudo compilado com sucesso! Clique no botão acima para salvar.")
                     
                 except Exception as e:
-                    st.error(f"❌ Erro ao compilar o PDF: {e}")
+                    st.error(f"❌ Erro crítico ao compilar o PDF: {e}")
 
 # --- SISTEMA DE PROTEÇÃO GLOBAL CONTRA TELA BRANCA (FAIL-SAFE) ---
 # Se o aplicativo se perder na navegação, este escudo força o retorno à tela de pacientes.
