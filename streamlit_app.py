@@ -560,7 +560,7 @@ elif st.session_state.pagina == 'dados_paciente':
                                 "Nome": nome.strip(), "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"), 
                                 "Idade": idade_calc, "CPF": cpf, "Telefone": telefone, 
                                 "Email": email, "Cidade_Estado": cidade, "Ocupacao": ocupacao, 
-                                "Diagnostico_Rapido": dx_rapido, "Historia": "" 
+                                "Diagnostico_Clinico": dx_clinico, "Historia": "" 
                             }
                             
                             # O COMANDO DE SALVAMENTO ABSOLUTO
@@ -1017,11 +1017,11 @@ elif st.session_state.pagina == 'painel_clinico':
         try:
             df_cad = conn.read(worksheet="Cadastro", ttl=0)
             registro_p = df_cad[df_cad['Nome'].str.strip() == p_sel].iloc[-1]
-            hist_clinica = registro_p.get('Diagnostico_Rapido', registro_p.get('Historia', 'Sem HMA base'))
+            hist_clinica = registro_p.get('Diagnostico_Clinico', registro_p.get('Historia', 'Sem HMA base'))
             idade_p = int(float(registro_p.get('Idade', 0))) if pd.notna(registro_p.get('Idade')) else "N/A"
-            dx_rapido_base = registro_p.get('Diagnostico_Rapido', 'Não especificado')
+            dx_clinico_base = registro_p.get('Diagnostico_Clinico', 'Não especificado')
         except:
-            hist_clinica = "Não disponível."; idade_p = "-"; dx_rapido_base = "-"
+            hist_clinica = "Não disponível."; idade_p = "-"; dx_clinico_base = "-"
 
         # --- B. RESGATE DA AVALIAÇÃO BASE (TESTES E FLAGS) ---
         try:
@@ -1047,7 +1047,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     <h3 style='margin: 0; color: {CORES_GENUA['primaria']}; font-weight: 700;'>👤 {p_sel}</h3>
                     <span style='background-color: #f1f3f5; color: {CORES_GENUA['primaria']}; padding: 6px 15px; border-radius: 20px; font-weight: 600;'>{idade_p} anos</span>
                 </div>
-                <p style='margin: 0; color: #495057;'><strong>Dx Triagem:</strong> {dx_rapido_base}</p>
+                <p style='margin: 0; color: #495057;'><strong>Dx Triagem:</strong> {dx_clinico_base}</p>
             </div>
         """, unsafe_allow_html=True)
 
