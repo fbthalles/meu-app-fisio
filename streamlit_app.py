@@ -922,32 +922,54 @@ elif st.session_state.pagina == 'painel_clinico':
 
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- MOTOR DE SALVAMENTO ATUALIZADO (Captura todos os Questionários) ---
+            # --- MOTOR DE SALVAMENTO INTELIGENTE (UX PBE) ---
             if st.button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True, type="primary"):
-                campos_texto = [qp, hma, sinais_sintomas, fat_alivio, fat_piora, trat_previos, mapa_dor, laudo_exames]
-                if any(campo.strip() == "" for campo in campos_texto):
-                    st.error("⚠️ ERRO: Todos os campos abertos são obrigatórios. Se não houver dado clínico, preencha com 'Nenhum'.")
+                
+                # Função interna (Autocura): Preenche campos vazios automaticamente
+                def check_vazio(texto):
+                    return texto if texto.strip() != "" else "Não relatado"
+
+                # Regra de Ouro: Apenas a Queixa Principal impede o salvamento
+                if qp.strip() == "":
+                    st.error("⚠️ ERRO: A 'Queixa Principal (QP)' é obrigatória para abrir o prontuário. Descreva o motivo da consulta.")
                 else:
                     dados_avaliacao = {
                         "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
                         "Paciente": st.session_state.paciente, "Membro": st.session_state.membro_ativo,
-                        "QP": qp, "HMA": hma, "Sinais_Sintomas": sinais_sintomas,
-                        "Fatores_Alivio": fat_alivio, "Fatores_Piora": fat_piora, "Tratamentos_Previos": trat_previos,
+                        
+                        # Campos Abertos Autopreenchíveis
+                        "QP": qp, 
+                        "HMA": check_vazio(hma), 
+                        "Sinais_Sintomas": check_vazio(sinais_sintomas),
+                        "Fatores_Alivio": check_vazio(fat_alivio), 
+                        "Fatores_Piora": check_vazio(fat_piora), 
+                        "Tratamentos_Previos": check_vazio(trat_previos),
+                        "Mapa_Dor": check_vazio(mapa_dor),
+                        "Laudo_Exames": check_vazio(laudo_exames),
+                        
+                        # Campos Fechados e Listas
                         "Class_Dor": class_dor, "Origem_Dor": origem_dor, 
-                        "Zonas_Dor": ", ".join(zonas_dor), "Mapa_Dor": mapa_dor,
-                        "Red_Flags": ", ".join(red_flags), "Yellow_Cog": ", ".join(yellow_cog), 
-                        "Sono": qualidade_sono, "Fatores_Sociais": ", ".join(fat_sociais), "Comorbidades": ", ".join(comorbidades),
+                        "Zonas_Dor": ", ".join(zonas_dor) if zonas_dor else "Nenhuma", 
+                        "Red_Flags": ", ".join(red_flags) if red_flags else "Nenhuma", 
+                        "Yellow_Cog": ", ".join(yellow_cog) if yellow_cog else "Nenhum", 
+                        "Sono": qualidade_sono, 
+                        "Fatores_Sociais": ", ".join(fat_sociais) if fat_sociais else "Nenhum", 
+                        "Comorbidades": ", ".join(comorbidades) if comorbidades else "Nenhuma",
                         "Derrame": derrame, "Alinhamento": alinhamento, "Marcha": marcha,
-                        "Trofismo": trofismo, "Perimetria": perimetria, "Pele": ", ".join(pele),
-                        "Palpacao": ", ".join(palpacao_comp), "Godet": godet, "Temperatura": temp,
-                        "Testes_Ligamentares": ", ".join(t_lig), "Testes_Meniscais": ", ".join(t_men),
+                        "Trofismo": trofismo, "Perimetria": perimetria, 
+                        "Pele": ", ".join(pele) if pele else "Normal",
+                        "Palpacao": ", ".join(palpacao_comp) if palpacao_comp else "Sem dor", 
+                        "Godet": godet, "Temperatura": temp,
+                        "Testes_Ligamentares": ", ".join(t_lig) if t_lig else "Não testado", 
+                        "Testes_Meniscais": ", ".join(t_men) if t_men else "Não testado",
                         "Forca_Qualitativa": forca_qual, "Din_Quad": din_quad, "Din_Isq": din_isq, "Din_Glut": din_glut,
-                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, "Flexibilidade": ", ".join(flexibilidade),
+                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, 
+                        "Flexibilidade": ", ".join(flexibilidade) if flexibilidade else "Normal",
                         "CM_Agachamento": cm_agac, "Dor_Agachamento": dor_agac,
                         "CM_Step": cm_step, "Dor_Step": dor_step, "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
-                        "Exames_Apresentados": ", ".join(tipos_exames), "Laudo_Exames": laudo_exames,
+                        "Exames_Apresentados": ", ".join(tipos_exames) if tipos_exames else "Nenhum", 
                         
-                        # NOVOS DADOS DA BATERIA DE QUESTIONÁRIOS
+                        # DADOS DA BATERIA DE QUESTIONÁRIOS
                         "LEFS_Pct": pct_lefs, "Interpretacao_LEFS": interp_lefs,
                         "VISA_P_Pts": score_visap, "Interpretacao_VISA_P": interp_visap,
                         "Lysholm_Pts": score_lysholm, "Interpretacao_Lysholm": interp_lysholm,
@@ -957,10 +979,10 @@ elif st.session_state.pagina == 'painel_clinico':
                         "Profissional_ID": st.session_state.get("user_email", "admin")
                     }
                     
-                    with st.spinner("🔄 Gravando avaliação clínica complexa na nuvem..."):
+                    with st.spinner("🔄 Gravando avaliação clínica na nuvem..."):
                         try:
                             db.collection("Avaliacao_Inicial").add(dados_avaliacao)
-                            st.success("✅ Avaliação Inicial registrada e blindada com sucesso!")
+                            st.success("✅ Avaliação Inicial registrada com sucesso!")
                         except Exception as e:
                             st.error(f"❌ Falha de sincronização na avaliação: {e}")
 
