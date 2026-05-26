@@ -487,14 +487,18 @@ if paciente_alvo:
 
 # --- TELAS DO SISTEMA MVP ---
 
-# PAGINA 1: LOGIN (UI PREMIUM)
-if st.session_state.pagina == 'login':
-    # Injeção de CSS para transformar o design padrão num layout SaaS
+# Injeção de CSS para transformar o design padrão num layout SaaS
     st.markdown(f"""
     <style>
-    /* 1. ESCONDE A SETINHA DA BARRA LATERAL NO LOGIN */
+    /* 1. ESCONDE A SETINHA E TODO O CABEÇALHO DO STREAMLIT NO LOGIN */
     [data-testid="collapsedControl"] {{
-        display: none;
+        display: none !important;
+    }}
+    [data-testid="stHeader"] {{
+        display: none !important;
+    }}
+    header {{
+        visibility: hidden !important;
     }}
     
     /* 2. Estilização do Botão de Login */
@@ -522,10 +526,6 @@ if st.session_state.pagina == 'login':
     }}
     </style>
     """, unsafe_allow_html=True)
-
-    # ... (O resto do seu código de colunas e formulário de login continua aqui para baixo) ...
-
-    # ... (O resto do seu código de colunas e formulário de login continua aqui para baixo) ...
 
     # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
     c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
