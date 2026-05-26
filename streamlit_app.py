@@ -980,6 +980,9 @@ elif st.session_state.pagina == 'painel_clinico':
                         "CM_Step": cm_step, "Dor_Step": dor_step, "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
                         "Exames_Apresentados": ", ".join(tipos_exames) if tipos_exames else "Nenhum", 
                         
+                        # --- GATILHO INTELIGENTE INSERIDO NO SÍTIO CERTO ---
+                        "Testes_Alvo": testes_alvo,
+                        
                         # DADOS DA BATERIA DE QUESTIONÁRIOS
                         "LEFS_Pct": pct_lefs, "Interpretacao_LEFS": interp_lefs,
                         "VISA_P_Pts": score_visap, "Interpretacao_VISA_P": interp_visap,
