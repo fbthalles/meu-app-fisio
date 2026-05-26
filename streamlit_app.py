@@ -120,8 +120,10 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # 5. INJEÇÃO DO LOGO NA INTERFACE (BARRA LATERAL)
-st.sidebar.image(NOVO_LOGO_GENUA, use_container_width=True)
-st.sidebar.markdown("---") # Cria uma linha divisória elegante abaixo do logo
+# Só desenha a barra lateral e o logo esquerdo se NÃO estiver na tela de login
+if st.session_state.get('pagina', 'login') != 'login':
+    st.sidebar.image(NOVO_LOGO_GENUA, use_container_width=True)
+    st.sidebar.markdown("---") # Cria uma linha divisória elegante abaixo do logo
 
 # ==========================================
 
@@ -530,13 +532,21 @@ if paciente_alvo:
     # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
     c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
 
+    # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
+    c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
+
     with c_login:
-        # Renderiza a Logo Centralizada
-        try:
-            st.image(NOVO_LOGO_GENUA, use_container_width=True)
-        except Exception:
-            st.markdown(f"<h1 style='text-align: center; color: {CORES_GENUA['primaria']}; font-size: 3rem;'>GENUA</h1>", unsafe_allow_html=True)
+        # Renderiza a Logo Centralizada (Removido o redimensionamento forçado que causava a invisibilidade)
+        col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
+        with col_img2:
+            try:
+                # O parâmetro use_container_width estava a esmagar o logo. Usamos largura fixa nativa.
+                st.image(NOVO_LOGO_GENUA)
+            except Exception:
+                pass
         
+        # Garante que o nome GENUA aparece caso o Streamlit falhe em carregar a foto local
+        st.markdown(f"<h1 style='text-align: center; color: {CORES_GENUA['primaria']}; font-size: 3rem; margin-top: -10px;'>GENUA</h1>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center; color: #6c757d; font-weight: normal; margin-top: -15px;'>Inteligência Clínica Integrada</h4><br>", unsafe_allow_html=True)
         
         # Caixa de Formulário
