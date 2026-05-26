@@ -492,7 +492,12 @@ if st.session_state.pagina == 'login':
     # Injeção de CSS para transformar o design padrão num layout SaaS
     st.markdown(f"""
     <style>
-    /* Estilização do Botão de Login */
+    /* 1. ESCONDE A SETINHA DA BARRA LATERAL NO LOGIN */
+    [data-testid="collapsedControl"] {{
+        display: none;
+    }}
+    
+    /* 2. Estilização do Botão de Login */
     div.stButton > button {{
         background-color: {CORES_GENUA['primaria']};
         color: white;
@@ -509,13 +514,16 @@ if st.session_state.pagina == 'login':
         border: none;
         box-shadow: 0px 4px 10px rgba(57, 142, 155, 0.4);
     }}
-    /* Centralização Vertical e Fundo do App */
+    
+    /* 3. Centralização Vertical e Fundo do App */
     .block-container {{
         padding-top: 4rem;
         padding-bottom: 0rem;
     }}
     </style>
     """, unsafe_allow_html=True)
+
+    # ... (O resto do seu código de colunas e formulário de login continua aqui para baixo) ...
 
     # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
     c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
