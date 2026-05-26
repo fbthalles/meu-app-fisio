@@ -516,7 +516,7 @@ if st.session_state.pagina == 'login':
         st.markdown("<p style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 20px;'>GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado</p>", unsafe_allow_html=True)
 
 # PAGINA 2: SELEÇÃO DE PACIENTE E CADASTRO COMPLETO
-elif st.session_state.pagina == 'dados_paciente':
+    elif st.session_state.pagina == 'dados_paciente':
     st.header("👤 Gestão de Pacientes")
 
     # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação)
