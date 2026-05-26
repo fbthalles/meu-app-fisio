@@ -517,7 +517,7 @@ if st.session_state.pagina == 'login':
 
 # PAGINA 2: SELEÇÃO DE PACIENTE E CADASTRO COMPLETO
     elif st.session_state.pagina == 'dados_paciente':
-    st.header("👤 Gestão de Pacientes")
+        st.header("👤 Gestão de Pacientes")
 
     # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação)
     try:
