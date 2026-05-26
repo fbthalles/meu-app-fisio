@@ -488,7 +488,7 @@ if paciente_alvo:
 
 
                 
-        st.markdown("<p style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 20px;'>GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 20px;'>GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado</p>", unsafe_allow_html=True)
 
 # PAGINA 2: SELEÇÃO DE PACIENTE E CADASTRO COMPLETO
 elif st.session_state.pagina == 'dados_paciente':
@@ -528,6 +528,7 @@ if st.session_state.pagina == 'login':
     paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
     
     if paciente == "+ Novo Paciente":
+        
         # 2. CONTAINER LIVRE (Sem camisas de força de formulários)
         with st.container():
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação do Paciente</h4>", unsafe_allow_html=True)
