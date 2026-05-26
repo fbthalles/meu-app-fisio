@@ -930,6 +930,8 @@ elif st.session_state.pagina == 'painel_clinico':
             lista_testes_disp = ["Agachamento Bipodal", "Agachamento Unipodal", "Step Down", "Lunge (Afundo)", "Salto (Hop Test)", "Corrida"]
             testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=["Agachamento Bipodal", "Step Down"])
             st.markdown("<br>", unsafe_allow_html=True)
+
+            "Testes_Alvo": testes_alvo,
             
             # --- MOTOR DE SALVAMENTO INTELIGENTE (UX PBE) ---
             if st.button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True, type="primary"):
@@ -995,46 +997,78 @@ elif st.session_state.pagina == 'painel_clinico':
                         except Exception as e:
                             st.error(f"❌ Falha de sincronização na avaliação: {e}")
 
-    # --- MÓDULO 2: CHECK-IN DIÁRIO (EXCLUSIVO JOELHO) ---
+    # --- MÓDULO 2: CHECK-IN DIÁRIO (O MUTANTE) ---
     elif menu == "Check-in Diário 📝":
-        with st.container():
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Quadro Sistêmico Universal</h4>", unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1: dor = st.slider("💥 Dor atual (EVA 0-10)", 0, 10, 0)
-            with c2: sono = st.radio("💤 Sono", ["Ruim", "Regular", "Bom"], horizontal=True)
-                
+        st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']};'>📝 Check-in Diário e Evolução</h3>", unsafe_allow_html=True)
+        
+        # 1. O "Caçador": Busca os testes definidos na Avaliação Inicial
+        testes_para_hoje = ["Agachamento Bipodal"] # Valor de segurança caso haja falha
+        try:
+            docs_aval = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
+            lista_aval = [doc.to_dict() for doc in docs_aval]
+            if lista_aval:
+                ultima_aval = sorted(lista_aval, key=lambda x: x.get('Data_Avaliacao', ''))[-1]
+                testes_para_hoje = ultima_aval.get("Testes_Alvo", ["Agachamento Bipodal"])
+        except Exception:
+            pass
+
+        # 2. Dados Basais da Sessão
+        c_chk1, c_chk2 = st.columns(2)
+        with c_chk1:
+            data_sessao = st.date_input("Data da Sessão", datetime.now())
+            dor_atual = st.slider("Dor no Repouso (EVA)", 0, 10, 0)
+            inchaco_atual = st.selectbox("Inchaço / Derrame Articular", ["Nenhum", "Leve (+)", "Moderado (++)", "Intenso (+++)"])
+        
+        with c_chk2:
+            adm_flex_atual = st.number_input("Flexão Máxima Atingida (Graus)", min_value=0, max_value=160, value=90)
+            adm_ext_atual = st.selectbox("Extensão Terminal", ["Completa (0°)", "Déficit de -5°", "Déficit de -10° ou pior"])
+            sono_atual = st.selectbox("Como dormiu esta noite?", ["Bem", "Acordou com dor", "Insónia"])
+
+        # 3. Módulo Dinâmico de Testes Funcionais (A sua Escala Oficial)
+        st.markdown("---")
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Desempenho Funcional Hoje</h4>", unsafe_allow_html=True)
+        st.caption("Classifique a relação entre dor e função para os testes definidos como alvo.")
+        
+        opcoes_escala = [
+            "Sem Dor (0 )", 
+            "Dor Leve (1 - 3)", 
+            "Dor Moderada (4 - 7)", 
+            "Dor Grave (8 - 10)", 
+            "Incapaz (Não realiza)"
+        ]
+        
+        resultados_testes = {}
+        for teste in testes_para_hoje:
+            resposta = st.selectbox(f"Desempenho no {teste}:", opcoes_escala, key=f"chk_{teste}")
+            resultados_testes[teste] = resposta
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 4. Motor de Salvamento do Check-in
+        if st.button("💾 REGISTAR SESSÃO DIÁRIA", use_container_width=True, type="primary"):
+            
+            # Pega o resultado do primeiro teste para compatibilidade com o Gráfico/PDF antigo
+            texto_agachamento = list(resultados_testes.values())[0] if resultados_testes else "Não testado"
+            
             dados_sessao = {
-                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"), "Paciente": st.session_state.paciente,
-                "Membro": "Joelho", "Dor": int(dor), "Sono": sono, "Postura": "Não avaliada",
+                "Data": data_sessao.strftime("%Y-%m-%d"),
+                "Paciente": st.session_state.paciente,
+                "Dor": dor_atual,
+                "Flexao": adm_flex_atual,
+                "Extensao": adm_ext_atual,
+                "Inchaço": inchaco_atual,
+                "Sono": sono_atual,
+                "Testes_Funcionais": resultados_testes, # Guarda o dicionário inteiro com os testes
+                "Agachamento": texto_agachamento, # Mantém o PDF antigo sem quebrar
                 "Profissional_ID": st.session_state.get("user_email", "admin")
             }
-
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Avaliação Específica: Joelho</h4>", unsafe_allow_html=True)
             
-            c_inc, c5, c6, c7 = st.columns(4)
-            with c_inc: inchaco = st.select_slider("💧 Inchaço", options=["0", "1", "2", "3"])
-            with c5: agac = st.selectbox("🏋️ Agachamento", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-            with c6: sup = st.selectbox("🪜 Step Up", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-            with c7: sdn = st.selectbox("📉 Step Down", ["Incapaz", "Dor Moderada", "Dor Leve", "Sem Dor"])
-            
-            c8, c9 = st.columns(2)
-            with c8: flexao = st.slider("📐 Flexão (Graus)", 0, 150, 90)
-            with c9: extensao = st.selectbox("📏 Extensão Terminal", ["Completa (0°)", "Déficit Leve (-5°)", "Déficit Grave (>-15°)"])
-            
-            dados_sessao.update({
-                "Inchaço": str(inchaco), "Agachamento": agac, "Step_Up": sup, 
-                "Step_Down": sdn, "Flexao": int(flexao), "Extensao": extensao
-            })
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("✅ REGISTRAR SESSÃO", use_container_width=True, type="primary"):
-                with st.spinner("🔄 Sincronizando dados evolutivos..."):
-                    try:
-                        # Injeção Imediata
-                        db.collection("Evolucao").add(dados_sessao)
-                        st.success("✅ Evolução do Joelho registrada com sucesso!")
-                    except Exception as e:
-                        st.error(f"❌ Falha ao gravar a sessão: {e}")
+            with st.spinner("A registar a sessão na nuvem..."):
+                try:
+                    db.collection("Evolucao").add(dados_sessao)
+                    st.success("✅ Check-in diário registado com sucesso! Os gráficos e o PDF já foram atualizados.")
+                except Exception as e:
+                    st.error(f"❌ Erro ao gravar: {e}")
                 
         st.write("---")
         with st.expander("⚖️ Conformidade LGPD e Privacidade"):
