@@ -498,7 +498,7 @@ elif st.session_state.pagina == 'dados_paciente':
     try:
         docs = db.collection("Cadastro").stream()
         lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to# PAGINA 1: LOGIN (DESIGN CLÁSSICO)
-if st.session_state.pagina == 'login':
+    if st.session_state.pagina == 'login':
     # Três colunas simples para centralizar
     c_espaco1, c_login, c_espaco2 = st.columns([1, 2, 1])
     
