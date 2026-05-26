@@ -921,6 +921,15 @@ elif st.session_state.pagina == 'painel_clinico':
                     st.info(f"📊 **Resultado IKDC Algorítmico: {score_ikdc:.1f}%** — **Interpretação:** {interp_ikdc}")
 
             st.markdown("<br>", unsafe_allow_html=True)
+
+            # --- GATILHO INTELIGENTE PARA O CHECK-IN DIÁRIO ---
+            st.markdown("---")
+            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Alvos Funcionais para Monitorização</h4>", unsafe_allow_html=True)
+            st.caption("Selecione os testes que farão parte do Check-in Diário deste paciente.")
+            
+            lista_testes_disp = ["Agachamento Bipodal", "Agachamento Unipodal", "Step Down", "Lunge (Afundo)", "Salto (Hop Test)", "Corrida"]
+            testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=["Agachamento Bipodal", "Step Down"])
+            st.markdown("<br>", unsafe_allow_html=True)
             
             # --- MOTOR DE SALVAMENTO INTELIGENTE (UX PBE) ---
             if st.button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True, type="primary"):
