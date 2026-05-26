@@ -525,6 +525,8 @@ if st.session_state.pagina == 'login':
 
     # ... (O resto do seu código de colunas e formulário de login continua aqui para baixo) ...
 
+    # ... (O resto do seu código de colunas e formulário de login continua aqui para baixo) ...
+
     # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
     c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
 
