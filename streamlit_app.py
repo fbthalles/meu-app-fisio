@@ -478,7 +478,7 @@ def mudar_pagina(nome_pagina):
     st.session_state.pagina = nome_pagina
     st.rerun()
 
-# TRAVA DE SEGURANÇA: Se o cirurgião acessar via link, pula o login e vai direto para o painel
+    # TRAVA DE SEGURANÇA: Se o cirurgião acessar via link, pula o login e vai direto para o painel
 if paciente_alvo:
     st.session_state.autenticado = True
     st.session_state.paciente = paciente_alvo
@@ -486,19 +486,8 @@ if paciente_alvo:
     st.session_state.pagina = 'painel_clinico'
     menu = "Painel Analítico 📊"
 
-
-                
-    st.markdown("<p style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 20px;'>GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado</p>", unsafe_allow_html=True)
-
-# PAGINA 2: SELEÇÃO DE PACIENTE E CADASTRO COMPLETO
-elif st.session_state.pagina == 'dados_paciente':
-    st.header("👤 Gestão de Pacientes")
-    
-    # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação Pandas)
-    try:
-        docs = db.collection("Cadastro").stream()
-        lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to# PAGINA 1: LOGIN (DESIGN CLÁSSICO)
-    if st.session_state.pagina == 'login':
+# PAGINA 1: LOGIN (DESIGN CLÁSSICO)
+if st.session_state.pagina == 'login':
     # Três colunas simples para centralizar
     c_espaco1, c_login, c_espaco2 = st.columns([1, 2, 1])
     
@@ -515,19 +504,31 @@ elif st.session_state.pagina == 'dados_paciente':
         senha = st.text_input("Senha", type="password")
         
         st.markdown("<br>", unsafe_allow_html=True)
+        
         if st.button("ENTRAR NO SISTEMA", use_container_width=True, type="primary"):
             if email and senha:
                 st.session_state.user_email = email
                 st.session_state.pagina = 'dados_paciente'
                 st.rerun()
             else:
-                st.warning("⚠️ Preencha e-mail e senha.")ict().get("Nome")]))
+                st.warning("⚠️ Preencha e-mail e senha.")
+                
+        st.markdown("<p style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 20px;'>GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado</p>", unsafe_allow_html=True)
+
+# PAGINA 2: SELEÇÃO DE PACIENTE E CADASTRO COMPLETO
+elif st.session_state.pagina == 'dados_paciente':
+    st.header("👤 Gestão de Pacientes")
+
+    # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação Pandas)
+    try:
+        docs = db.collection("Cadastro").stream()
+        lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
     except:
         lista = []
-        
+
     paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
-    
-    if paciente == "+ Novo Paciente":
+
+
         
         # 2. CONTAINER LIVRE (Sem camisas de força de formulários)
         with st.container():
