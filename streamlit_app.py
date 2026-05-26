@@ -120,10 +120,9 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # 5. INJEÇÃO DO LOGO NA INTERFACE (BARRA LATERAL)
-# Só desenha a barra lateral e o logo esquerdo se NÃO estiver na tela de login
-if st.session_state.get('pagina', 'login') != 'login':
-    st.sidebar.image(NOVO_LOGO_GENUA, use_container_width=True)
-    st.sidebar.markdown("---") # Cria uma linha divisória elegante abaixo do logo
+# O Streamlit gere a barra lateral de forma nativa
+st.sidebar.image(NOVO_LOGO_GENUA, use_container_width=True)
+st.sidebar.markdown("---")
 
 # ==========================================
 
@@ -487,84 +486,7 @@ if paciente_alvo:
     st.session_state.pagina = 'painel_clinico'
     menu = "Painel Analítico 📊"
 
-# --- TELAS DO SISTEMA MVP ---
 
-# Injeção de CSS para transformar o design padrão num layout SaaS
-    st.markdown(f"""
-    <style>
-    /* 1. ESCONDE A SETINHA E TODO O CABEÇALHO DO STREAMLIT NO LOGIN */
-    [data-testid="collapsedControl"] {{
-        display: none !important;
-    }}
-    [data-testid="stHeader"] {{
-        display: none !important;
-    }}
-    header {{
-        visibility: hidden !important;
-    }}
-    
-    /* 2. Estilização do Botão de Login */
-    div.stButton > button {{
-        background-color: {CORES_GENUA['primaria']};
-        color: white;
-        border-radius: 8px;
-        height: 50px;
-        font-weight: bold;
-        font-size: 16px;
-        border: none;
-        transition: 0.3s;
-    }}
-    div.stButton > button:hover {{
-        background-color: {CORES_GENUA['secundaria']};
-        color: white;
-        border: none;
-        box-shadow: 0px 4px 10px rgba(57, 142, 155, 0.4);
-    }}
-    
-    /* 3. Centralização Vertical e Fundo do App */
-    .block-container {{
-        padding-top: 4rem;
-        padding-bottom: 0rem;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
-    c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
-
-    # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
-    c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
-
-    with c_login:
-        # Renderiza a Logo Centralizada (Removido o redimensionamento forçado que causava a invisibilidade)
-        col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
-        with col_img2:
-            try:
-                # O parâmetro use_container_width estava a esmagar o logo. Usamos largura fixa nativa.
-                st.image(NOVO_LOGO_GENUA)
-            except Exception:
-                pass
-        
-        # Garante que o nome GENUA aparece caso o Streamlit falhe em carregar a foto local
-        st.markdown(f"<h1 style='text-align: center; color: {CORES_GENUA['primaria']}; font-size: 3rem; margin-top: -10px;'>GENUA</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center; color: #6c757d; font-weight: normal; margin-top: -15px;'>Inteligência Clínica Integrada</h4><br>", unsafe_allow_html=True)
-        
-        # Caixa de Formulário
-        email = st.text_input("✉️ E-mail Profissional", placeholder="dr.nome@clinica.com")
-        senha = st.text_input("🔑 Senha de Acesso", type="password", placeholder="••••••••")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Motor de Autenticação (Mantendo a sua lógica atual simplificada ou Firebase Auth)
-        if st.button("ENTRAR NO SISTEMA", use_container_width=True):
-            if email and senha:
-                with st.spinner("A autenticar credenciais..."):
-                    # Aqui entra a sua verificação real. Para já, avança o estado:
-                    st.session_state.user_email = email
-                    st.session_state.pagina = 'dados_paciente'
-                    st.rerun()
-            else:
-                st.warning("⚠️ Preencha o e-mail e a senha para aceder.")
                 
         st.markdown("<p style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 20px;'>GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado</p>", unsafe_allow_html=True)
 
@@ -575,7 +497,31 @@ elif st.session_state.pagina == 'dados_paciente':
     # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação Pandas)
     try:
         docs = db.collection("Cadastro").stream()
-        lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
+        lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to# PAGINA 1: LOGIN (DESIGN CLÁSSICO)
+if st.session_state.pagina == 'login':
+    # Três colunas simples para centralizar
+    c_espaco1, c_login, c_espaco2 = st.columns([1, 2, 1])
+    
+    with c_login:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        try:
+            st.image(NOVO_LOGO_GENUA, use_container_width=True)
+        except Exception:
+            st.markdown(f"<h1 style='text-align: center; color: {CORES_GENUA['primaria']};'>GENUA</h1>", unsafe_allow_html=True)
+            
+        st.markdown(f"<h3 style='text-align: center; color: {CORES_GENUA['texto_suave']};'>Acesso Seguro</h3>", unsafe_allow_html=True)
+        
+        email = st.text_input("E-mail Profissional", placeholder="dr.nome@clinica.com")
+        senha = st.text_input("Senha", type="password")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("ENTRAR NO SISTEMA", use_container_width=True, type="primary"):
+            if email and senha:
+                st.session_state.user_email = email
+                st.session_state.pagina = 'dados_paciente'
+                st.rerun()
+            else:
+                st.warning("⚠️ Preencha e-mail e senha.")ict().get("Nome")]))
     except:
         lista = []
         
