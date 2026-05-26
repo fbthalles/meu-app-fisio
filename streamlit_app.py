@@ -519,7 +519,7 @@ if st.session_state.pagina == 'login':
 elif st.session_state.pagina == 'dados_paciente':
     st.header("👤 Gestão de Pacientes")
 
-    # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação Pandas)
+    # 1. LEITURA DIRETA E NATIVA (Imune a falhas de formatação)
     try:
         docs = db.collection("Cadastro").stream()
         lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
@@ -528,30 +528,21 @@ elif st.session_state.pagina == 'dados_paciente':
 
     paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
 
-
-        
-        # 2. CONTAINER LIVRE (Sem camisas de força de formulários)
-        with st.container():
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação do Paciente</h4>", unsafe_allow_html=True)
-            nome = st.text_input("Nome Completo *")
-            
-            c_cad1, c_cad2, c_cad3 = st.columns(3)
-            with c_cad1: 
-                data_padrao = datetime(2000, 1, 1)
-                data_minima = datetime(datetime.now().year - 100, 1, 1)
-                dt_nasc = st.date_input("Data de Nascimento *", value=data_padrao, min_value=data_minima, max_value=datetime.today(), format="DD/MM/YYYY")
-            with c_cad2: cpf = st.text_input("CPF")
-            with c_cad3: telefone = st.text_input("Telefone (WhatsApp)")
-            
-            c_cad4, c_cad5, c_cad6 = st.columns(3)
-            with c_cad4: email = st.text_input("E-mail")
-            with c_cad5: cidade = st.text_input("Cidade e Estado")
-            with c_cad6: ocupacao = st.text_input("Atividade Ocupacional")
-            
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Diagnóstico Clinico (Triagem)</h4>", unsafe_allow_html=True)
-            dx_clinico = st.text_input("Diagnóstico Clínico/Médico", placeholder="Ex: LCA, Condropatia, Tendinopatia...")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
+    # 2. CONTAINER DE AÇÃO (Corrigido e alinhado)
+    with st.container():
+        if paciente == "+ Novo Paciente":
+            novo_nome = st.text_input("Nome do Novo Paciente:")
+            if st.button("Cadastrar Paciente"):
+                if novo_nome:
+                    db.collection("Cadastro").add({"Nome": novo_nome, "Data_Cadastro": datetime.now().strftime("%d/%m/%Y")})
+                    st.session_state.paciente = novo_nome
+                    st.session_state.pagina = 'painel_clinico'
+                    st.rerun()
+        else:
+            if st.button("Carregar Prontuário"):
+                st.session_state.paciente = paciente
+                st.session_state.pagina = 'painel_clinico'
+                st.rerun()
             
             # 3. BOTÃO REATIVO DE COMUNICAÇÃO NATIVA
             if st.button("💾 Salvar Cadastro", use_container_width=True, type="primary"):
