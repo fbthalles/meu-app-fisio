@@ -799,7 +799,7 @@ elif st.session_state.pagina == 'painel_clinico':
 
 
             with t_funcional:
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>💪 Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>💪 Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
             
             # 1. Força Geral (Qualitativa 0-5)
             st.caption("Força Geral (Resistência Manual - Escala 0 a 5)")
