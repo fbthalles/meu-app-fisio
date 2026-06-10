@@ -871,6 +871,7 @@ elif st.session_state.pagina == 'painel_clinico':
             })
             
             matriz_relacional = st.data_editor(df_matriz, use_container_width=True, hide_index=True)
+           
             # Substituído para Multi-seleção de testes padronizados
                     flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
                         ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
