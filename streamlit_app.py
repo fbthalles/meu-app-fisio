@@ -802,10 +802,19 @@ elif st.session_state.pagina == 'painel_clinico':
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>💪 Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
                 
                 # 1. Força Geral (Qualitativa 0-5)
-                st.caption("Força Geral (Resistência Manual - Escala 0 a 5)")
-                c_fg1, c_fg2 = st.columns(2)
-                fg_d = c_fg1.number_input("Força Geral (Direito)", min_value=0, max_value=5, value=3)
-                fg_e = c_fg2.number_input("Força Geral (Esquerdo)", min_value=0, max_value=5, value=3)
+                st.caption("Força Geral (Resistência Manual - Escala de Oxford 0 a 5)")
+                
+                c_fg1, c_fg2, c_fg3, c_fg4 = st.columns(4)
+                fg_ext_d = c_fg1.number_input("Extensão (Dir) [0-5]", min_value=0, max_value=5, value=5)
+                fg_flex_d = c_fg2.number_input("Flexão (Dir) [0-5]", min_value=0, max_value=5, value=5)
+                fg_abd_d = c_fg3.number_input("Abdução (Dir) [0-5]", min_value=0, max_value=5, value=5)
+                fg_add_d = c_fg4.number_input("Adução (Dir) [0-5]", min_value=0, max_value=5, value=5)
+                
+                c_fg5, c_fg6, c_fg7, c_fg8 = st.columns(4)
+                fg_ext_e = c_fg5.number_input("Extensão (Esq) [0-5]", min_value=0, max_value=5, value=5)
+                fg_flex_e = c_fg6.number_input("Flexão (Esq) [0-5]", min_value=0, max_value=5, value=5)
+                fg_abd_e = c_fg7.number_input("Abdução (Esq) [0-5]", min_value=0, max_value=5, value=5)
+                fg_add_e = c_fg8.number_input("Adução (Esq) [0-5]", min_value=0, max_value=5, value=5)
 
                 # 2. Dinamometria Quantitativa
                 st.markdown(f"<h5 style='color: {CORES_GENUA['primaria']};'>Dinamometria (kg)</h5>", unsafe_allow_html=True)
