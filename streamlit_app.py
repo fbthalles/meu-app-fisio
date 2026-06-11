@@ -800,9 +800,9 @@ elif st.session_state.pagina == 'painel_clinico':
 
             with t_funcional:
         # Repare como o 'st.markdown' está recuado para a direita em relação ao 'with'
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>💪 Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>💪 Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
         
-        # 1. Força Geral (Qualitativa 0-5)
+            # 1. Força Geral (Qualitativa 0-5)
         st.caption("Força Geral (Resistência Manual - Escala 0 a 5)")
         c_fg1, c_fg2 = st.columns(2)
         fg_d = c_fg1.number_input("Força Geral (Direito)", min_value=0, max_value=5, value=3)
