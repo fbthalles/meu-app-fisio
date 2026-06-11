@@ -799,79 +799,77 @@ elif st.session_state.pagina == 'painel_clinico':
 
 
             with t_funcional:
-        # Repare como o 'st.markdown' está recuado para a direita em relação ao 'with'
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>💪 Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
-        
-            # 1. Força Geral (Qualitativa 0-5)
-        st.caption("Força Geral (Resistência Manual - Escala 0 a 5)")
-        c_fg1, c_fg2 = st.columns(2)
-        fg_d = c_fg1.number_input("Força Geral (Direito)", min_value=0, max_value=5, value=3)
-        fg_e = c_fg2.number_input("Força Geral (Esquerdo)", min_value=0, max_value=5, value=3)
+                
+                # 1. Força Geral (Qualitativa 0-5)
+                st.caption("Força Geral (Resistência Manual - Escala 0 a 5)")
+                c_fg1, c_fg2 = st.columns(2)
+                fg_d = c_fg1.number_input("Força Geral (Direito)", min_value=0, max_value=5, value=3)
+                fg_e = c_fg2.number_input("Força Geral (Esquerdo)", min_value=0, max_value=5, value=3)
 
-        # 2. Dinamometria Quantitativa
-        st.markdown(f"<h5 style='color: {CORES_GENUA['primaria']};'>Dinamometria (kg)</h5>", unsafe_allow_html=True)
-        c_din1, c_din2, c_din3, c_din4 = st.columns(4)
-        din_ext_d = c_din1.number_input("Extensão (Dir)", min_value=0.0, step=1.0)
-        din_flex_d = c_din2.number_input("Flexão (Dir)", min_value=0.0, step=1.0)
-        din_abd_d = c_din3.number_input("Abdução (Dir)", min_value=0.0, step=1.0)
-        din_add_d = c_din4.number_input("Adução (Dir)", min_value=0.0, step=1.0)
-        
-        c_din5, c_din6, c_din7, c_din8 = st.columns(4)
-        din_ext_e = c_din5.number_input("Extensão (Esq)", min_value=0.0, step=1.0)
-        din_flex_e = c_din6.number_input("Flexão (Esq)", min_value=0.0, step=1.0)
-        din_abd_e = c_din7.number_input("Abdução (Esq)", min_value=0.0, step=1.0)
-        din_add_e = c_din8.number_input("Adução (Esq)", min_value=0.0, step=1.0)
+                # 2. Dinamometria Quantitativa
+                st.markdown(f"<h5 style='color: {CORES_GENUA['primaria']};'>Dinamometria (kg)</h5>", unsafe_allow_html=True)
+                c_din1, c_din2, c_din3, c_din4 = st.columns(4)
+                din_ext_d = c_din1.number_input("Extensão (Dir)", min_value=0.0, step=1.0)
+                din_flex_d = c_din2.number_input("Flexão (Dir)", min_value=0.0, step=1.0)
+                din_abd_d = c_din3.number_input("Abdução (Dir)", min_value=0.0, step=1.0)
+                din_add_d = c_din4.number_input("Adução (Dir)", min_value=0.0, step=1.0)
+                
+                c_din5, c_din6, c_din7, c_din8 = st.columns(4)
+                din_ext_e = c_din5.number_input("Extensão (Esq)", min_value=0.0, step=1.0)
+                din_flex_e = c_din6.number_input("Flexão (Esq)", min_value=0.0, step=1.0)
+                din_abd_e = c_din7.number_input("Abdução (Esq)", min_value=0.0, step=1.0)
+                din_add_e = c_din8.number_input("Adução (Esq)", min_value=0.0, step=1.0)
 
-        # --- CÁLCULO DE DÉFICIT DA DINAMOMETRIA ---
-        if any([din_ext_d, din_ext_e, din_flex_d, din_flex_e, din_abd_d, din_abd_e, din_add_d, din_add_e]):
-            st.markdown("**⚖️ Análise de Simetria de Força (Déficit)**")
-            c_res1, c_res2 = st.columns(2)
-            if din_ext_d > 0 or din_ext_e > 0:
-                diff_ext = din_ext_d - din_ext_e
-                c_res1.caption(f"**Extensão:** Diferença de {abs(diff_ext):.1f} kg ({'Dir mais forte' if diff_ext > 0 else 'Esq mais forte' if diff_ext < 0 else 'Simétrico'})")
-            if din_flex_d > 0 or din_flex_e > 0:
-                diff_flex = din_flex_d - din_flex_e
-                c_res1.caption(f"**Flexão:** Diferença de {abs(diff_flex):.1f} kg ({'Dir mais forte' if diff_flex > 0 else 'Esq mais forte' if diff_flex < 0 else 'Simétrico'})")
-            if din_abd_d > 0 or din_abd_e > 0:
-                diff_abd = din_abd_d - din_abd_e
-                c_res2.caption(f"**Abdução:** Diferença de {abs(diff_abd):.1f} kg ({'Dir mais forte' if diff_abd > 0 else 'Esq mais forte' if diff_abd < 0 else 'Simétrico'})")
-            if din_add_d > 0 or din_add_e > 0:
-                diff_add = din_add_d - din_add_e
-                c_res2.caption(f"**Adução:** Diferença de {abs(diff_add):.1f} kg ({'Dir mais forte' if diff_add > 0 else 'Esq mais forte' if diff_add < 0 else 'Simétrico'})")
+                # --- CÁLCULO DE DÉFICIT DA DINAMOMETRIA ---
+                if any([din_ext_d, din_ext_e, din_flex_d, din_flex_e, din_abd_d, din_abd_e, din_add_d, din_add_e]):
+                    st.markdown("**⚖️ Análise de Simetria de Força (Déficit)**")
+                    c_res1, c_res2 = st.columns(2)
+                    if din_ext_d > 0 or din_ext_e > 0:
+                        diff_ext = din_ext_d - din_ext_e
+                        c_res1.caption(f"**Extensão:** Diferença de {abs(diff_ext):.1f} kg ({'Dir mais forte' if diff_ext > 0 else 'Esq mais forte' if diff_ext < 0 else 'Simétrico'})")
+                    if din_flex_d > 0 or din_flex_e > 0:
+                        diff_flex = din_flex_d - din_flex_e
+                        c_res1.caption(f"**Flexão:** Diferença de {abs(diff_flex):.1f} kg ({'Dir mais forte' if diff_flex > 0 else 'Esq mais forte' if diff_flex < 0 else 'Simétrico'})")
+                    if din_abd_d > 0 or din_abd_e > 0:
+                        diff_abd = din_abd_d - din_abd_e
+                        c_res2.caption(f"**Abdução:** Diferença de {abs(diff_abd):.1f} kg ({'Dir mais forte' if diff_abd > 0 else 'Esq mais forte' if diff_abd < 0 else 'Simétrico'})")
+                    if din_add_d > 0 or din_add_e > 0:
+                        diff_add = din_add_d - din_add_e
+                        c_res2.caption(f"**Adução:** Diferença de {abs(diff_add):.1f} kg ({'Dir mais forte' if diff_add > 0 else 'Esq mais forte' if diff_add < 0 else 'Simétrico'})")
 
-        # 3. Mobilidade e Lunge Test
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>📐 Mobilidade Articular (Goniometria)</h4>", unsafe_allow_html=True)
-        c_lunge1, c_lunge2 = st.columns(2)
-        lunge_d = c_lunge1.number_input("Lunge Test (Dir) - cm", min_value=0.0, step=0.5)
-        lunge_e = c_lunge2.number_input("Lunge Test (Esq) - cm", min_value=0.0, step=0.5)
-        
-        if lunge_d > 0 or lunge_e > 0:
-            diff_lunge = lunge_d - lunge_e
-            if diff_lunge > 0:
-                st.info(f"📊 **Análise Lunge Test:** O lado **Direito** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
-            elif diff_lunge < 0:
-                st.info(f"📊 **Análise Lunge Test:** O lado **Esquerdo** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
-            else:
-                st.success("📊 **Análise Lunge Test:** Mobilidade perfeitamente simétrica.")
+                # 3. Mobilidade e Lunge Test
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>📐 Mobilidade Articular (Goniometria)</h4>", unsafe_allow_html=True)
+                c_lunge1, c_lunge2 = st.columns(2)
+                lunge_d = c_lunge1.number_input("Lunge Test (Dir) - cm", min_value=0.0, step=0.5)
+                lunge_e = c_lunge2.number_input("Lunge Test (Esq) - cm", min_value=0.0, step=0.5)
+                
+                if lunge_d > 0 or lunge_e > 0:
+                    diff_lunge = lunge_d - lunge_e
+                    if diff_lunge > 0:
+                        st.info(f"📊 **Análise Lunge Test:** O lado **Direito** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
+                    elif diff_lunge < 0:
+                        st.info(f"📊 **Análise Lunge Test:** O lado **Esquerdo** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
+                    else:
+                        st.success("📊 **Análise Lunge Test:** Mobilidade perfeitamente simétrica.")
 
-        # 4. MATRIZ RELACIONAL FUNCIONAL
-        st.markdown("---")
-        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>⚙️ Matriz Relacional Funcional</h4>", unsafe_allow_html=True)
-        
-        df_matriz = pd.DataFrame({
-            "Teste Relacional": ["Agachamento Bipodal", "Agachamento Uni (D)", "Agachamento Uni (E)", "Step Up (D)", "Step Up (E)", "Step Down (D)", "Step Down (E)", "Salto", "Corrida", "Marcha", "Afundo (D)", "Afundo (E)", "Equilíbrio Uni (D)", "Equilíbrio Uni (E)"],
-            "Qualidade (0-3)": [3]*14,
-            "Dor (0-10)": [0]*14,
-            "Compensação": [""]*14
-        })
-        matriz_relacional = st.data_editor(df_matriz, use_container_width=True, hide_index=True)
-           
-            # Substituído para Multi-seleção de testes padronizados
-        flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
-                        ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
+                # 4. MATRIZ RELACIONAL FUNCIONAL
+                st.markdown("---")
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>⚙️ Matriz Relacional Funcional</h4>", unsafe_allow_html=True)
+                
+                df_matriz = pd.DataFrame({
+                    "Teste Relacional": ["Agachamento Bipodal", "Agachamento Uni (D)", "Agachamento Uni (E)", "Step Up (D)", "Step Up (E)", "Step Down (D)", "Step Down (E)", "Salto", "Corrida", "Marcha", "Afundo (D)", "Afundo (E)", "Equilíbrio Uni (D)", "Equilíbrio Uni (E)"],
+                    "Qualidade (0-3)": [3]*14,
+                    "Dor (0-10)": [0]*14,
+                    "Compensação": [""]*14
+                })
+                matriz_relacional = st.data_editor(df_matriz, use_container_width=True, hide_index=True)
+                
+                flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
+                    ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
 
             with t_exames:
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
                 tipos_exames = st.multiselect("Exames Apresentados *", 
                     ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"], default=["Nenhum"])
                 
