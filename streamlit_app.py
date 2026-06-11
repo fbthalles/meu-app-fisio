@@ -877,7 +877,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
 
             with t_quest:
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Bateria de Questionários Funcionais (PBE)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Bateria de Questionários Funcionais (PBE)</h4>", unsafe_allow_html=True)
                 st.caption("Expanda o questionário desejado. A pontuação e a interpretação clínica são geradas em tempo real. Preencha apenas as escalas adequadas ao fenótipo do paciente atual.")
 
                 # --- 1. LEFS (Geral) ---
