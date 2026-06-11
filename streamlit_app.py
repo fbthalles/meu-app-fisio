@@ -888,6 +888,14 @@ elif st.session_state.pagina == 'painel_clinico':
                 flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
                     ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
 
+            # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
+                st.markdown("---")
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Alvos Funcionais para Monitorização</h4>", unsafe_allow_html=True)
+                st.caption("Selecione os testes que farão parte do Check-in Diário deste paciente.")
+                
+                lista_testes_disp = ["Agachamento Bipodal", "Agachamento Unipodal", "Step Down", "Lunge (Afundo)", "Salto (Hop Test)", "Corrida", "Marcha"]
+                testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=["Agachamento Bipodal", "Step Down"])
+
             with t_exames:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
                 tipos_exames = st.multiselect("Exames Apresentados *", 
@@ -1013,11 +1021,6 @@ elif st.session_state.pagina == 'painel_clinico':
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # --- GATILHO INTELIGENTE PARA O CHECK-IN DIÁRIO ---
-            st.markdown("---")
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Alvos Funcionais para Monitorização</h4>", unsafe_allow_html=True)
-            st.caption("Selecione os testes que farão parte do Check-in Diário deste paciente.")
-            
             lista_testes_disp = ["Agachamento Bipodal", "Agachamento Unipodal", "Step Down", "Lunge (Afundo)", "Salto (Hop Test)", "Corrida"]
             testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=["Agachamento Bipodal", "Step Down"])
             st.markdown("<br>", unsafe_allow_html=True)
