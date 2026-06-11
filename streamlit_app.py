@@ -853,17 +853,37 @@ elif st.session_state.pagina == 'painel_clinico':
                     else:
                         st.success("📊 **Análise Lunge Test:** Mobilidade perfeitamente simétrica.")
 
-                # 4. MATRIZ RELACIONAL FUNCIONAL
+                # 4. CONTROLE MOTOR E TESTES RELACIONAIS
                 st.markdown("---")
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>⚙️ Matriz Relacional Funcional</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>⚙️ Controle Motor e Testes Relacionais</h4>", unsafe_allow_html=True)
+                st.info("Escala: 0 – Incapaz | 1 – Ruim | 2 – Regular | 3 – Normal")
                 
-                df_matriz = pd.DataFrame({
-                    "Teste Relacional": ["Agachamento Bipodal", "Agachamento Uni (D)", "Agachamento Uni (E)", "Step Up (D)", "Step Up (E)", "Step Down (D)", "Step Down (E)", "Salto", "Corrida", "Marcha", "Afundo (D)", "Afundo (E)", "Equilíbrio Uni (D)", "Equilíbrio Uni (E)"],
-                    "Qualidade (0-3)": [3]*14,
-                    "Dor (0-10)": [0]*14,
-                    "Compensação": [""]*14
-                })
-                matriz_relacional = st.data_editor(df_matriz, use_container_width=True, hide_index=True)
+                opcoes_cm = ["3 - Normal", "2 - Regular", "1 - Ruim", "0 - Incapaz"]
+                
+                cm1, cm2, cm3 = st.columns(3)
+                
+                with cm1:
+                    st.markdown("**Globais**")
+                    cm_marcha = st.selectbox("Marcha", opcoes_cm)
+                    cm_corrida = st.selectbox("Corrida", opcoes_cm)
+                    cm_salto = st.selectbox("Salto", opcoes_cm)
+                    cm_agach_bi = st.selectbox("Agachamento Bi", opcoes_cm)
+                    
+                with cm2:
+                    st.markdown("**Membro Direito**")
+                    cm_agach_uni_d = st.selectbox("Agachamento Uni (D)", opcoes_cm)
+                    cm_step_down_d = st.selectbox("Step Down (D)", opcoes_cm)
+                    cm_step_up_d = st.selectbox("Step Up (D)", opcoes_cm)
+                    cm_afundo_d = st.selectbox("Afundo (D)", opcoes_cm)
+                    cm_eq_uni_d = st.selectbox("Equilíbrio Uni (D)", opcoes_cm)
+                    
+                with cm3:
+                    st.markdown("**Membro Esquerdo**")
+                    cm_agach_uni_e = st.selectbox("Agachamento Uni (E)", opcoes_cm)
+                    cm_step_down_e = st.selectbox("Step Down (E)", opcoes_cm)
+                    cm_step_up_e = st.selectbox("Step Up (E)", opcoes_cm)
+                    cm_afundo_e = st.selectbox("Afundo (E)", opcoes_cm)
+                    cm_eq_uni_e = st.selectbox("Equilíbrio Uni (E)", opcoes_cm)
                 
                 flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
                     ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
