@@ -692,12 +692,45 @@ elif st.session_state.pagina == 'painel_clinico':
                 def get_idx(opcoes, chave):
                     return opcoes.index(dados.get(chave)) if dados.get(chave) in opcoes else 0
                     
-                def get_list(opcoes_validas, chave):
+                def get_list(chave):
                     val = dados.get(chave, [])
-                    if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]: return []
+                    # 1. Trata a diferença entre Listas (Testes_Alvo) e Textos (Exames)
+                    if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]:
+                        return []
                     lista_bruta = val if isinstance(val, list) else [v.strip() for v in str(val).split(',')]
-                    # Escudo Anti-Crash: Só injeta o valor se ele existir na lista de opções atual!
-                    return [v for v in lista_bruta if v in opcoes_validas]
+                    
+                    # 2. Dicionário Mestre (Escudo Anti-Crash)
+                    opcoes_validas = {
+                        'Step Up', '6. Correr em terreno plano', 'Cicatrizes', 'Agachamento Bipodal', 'Sintomas depressivos / Ansiedade', 
+                        'Anterior (Tendão)', 'Histórico de Câncer', 'Posterior (Poplítea)', 'Nociplástica (Sensibilização Central)', 
+                        'Nociceptiva (Mecânica/Inflamatória)', 'Difusa', 'Anterior', 'Hematoma', 'Neuropática (Irradiação/Queimação)', 
+                        'Obesidade (IMC > 30)', 'Leve', 'Falta de suporte familiar', 'Positivo', 'Posterior', 'Baixa auto-eficácia', 
+                        'Trabalho braçal/Carga pesada', 'Gaveta Anterior', 'Anterior (Patelar)', 'Valgo', 'Medial (Interlinha)', 
+                        'Normal', 'Diminuída', 'Incapacidade total de descarga de peso', 'Ressonância Magnética (RM)', 'Não Aplicável', 
+                        'Medial', 'Moderado', 'Cardiopatia', 'Step Down', 'Thomas (+) - Reto Femoral', 'Hipertensão', 'Ege', 
+                        'Dial Test', 'Thomas (+) - Iliopsoas', 'Salto (Hop Test)', 'Expectativas irreais de recuperação', 'McMurray', 
+                        'Sinal de Clarke', 'Nenhum', 'Flexo', 'Equimose', 'Hipotrófico', 'Doença Autoimune', '5. Ficar em pé por 1 hora', 
+                        'Déficit Neurológico Progressivo', 'Extensão CCA', 'Claudicante', 'Litígio/Processo judicial', 'Lunge (Afundo)', 
+                        'Recurvatum', 'Raio-X', 'Gaveta Posterior', 'Diabetes', 'Marcha', '8. Mudança rápida de direção (Corte)', 
+                        'Estresse Varo', 'Febre/Calafrios (Infecção)', 'Tesale', 'Apley', 'Distúrbio Vascular', 'Ober (+) - Trato Iliotibial', 
+                        'Estresse Valgo', 'Insidiosa / Sobrecarga', 'Eletroneuromiografia', 'Nenhuma', 'Sentar e Alcançar (Isquios)', 
+                        'Lateral (Interlinha)', 'Varo', 'Lachman', 'Teste de Noble (Trato Iliotibial)', 'Corrida', 'Antálgica', 
+                        'Tomografia Computadorizada (TC)', 'Agachamento Unipodal', 'Traumática', 'Apreensão Patelar', 'Sedentarismo', 
+                        'Afastado pelo INSS', 'Trauma Agudo com deformidade', 'Lateral', 'Osteoporose', 'Ausente', '2. Andar 2 quarteirões', 
+                        'Decline Squat (Tendinopatia)', 'Aumentada', 'Degenerativa', '3. Subir um lance de escadas', 'Fístulas', 'Grave', 
+                        '1. Agachar ou ajoelhar', 'Tabagismo', 'Pós-operatória', 'Normal/Restaurador', 'Pivot Shift', 'Perda de peso inexplicada', 
+                        '7. Fazer trabalho pesado', 'Ely (+) - Reto Femoral', 'Sinais de TVP (Calor/Edema panturrilha)', 'Ruim (Insônia/Acorda com dor)', 
+                        'Ultrassonografia (USG)', '4. Descer um lance de escadas', 'Negativo', 'Cinesiofobia (Medo de movimento)', 'Catastrofização', 
+                        'Uso de dispositivo', 'Irregular'
+                    }
+                    
+                    lista_limpa = []
+                    for v in lista_bruta:
+                        if v == "Difusa/Articular": v = "Difusa" # Corrige instantaneamente o erro antigo
+                        if v in opcoes_validas:
+                            lista_limpa.append(v)
+                            
+                    return lista_limpa
                 
                 # --- PREENCHIMENTO DA ANAMNESE ---
                 qp = st.text_input("Queixa Principal (QP) *", value=dados.get("QP", ""), placeholder="O que você deixou de fazer devido à dor?")
