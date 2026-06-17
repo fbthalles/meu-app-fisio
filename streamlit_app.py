@@ -693,9 +693,15 @@ elif st.session_state.pagina == 'painel_clinico':
                     return opcoes.index(dados.get(chave)) if dados.get(chave) in opcoes else 0
                     
                 def get_list(chave):
-                    val = dados.get(chave, "")
-                    if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]: return []
-                    return [v.strip() for v in val.split(',')]
+                    val = dados.get(chave, [])
+                    # Se já for uma lista (ex: Testes_Alvo), devolve diretamente
+                    if isinstance(val, list):
+                        return val
+                    # Se for vazio ou texto padrão de negação, devolve lista vazia
+                    if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]: 
+                        return []
+                    # Se for um texto com vírgulas, corta e transforma em lista
+                    return [v.strip() for v in str(val).split(',')]
                 
                 # --- PREENCHIMENTO DA ANAMNESE ---
                 qp = st.text_input("Queixa Principal (QP) *", value=dados.get("QP", ""), placeholder="O que você deixou de fazer devido à dor?")
