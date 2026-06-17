@@ -1039,13 +1039,15 @@ elif st.session_state.pagina == 'painel_clinico':
 
            
             # --- MOTOR DE SALVAMENTO INTELIGENTE (UX PBE) ---
-            if st.button("💾 SALVAR AVALIAÇÃO INICIAL", use_container_width=True, type="primary"):
-                
-                # Função interna (Autocura): Preenche campos vazios automaticamente
+            # Identifica se é uma edição para mudar o aspeto do botão
+            modo_edicao = st.session_state.get("doc_id_avaliacao") is not None
+            texto_botao = "🔄 ATUALIZAR AVALIAÇÃO (SOBRESCREVER)" if modo_edicao else "💾 SALVAR NOVA AVALIAÇÃO"
+            
+            if st.button(texto_botao, use_container_width=True, type="primary"):
+
                 def check_vazio(texto):
                     return texto if texto.strip() != "" else "Não relatado"
 
-                # Regra de Ouro: Apenas a Queixa Principal impede o salvamento
                 if qp.strip() == "":
                     st.error("⚠️ ERRO: A 'Queixa Principal (QP)' é obrigatória para abrir o prontuário. Descreva o motivo da consulta.")
                 else:
@@ -1098,12 +1100,19 @@ elif st.session_state.pagina == 'painel_clinico':
                         "Profissional_ID": st.session_state.get("user_email", "admin")
                     }
                     
-                    with st.spinner("🔄 Gravando avaliação clínica na nuvem..."):
+                    with st.spinner("A processar prontuário na nuvem..."):
                         try:
-                            db.collection("Avaliacao_Inicial").add(dados_avaliacao)
-                            st.success("✅ Avaliação Inicial registrada com sucesso!")
+                            if modo_edicao:
+                                # ATUALIZA O DOCUMENTO EXISTENTE
+                                db.collection("Avaliacao_Inicial").document(st.session_state.doc_id_avaliacao).update(dados_avaliacao)
+                                st.success("🔄 Prontuário atualizado com sucesso! As alterações foram guardadas.")
+                            else:
+                                # CRIA UM NOVO DOCUMENTO
+                                db.collection("Avaliacao_Inicial").add(dados_avaliacao)
+                                st.success("✅ Nova Avaliação criada com sucesso!")
+                                
                         except Exception as e:
-                            st.error(f"❌ Falha de sincronização na avaliação: {e}")
+                            st.error(f"❌ Erro ao comunicar com a base de dados: {e}")
 
     # --- MÓDULO 2: CHECK-IN DIÁRIO (O MUTANTE) ---
     elif menu == "Check-in Diário 📝":
