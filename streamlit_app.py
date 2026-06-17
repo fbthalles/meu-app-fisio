@@ -1017,19 +1017,6 @@ elif st.session_state.pagina == 'painel_clinico':
                     
                 testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=def_alvos)
 
-                # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
-                st.markdown("---")
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Alvos Funcionais para Monitorização</h4>", unsafe_allow_html=True)
-                st.caption("Selecione os testes que farão parte do Check-in Diário deste paciente.")
-                
-                lista_testes_disp = ["Agachamento Bipodal", "Agachamento Unipodal", "Step Down", "Lunge (Afundo)", "Salto (Hop Test)", "Corrida", "Marcha"]
-                
-                def_alvos = get_list("Testes_Alvo")
-                if not def_alvos:
-                    def_alvos = ["Agachamento Bipodal", "Step Down"]
-                    
-                testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=def_alvos)
-
                 # --- 1. LEFS (Geral) ---
                 with st.expander("📝 LEFS (Escala Funcional da Extremidade Inferior)"):
                     opcoes_lefs = {"Incapaz / Extrema Dificuldade": 0, "Muita Dificuldade": 1, "Dificuldade Moderada": 2, "Um Pouco de Dificuldade": 3, "Nenhuma Dificuldade": 4}
