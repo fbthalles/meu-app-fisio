@@ -666,10 +666,18 @@ elif st.session_state.pagina == 'painel_clinico':
         st.markdown("<hr style='margin-top: -5px; margin-bottom: 25px;'>", unsafe_allow_html=True)
 
     # --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
-
-    # --- MÓDULO 1: AVALIAÇÃO INICIAL (O MARCO ZERO) ---
     if menu == "Avaliação Inicial 🔎":
         st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
+
+        # --- MOTOR DE CONSULTA E EDIÇÃO (PASSO 1) ---
+        if 'paciente' in st.session_state and st.session_state.paciente:
+            docs = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
+            st.session_state.doc_id_avaliacao = None
+            st.session_state.dados_antigos = None
+            for doc in docs:
+                st.session_state.dados_antigos = doc.to_dict()
+                st.session_state.doc_id_avaliacao = doc.id
+                break
 
         with st.container():
             # Estrutura expandida com as duas novas abas
@@ -679,10 +687,9 @@ elif st.session_state.pagina == 'painel_clinico':
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Histórico e Contexto</h4>", unsafe_allow_html=True)
                 
                 # --- AUTO-PREENCHIMENTO (PASSO 2) ---
-                # Puxa os dados antigos se existirem, senão cria um dicionário vazio
                 dados = st.session_state.get('dados_antigos') or {}
                 
-                qp = st.text_input("Queixa Principal (QP) *", value=dados.get("Queixa Principal", ""), placeholder="O que você deixou de fazer devido à dor?")
+                qp = st.text_input("Queixa Principal (QP) *", value=dados.get("QP", ""), placeholder="O que você deixou de fazer devido à dor?")
                 hma = st.text_area("História da Moléstia Atual (HMA) *", value=dados.get("HMA", ""), placeholder="Descrição detalhada do início e evolução do quadro...")
                 sinais_sintomas = st.text_input("Sinais e Sintomas (Localização / Mapa Corporal)", value=dados.get("Sinais_Sintomas", ""), placeholder="Ex: Dor na interlinha medial, estalos...")
 
