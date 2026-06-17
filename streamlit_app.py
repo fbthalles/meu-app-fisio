@@ -686,9 +686,18 @@ elif st.session_state.pagina == 'painel_clinico':
             with t_anamnese:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Histórico e Contexto</h4>", unsafe_allow_html=True)
                 
-                # --- AUTO-PREENCHIMENTO (PASSO 2) ---
+                # --- MOTOR CENTRAL DE AUTO-PREENCHIMENTO ---
                 dados = st.session_state.get('dados_antigos') or {}
                 
+                def get_idx(opcoes, chave):
+                    return opcoes.index(dados.get(chave)) if dados.get(chave) in opcoes else 0
+                    
+                def get_list(chave):
+                    val = dados.get(chave, "")
+                    if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]: return []
+                    return [v.strip() for v in val.split(',')]
+                
+                # --- PREENCHIMENTO DA ANAMNESE ---
                 qp = st.text_input("Queixa Principal (QP) *", value=dados.get("QP", ""), placeholder="O que você deixou de fazer devido à dor?")
                 hma = st.text_area("História da Moléstia Atual (HMA) *", value=dados.get("HMA", ""), placeholder="Descrição detalhada do início e evolução do quadro...")
                 sinais_sintomas = st.text_input("Sinais e Sintomas (Localização / Mapa Corporal)", value=dados.get("Sinais_Sintomas", ""), placeholder="Ex: Dor na interlinha medial, estalos...")
@@ -702,114 +711,125 @@ elif st.session_state.pagina == 'painel_clinico':
                 trat_previos = st.text_area("Tratamentos Anteriores", value=dados.get("Tratamentos_Previos", ""), placeholder="Intervenções médicas e fisioterapêuticas prévias...")
 
             with t_dor:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Classificação e Origem</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}'>Classificação e Origem</h4>", unsafe_allow_html=True)
                 c_dor1, c_dor2 = st.columns(2)
-                with c_dor1: class_dor = st.selectbox("Classificação da Dor *", ["Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)", "Não Aplicável"])
-                with c_dor2: origem_dor = st.selectbox("Origem *", ["Traumática", "Insidiosa / Sobrecarga", "Pós-operatória", "Degenerativa", "Não Aplicável"])
                 
+                op_class = ["Nociceptiva (Mecânica/Inflamatória)", "Neuropática (Irradiação/Queimação)", "Nociplástica (Sensibilização Central)", "Não Aplicável"]
+                with c_dor1: class_dor = st.selectbox("Classificação da Dor *", op_class, index=get_idx(op_class, "Class_Dor"))
+                
+                op_origem = ["Traumática", "Insidiosa / Sobrecarga", "Pós-operatória", "Degenerativa", "Não Aplicável"]
+                with c_dor2: origem_dor = st.selectbox("Origem *", op_origem, index=get_idx(op_origem, "Origem_Dor"))
+
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>Mapa Anatômico da Dor Interativo</h4>", unsafe_allow_html=True)
-                st.info("🎯 Clique diretamente na imagem do joelho abaixo para marcar os pontos exatos de dor do paciente. Cada clique gerará um marcador vermelho.")
-                
+                st.info("🎯 Clique diretamente na imagem do joelho abaixo para marcar os pontos exatos de dor.")
+
                 if "pontos_dor" not in st.session_state:
                     st.session_state.pontos_dor = []
                 if "last_click" not in st.session_state:
                     st.session_state.last_click = None
                 if "map_key" not in st.session_state:
                     st.session_state.map_key = 0
-                
+
                 c_mapa1, c_mapa2 = st.columns([1.3, 1.7])
                 with c_mapa1:
                     try:
                         from PIL import ImageDraw, Image
                         from streamlit_image_coordinates import streamlit_image_coordinates
-                        
+
                         img_base = Image.open("mapa_joelho.png").convert("RGB")
                         img_base.thumbnail((350, 600))
                         draw = ImageDraw.Draw(img_base)
-                        
-                        for pt in st.session_state.pontos_dor:
-                            x, y = pt["x"], pt["y"]
-                            draw.ellipse([(x-6, y-6), (x+6, y+6)], fill="#dc3545", outline="white", width=2)
-                        
-                        value = streamlit_image_coordinates(img_base, key=f"mapa_interativo_joelho_{st.session_state.map_key}")
-                        
-                        if value is not None and value != st.session_state.last_click:
-                            st.session_state.last_click = value
-                            st.session_state.pontos_dor.append({"x": value["x"], "y": value["y"]})
-                            st.rerun()
-                            
-                        if st.button("❌ Limpar Marcações", use_container_width=True):
-                            st.session_state.pontos_dor = []
-                            st.session_state.last_click = None
-                            st.session_state.map_key += 1
-                            st.rerun()
-                            
-                    except ModuleNotFoundError:
-                        st.warning("⚠️ Instalação necessária: adicione 'streamlit-image-coordinates' ao requirements.txt.")
-                    except FileNotFoundError:
-                        st.warning("⚠️ Arquivo 'mapa_joelho.png' não encontrado na pasta raiz.")
-                        
+
+                        for ponto in st.session_state.pontos_dor:
+                            x, y = ponto['x'], ponto['y']
+                            raio = 6
+                            draw.ellipse((x - raio, y - raio, x + raio, y + raio), fill="red", outline="darkred")
+
+                        value = streamlit_image_coordinates(img_base, key=f"joelho_map_{st.session_state.map_key}")
+
+                        if value is not None:
+                            current_click = (value['x'], value['y'])
+                            if st.session_state.last_click != current_click:
+                                st.session_state.pontos_dor.append(current_click)
+                                st.session_state.last_click = current_click
+                                st.session_state.map_key += 1
+                                st.rerun()
+                                
+                    except Exception as e:
+                        st.warning(f"⚠️ Imagem do mapa (mapa_joelho.png) não encontrada. {e}")
+
                 with c_mapa2:
-                    zonas_dor = st.multiselect(
-                        "Localização Apontada (Selecione 1 ou mais) *", 
-                        ["Nenhuma", "Anterior (Patela/Tendão)", "Posterior (Poplítea)", "Medial (LCM/Interlinha)", "Lateral (LCL/Trato)", "Difusa/Articular", "Irradiada"], 
-                        default=["Nenhuma"],
-                        key="seletor_zonas_dor_unico"
-                    )
+                    if st.button("🗑️ Limpar Marcadores", use_container_width=True):
+                        st.session_state.pontos_dor = []
+                        st.session_state.last_click = None
+                        st.session_state.map_key += 1
+                        st.rerun()
                     
-                    coordenadas_texto = "; ".join([f"({p['x']},{p['y']})" for p in st.session_state.pontos_dor]) if st.session_state.pontos_dor else "Nenhuma coordenada"
-                    
-                    mapa_dor = st.text_area(
-                        "Descrição Detalhada / Outras Regiões *", 
-                        value="Nenhuma", 
-                        placeholder="Descreva particularidades anatômicas da dor constatada...", 
-                        height=150,
-                        key="texto_mapa_dor_unico"
-                    )
+                    op_zonas = ["Anterior (Patelar)", "Anterior (Tendão)", "Medial (Interlinha)", "Lateral (Interlinha)", "Posterior (Poplítea)", "Difusa", "Nenhuma"]
+                    zonas_dor = st.multiselect("Zonas de Dor Relatadas", op_zonas, default=get_list("Zonas_Dor"))
+                    mapa_dor = st.text_area("Descrição do Mapa da Dor", value=dados.get("Mapa_Dor", ""), placeholder="Ex: Dor na face anterior do joelho direito...", height=150)
 
             with t_flags:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Identificação de Risco e Fatores Biopsicossociais</h4>", unsafe_allow_html=True)
-                red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta para Encaminhamento) *", 
-                    ["Nenhum", "Trauma significativo recente", "Cirurgia recente", "Sinais de infecção", "Suspeita de fratura", "Dor constante/noturna intensa", "Histórico de câncer", "Sinais de TVP", "Deformidade visível"], default=["Nenhum"])
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Sistema de Triagem (Bandeiras)</h4>", unsafe_allow_html=True)
                 
-                yellow_cog = st.multiselect("🟡 Yellow Flags (Cognitivo-Emocionais) *", 
-                    ["Nenhum", "Cinesiofobia", "Catastrofização", "Crenças limitantes", "Estresse", "Ansiedade"], default=["Nenhum"])
+                op_red = ["Nenhuma", "Histórico de Câncer", "Perda de peso inexplicada", "Febre/Calafrios (Infecção)", "Sinais de TVP (Calor/Edema panturrilha)", "Déficit Neurológico Progressivo", "Trauma Agudo com deformidade", "Incapacidade total de descarga de peso"]
+                red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta) *", op_red, default=get_list("Red_Flags"))
                 
+                op_yellow = ["Nenhum", "Cinesiofobia (Medo de movimento)", "Catastrofização", "Baixa auto-eficácia", "Sintomas depressivos / Ansiedade", "Expectativas irreais de recuperação"]
+                yellow_cog = st.multiselect("🟡 Yellow Flags (Cognitivo-Emocionais) *", op_yellow, default=get_list("Yellow_Cog"))
+
                 c_fl1, c_fl2 = st.columns(2)
-                with c_fl1: qualidade_sono = st.selectbox("Qualidade do Sono (Comportamental) *", ["Normal/Restaurador", "Irregular", "Ruim (Insônia/Acorda com dor)"])
-                with c_fl2: 
-                    # Substituído para Multi-seleção padronizada
-                    fat_sociais = st.multiselect("Fatores Contextuais e Sociais *", 
-                        ["Nenhum", "Problemas no trabalho", "Conflitos familiares", "Afastamento INSS", "Isolamento social", "Dificuldade financeira"], default=["Nenhum"])
+                op_sono = ["Normal/Restaurador", "Irregular", "Ruim (Insônia/Acorda com dor)"]
+                with c_fl1: qualidade_sono = st.selectbox("Qualidade do Sono *", op_sono, index=get_idx(op_sono, "Sono"))
                 
-                # Substituído para Multi-seleção padronizada
-                comorbidades = st.multiselect("Comorbidades Associadas *", 
-                    ["Nenhuma", "Hipertensão Arterial", "Diabetes Mellitus", "Obesidade", "Doença Reumatológica", "Cardiopatia", "Distúrbio Tireoidiano", "Asma/DPOC", "Doença Neurológica"], default=["Nenhuma"])
+                op_sociais = ["Nenhum", "Trabalho braçal/Carga pesada", "Afastado pelo INSS", "Sedentarismo", "Litígio/Processo judicial", "Falta de suporte familiar"]
+                with c_fl2: fat_sociais = st.multiselect("Fatores Contextuais/Sociais *", op_sociais, default=get_list("Fatores_Sociais"))
+
+                op_comorb = ["Nenhuma", "Hipertensão", "Diabetes", "Obesidade (IMC > 30)", "Cardiopatia", "Doença Autoimune", "Osteoporose", "Tabagismo", "Distúrbio Vascular"]
+                comorbidades = st.multiselect("Comorbidades Associadas *", op_comorb, default=get_list("Comorbidades"))
 
             with t_fisico:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Inspeção Estática e Dinâmica</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Inspeção e Palpação</h4>", unsafe_allow_html=True)
                 c_f1, c_f2, c_f3 = st.columns(3)
-                with c_f1: derrame = st.selectbox("Derrame Articular", ["Ausente", "Leve", "Moderado", "Grave"])
-                with c_f2: alinhamento = st.selectbox("Alinhamento Postural", ["Normal", "Valgo", "Varo", "Recurvatum", "Flexo"])
-                with c_f3: marcha = st.selectbox("Padrão de Marcha (Estrutural)", ["Normal", "Antálgica", "Claudicante", "Uso de dispositivo"])
                 
+                op_der = ["Ausente", "Leve", "Moderado", "Grave"]
+                with c_f1: derrame = st.selectbox("Derrame Articular", op_der, index=get_idx(op_der, "Derrame"))
+                
+                op_ali = ["Normal", "Valgo", "Varo", "Recurvatum", "Flexo"]
+                with c_f2: alinhamento = st.selectbox("Alinhamento Postural", op_ali, index=get_idx(op_ali, "Alinhamento"))
+                
+                op_mar = ["Normal", "Antálgica", "Claudicante", "Uso de dispositivo"]
+                with c_f3: marcha = st.selectbox("Padrão de Marcha", op_mar, index=get_idx(op_mar, "Marcha"))
+
                 c_f4, c_f5 = st.columns(2)
-                with c_f4: 
-                    trofismo = st.selectbox("Trofismo Muscular", ["Normal", "Hipotrófico"])
-                    perimetria = st.text_input("Perimetria (Se hipotrófico)", placeholder="Ex: -2cm no VMO direito")
-                with c_f5: 
-                    pele = st.multiselect("Alterações Cutâneas", ["Nenhuma", "Equimose", "Hematoma", "Cicatrizes", "Fístulas"])
-                
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Palpação</h4>", unsafe_allow_html=True)
+                op_trof = ["Normal", "Hipotrófico"]
+                with c_f4: trofismo = st.selectbox("Trofismo Muscular", op_trof, index=get_idx(op_trof, "Trofismo"))
+                with c_f5: perimetria = st.text_input("Perimetria (Se hipotrófico)", value=dados.get("Perimetria", ""), placeholder="Ex: -2cm no VMO direito")
+
+                op_pele = ["Nenhuma", "Equimose", "Hematoma", "Cicatrizes", "Fístulas"]
+                pele = st.multiselect("Alterações Cutâneas", op_pele, default=get_list("Pele"))
+
+                st.markdown("---")
                 c_p1, c_p2, c_p3 = st.columns(3)
-                with c_p1: palpacao_comp = st.multiselect("Estruturas Dolorosas", ["Anterior", "Medial", "Lateral", "Posterior", "Nenhuma"])
-                with c_p2: godet = st.radio("Sinal de Godet (Edema)", ["Negativo", "Positivo"])
-                with c_p3: temp = st.radio("Temperatura", ["Normal", "Aumentada", "Diminuída"])
+                op_palp = ["Anterior", "Medial", "Lateral", "Posterior", "Nenhuma"]
+                with c_p1: palpacao_comp = st.multiselect("Estruturas Dolorosas", op_palp, default=get_list("Palpacao"))
+                
+                op_godet = ["Negativo", "Positivo"]
+                with c_p2: godet = st.radio("Sinal de Godet (Edema)", op_godet, index=get_idx(op_godet, "Godet"))
+                
+                op_temp = ["Normal", "Aumentada", "Diminuída"]
+                with c_p3: temp = st.radio("Temperatura", op_temp, index=get_idx(op_temp, "Temperatura"))
 
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Testes Especiais Ortopédicos (Positivos)</h4>", unsafe_allow_html=True)
-                t_lig = st.multiselect("Testes Ligamentares", ["Nenhum", "Lachman", "Gaveta Anterior", "Gaveta Posterior", "Estresse Valgo", "Estresse Varo", "Pivot Shift", "Dial Test"], key="t_lig_unico")
-                t_men = st.multiselect("Testes Meniscais", ["Nenhum", "Ege", "Tesale", "McMurray", "Apley"], key="t_men_unico")
-                t_pat = st.multiselect("Testes Femoropatelar", ["Nenhum", "Step Up", "Step Down", "Extensão CCA", "Sinal de Clarke", "Apreensão Patelar", "Decline Squat (Tendinopatia)", "Teste de Noble (Trato Iliotibial)"], key="t_pat_unico")
+                
+                op_lig = ["Nenhum", "Lachman", "Gaveta Anterior", "Gaveta Posterior", "Estresse Valgo", "Estresse Varo", "Pivot Shift", "Dial Test"]
+                t_lig = st.multiselect("Testes Ligamentares", op_lig, default=get_list("Testes_Ligamentares"), key="t_lig_unico")
+                
+                op_men = ["Nenhum", "Ege", "Tesale", "McMurray", "Apley"]
+                t_men = st.multiselect("Testes Meniscais", op_men, default=get_list("Testes_Meniscais"), key="t_men_unico")
+                
+                op_pat = ["Nenhum", "Step Up", "Step Down", "Extensão CCA", "Sinal de Clarke", "Apreensão Patelar", "Decline Squat (Tendinopatia)", "Teste de Noble (Trato Iliotibial)"]
+                t_pat = st.multiselect("Testes Femoropatelar", op_pat, default=get_list("Testes_Femoropatelar"), key="t_pat_unico")
 
 
             with t_funcional:
