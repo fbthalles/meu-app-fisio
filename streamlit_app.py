@@ -1080,14 +1080,23 @@ elif st.session_state.pagina == 'painel_clinico':
                         "Godet": godet, "Temperatura": temp,
                         "Testes_Ligamentares": ", ".join(t_lig) if t_lig else "Não testado", 
                         "Testes_Meniscais": ", ".join(t_men) if t_men else "Não testado",
-                        "Forca_Qualitativa": forca_qual, "Din_Quad": din_quad, "Din_Isq": din_isq, "Din_Glut": din_glut,
-                        "ADM_Flex": adm_flex, "ADM_Ext": adm_ext, 
-                        "Flexibilidade": ", ".join(flexibilidade) if flexibilidade else "Normal",
-                        "CM_Agachamento": cm_agac, "Dor_Agachamento": dor_agac,
-                        "CM_Step": cm_step, "Dor_Step": dor_step, "CM_Lunge": cm_lunge, "Dor_Lunge": dor_lunge,
-                        "Exames_Apresentados": ", ".join(tipos_exames) if tipos_exames else "Nenhum", 
+                        "Testes_Femoropatelar": ", ".join(t_pat) if t_pat else "Não testado", # Corrigido: Antes este teste não estava a ser salvo!
                         
-                        # --- GATILHO INTELIGENTE INSERIDO NO SÍTIO CERTO ---
+                        # Força e Dinamometria (MAPEAMENTO DAS NOVAS VARIÁVEIS)
+                        "Forca_Geral_Dir": f"Ext:{fg_ext_d} Flex:{fg_flex_d} Abd:{fg_abd_d} Add:{fg_add_d}",
+                        "Forca_Geral_Esq": f"Ext:{fg_ext_e} Flex:{fg_flex_e} Abd:{fg_abd_e} Add:{fg_add_e}",
+                        "Dinamometria_Dir": f"Ext:{din_ext_d} Flex:{din_flex_d} Abd:{din_abd_d} Add:{din_add_d}",
+                        "Dinamometria_Esq": f"Ext:{din_ext_e} Flex:{din_flex_e} Abd:{din_abd_e} Add:{din_add_e}",
+                        "Lunge_Test": f"Dir:{lunge_d} Esq:{lunge_e}",
+                        
+                        "Flexibilidade": ", ".join(flexibilidade) if flexibilidade else "Normal",
+                        
+                        # Controle Motor (MAPEAMENTO DAS NOVAS VARIÁVEIS)
+                        "CM_Globais": f"Marcha:{cm_marcha} | Corrida:{cm_corrida} | Salto:{cm_salto} | Agach_Bi:{cm_agach_bi}",
+                        "CM_Membro_Dir": f"Agach:{cm_agach_uni_d} | StepDown:{cm_step_down_d} | StepUp:{cm_step_up_d} | Afundo:{cm_afundo_d} | Eq:{cm_eq_uni_d}",
+                        "CM_Membro_Esq": f"Agach:{cm_agach_uni_e} | StepDown:{cm_step_down_e} | StepUp:{cm_step_up_e} | Afundo:{cm_afundo_e} | Eq:{cm_eq_uni_e}",
+                        
+                        "Exames_Apresentados": ", ".join(tipos_exames) if tipos_exames else "Nenhum", 
                         "Testes_Alvo": testes_alvo,
                         
                         # DADOS DA BATERIA DE QUESTIONÁRIOS
