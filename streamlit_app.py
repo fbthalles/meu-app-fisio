@@ -677,15 +677,22 @@ elif st.session_state.pagina == 'painel_clinico':
             
             with t_anamnese:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Histórico e Contexto</h4>", unsafe_allow_html=True)
-                qp = st.text_input("Queixa Principal (QP) *", placeholder="O que você deixou de fazer devido à dor?")
-                hma = st.text_area("História da Moléstia Atual (HMA) *", placeholder="Descrição detalhada do início e evolução do quadro...")
-                sinais_sintomas = st.text_input("Sinais e Sintomas (Localização / Mapa Corporal)", placeholder="Ex: Dor na interlinha medial, estalos...")
                 
+                # --- AUTO-PREENCHIMENTO (PASSO 2) ---
+                # Puxa os dados antigos se existirem, senão cria um dicionário vazio
+                dados = st.session_state.get('dados_antigos') or {}
+                
+                qp = st.text_input("Queixa Principal (QP) *", value=dados.get("Queixa Principal", ""), placeholder="O que você deixou de fazer devido à dor?")
+                hma = st.text_area("História da Moléstia Atual (HMA) *", value=dados.get("HMA", ""), placeholder="Descrição detalhada do início e evolução do quadro...")
+                sinais_sintomas = st.text_input("Sinais e Sintomas (Localização / Mapa Corporal)", value=dados.get("Sinais_Sintomas", ""), placeholder="Ex: Dor na interlinha medial, estalos...")
+
                 c_an1, c_an2 = st.columns(2)
-                with c_an1: fat_alivio = st.text_input("Fatores de Alívio", placeholder="Ex: Repouso, decúbito, gelo...")
-                with c_an2: fat_piora = st.text_input("Fatores de Piora", placeholder="Ex: Descer escadas, agachar, carga mecânica...")
-                
-                trat_previos = st.text_area("Tratamentos Anteriores", placeholder="Intervenções médicas e fisioterapêuticas prévias...")
+                with c_an1: 
+                    fat_alivio = st.text_input("Fatores de Alívio", value=dados.get("Fatores_Alivio", ""), placeholder="Ex: Repouso, decúbito, gelo...")
+                with c_an2: 
+                    fat_piora = st.text_input("Fatores de Piora", value=dados.get("Fatores_Piora", ""), placeholder="Ex: Descer escadas, agachar, carga mecânica...")
+
+                trat_previos = st.text_area("Tratamentos Anteriores", value=dados.get("Tratamentos_Previos", ""), placeholder="Intervenções médicas e fisioterapêuticas prévias...")
 
             with t_dor:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Classificação e Origem</h4>", unsafe_allow_html=True)
