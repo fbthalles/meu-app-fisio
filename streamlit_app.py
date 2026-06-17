@@ -692,9 +692,12 @@ elif st.session_state.pagina == 'painel_clinico':
                 def get_idx(opcoes, chave):
                     return opcoes.index(dados.get(chave)) if dados.get(chave) in opcoes else 0
                     
-                def get_list(chave):
+                def get_list(*args):
+                    # Aceita 1 ou 2 argumentos automaticamente para não quebrar o código antigo
+                    chave = args[1] if len(args) == 2 else args[0]
                     val = dados.get(chave, [])
-                    # 1. Trata a diferença entre Listas (Testes_Alvo) e Textos (Exames)
+                    
+                    # 1. Trata a diferença entre Listas e Textos
                     if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]:
                         return []
                     lista_bruta = val if isinstance(val, list) else [v.strip() for v in str(val).split(',')]
@@ -726,7 +729,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     
                     lista_limpa = []
                     for v in lista_bruta:
-                        if v == "Difusa/Articular": v = "Difusa" # Corrige instantaneamente o erro antigo
+                        if v == "Difusa/Articular": v = "Difusa" # Corrige o erro antigo instantaneamente
                         if v in opcoes_validas:
                             lista_limpa.append(v)
                             
