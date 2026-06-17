@@ -692,16 +692,12 @@ elif st.session_state.pagina == 'painel_clinico':
                 def get_idx(opcoes, chave):
                     return opcoes.index(dados.get(chave)) if dados.get(chave) in opcoes else 0
                     
-                def get_list(chave):
+                def get_list(opcoes_validas, chave):
                     val = dados.get(chave, [])
-                    # Se já for uma lista (ex: Testes_Alvo), devolve diretamente
-                    if isinstance(val, list):
-                        return val
-                    # Se for vazio ou texto padrão de negação, devolve lista vazia
-                    if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]: 
-                        return []
-                    # Se for um texto com vírgulas, corta e transforma em lista
-                    return [v.strip() for v in str(val).split(',')]
+                    if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]: return []
+                    lista_bruta = val if isinstance(val, list) else [v.strip() for v in str(val).split(',')]
+                    # Escudo Anti-Crash: Só injeta o valor se ele existir na lista de opções atual!
+                    return [v for v in lista_bruta if v in opcoes_validas]
                 
                 # --- PREENCHIMENTO DA ANAMNESE ---
                 qp = st.text_input("Queixa Principal (QP) *", value=dados.get("QP", ""), placeholder="O que você deixou de fazer devido à dor?")
@@ -772,27 +768,27 @@ elif st.session_state.pagina == 'painel_clinico':
                         st.rerun()
                     
                     op_zonas = ["Anterior (Patelar)", "Anterior (Tendão)", "Medial (Interlinha)", "Lateral (Interlinha)", "Posterior (Poplítea)", "Difusa", "Nenhuma"]
-                    zonas_dor = st.multiselect("Zonas de Dor Relatadas", op_zonas, default=get_list("Zonas_Dor"))
+                    zonas_dor = st.multiselect("Zonas de Dor Relatadas", op_zonas, default=get_list(op_zonas, "Zonas_Dor"))
                     mapa_dor = st.text_area("Descrição do Mapa da Dor", value=dados.get("Mapa_Dor", ""), placeholder="Ex: Dor na face anterior do joelho direito...", height=150)
 
             with t_flags:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Sistema de Triagem (Bandeiras)</h4>", unsafe_allow_html=True)
                 
                 op_red = ["Nenhuma", "Histórico de Câncer", "Perda de peso inexplicada", "Febre/Calafrios (Infecção)", "Sinais de TVP (Calor/Edema panturrilha)", "Déficit Neurológico Progressivo", "Trauma Agudo com deformidade", "Incapacidade total de descarga de peso"]
-                red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta) *", op_red, default=get_list("Red_Flags"))
+                red_flags = st.multiselect("🚨 Red Flags (Sinais de Alerta) *", op_red, default=get_list(op_red, "Red_Flags"))
                 
                 op_yellow = ["Nenhum", "Cinesiofobia (Medo de movimento)", "Catastrofização", "Baixa auto-eficácia", "Sintomas depressivos / Ansiedade", "Expectativas irreais de recuperação"]
-                yellow_cog = st.multiselect("🟡 Yellow Flags (Cognitivo-Emocionais) *", op_yellow, default=get_list("Yellow_Cog"))
+                yellow_cog = st.multiselect("🟡 Yellow Flags (Cognitivo-Emocionais) *", op_yellow, default=get_list(op_yellow, "Yellow_Cog"))
 
                 c_fl1, c_fl2 = st.columns(2)
                 op_sono = ["Normal/Restaurador", "Irregular", "Ruim (Insônia/Acorda com dor)"]
                 with c_fl1: qualidade_sono = st.selectbox("Qualidade do Sono *", op_sono, index=get_idx(op_sono, "Sono"))
                 
                 op_sociais = ["Nenhum", "Trabalho braçal/Carga pesada", "Afastado pelo INSS", "Sedentarismo", "Litígio/Processo judicial", "Falta de suporte familiar"]
-                with c_fl2: fat_sociais = st.multiselect("Fatores Contextuais/Sociais *", op_sociais, default=get_list("Fatores_Sociais"))
+                with c_fl2: fat_sociais = st.multiselect("Fatores Contextuais/Sociais *", op_sociais, default=get_list(op_sociais, "Fatores_Sociais"))
 
                 op_comorb = ["Nenhuma", "Hipertensão", "Diabetes", "Obesidade (IMC > 30)", "Cardiopatia", "Doença Autoimune", "Osteoporose", "Tabagismo", "Distúrbio Vascular"]
-                comorbidades = st.multiselect("Comorbidades Associadas *", op_comorb, default=get_list("Comorbidades"))
+                comorbidades = st.multiselect("Comorbidades Associadas *", op_comorb, default=get_list(op_comorb, "Comorbidades"))
 
             with t_fisico:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Inspeção e Palpação</h4>", unsafe_allow_html=True)
@@ -813,12 +809,12 @@ elif st.session_state.pagina == 'painel_clinico':
                 with c_f5: perimetria = st.text_input("Perimetria (Se hipotrófico)", value=dados.get("Perimetria", ""), placeholder="Ex: -2cm no VMO direito")
 
                 op_pele = ["Nenhuma", "Equimose", "Hematoma", "Cicatrizes", "Fístulas"]
-                pele = st.multiselect("Alterações Cutâneas", op_pele, default=get_list("Pele"))
+                pele = st.multiselect("Alterações Cutâneas", op_pele, default=get_list(op_pele, "Pele"))
 
                 st.markdown("---")
                 c_p1, c_p2, c_p3 = st.columns(3)
                 op_palp = ["Anterior", "Medial", "Lateral", "Posterior", "Nenhuma"]
-                with c_p1: palpacao_comp = st.multiselect("Estruturas Dolorosas", op_palp, default=get_list("Palpacao"))
+                with c_p1: palpacao_comp = st.multiselect("Estruturas Dolorosas", op_palp, default=get_list(op_palp, "Palpacao"))
                 
                 op_godet = ["Negativo", "Positivo"]
                 with c_p2: godet = st.radio("Sinal de Godet (Edema)", op_godet, index=get_idx(op_godet, "Godet"))
@@ -829,14 +825,13 @@ elif st.session_state.pagina == 'painel_clinico':
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Testes Especiais Ortopédicos (Positivos)</h4>", unsafe_allow_html=True)
                 
                 op_lig = ["Nenhum", "Lachman", "Gaveta Anterior", "Gaveta Posterior", "Estresse Valgo", "Estresse Varo", "Pivot Shift", "Dial Test"]
-                t_lig = st.multiselect("Testes Ligamentares", op_lig, default=get_list("Testes_Ligamentares"), key="t_lig_unico")
+                t_lig = st.multiselect("Testes Ligamentares", op_lig, default=get_list(op_lig, "Testes_Ligamentares"), key="t_lig_unico")
                 
                 op_men = ["Nenhum", "Ege", "Tesale", "McMurray", "Apley"]
-                t_men = st.multiselect("Testes Meniscais", op_men, default=get_list("Testes_Meniscais"), key="t_men_unico")
+                t_men = st.multiselect("Testes Meniscais", op_men, default=get_list(op_men, "Testes_Meniscais"), key="t_men_unico")
                 
                 op_pat = ["Nenhum", "Step Up", "Step Down", "Extensão CCA", "Sinal de Clarke", "Apreensão Patelar", "Decline Squat (Tendinopatia)", "Teste de Noble (Trato Iliotibial)"]
-                t_pat = st.multiselect("Testes Femoropatelar", op_pat, default=get_list("Testes_Femoropatelar"), key="t_pat_unico")
-
+                t_pat = st.multiselect("Testes Femoropatelar", op_pat, default=get_list(op_pat, "Testes_Femoropatelar"), key="t_pat_unico")
 
             with t_funcional:
                 # --- HELPER PARA DESCOMPACTAR DADOS DA BASE ---
@@ -963,17 +958,28 @@ elif st.session_state.pagina == 'painel_clinico':
                     cm_afundo_e = st.selectbox("Afundo (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "Afundo"))
                     cm_eq_uni_e = st.selectbox("Equilíbrio Uni (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "Eq"))
 
-                flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
-                    ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], 
-                    default=get_list("Flexibilidade"))
+                op_flex = ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"]
+                flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", op_flex, default=get_list(op_flex, "Flexibilidade"))
 
             with t_exames:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
-                tipos_exames = st.multiselect("Exames Apresentados *", 
-                    ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"], 
-                    default=get_list("Exames_Apresentados"))
+                op_exames = ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"]
+                tipos_exames = st.multiselect("Exames Apresentados *", op_exames, default=get_list(op_exames, "Exames_Apresentados"))
                 
                 laudo_exames = st.text_area("Laudo / Achados Importantes *", value=dados.get("Laudo_Exames", "Nenhum"), placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
+
+                # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
+                st.markdown("---")
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Alvos Funcionais para Monitorização</h4>", unsafe_allow_html=True)
+                st.caption("Selecione os testes que farão parte do Check-in Diário deste paciente.")
+                
+                lista_testes_disp = ["Agachamento Bipodal", "Agachamento Unipodal", "Step Down", "Lunge (Afundo)", "Salto (Hop Test)", "Corrida", "Marcha"]
+                
+                def_alvos = get_list(lista_testes_disp, "Testes_Alvo")
+                if not def_alvos:
+                    def_alvos = ["Agachamento Bipodal", "Step Down"]
+                    
+                testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=def_alvos)
 
                 # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
                 st.markdown("---")
