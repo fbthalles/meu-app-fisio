@@ -833,36 +833,61 @@ elif st.session_state.pagina == 'painel_clinico':
 
 
             with t_funcional:
+                # --- HELPER PARA DESCOMPACTAR DADOS DA BASE ---
+                def get_val_str(chave_db, prefix, default, tipo=int):
+                    try:
+                        val = dados.get(chave_db, "")
+                        if not val: return default
+                        parts = val.replace(" | ", " ").split()
+                        for p in parts:
+                            if p.startswith(prefix + ":"):
+                                return tipo(p.split(":")[1])
+                    except:
+                        pass
+                    return default
+                    
+                def get_val_cm(chave_db, prefix):
+                    try:
+                        val = dados.get(chave_db, "")
+                        if not val: return "3 - Normal"
+                        parts = val.split(" | ")
+                        for p in parts:
+                            if p.startswith(prefix + ":"):
+                                return p.split(":")[1]
+                    except:
+                        pass
+                    return "3 - Normal"
+
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>💪 Força Muscular e Dinamometria</h4>", unsafe_allow_html=True)
                 
                 # 1. Força Geral (Qualitativa 0-5)
                 st.caption("Força Geral (Resistência Manual - Escala de Oxford 0 a 5)")
                 
                 c_fg1, c_fg2, c_fg3, c_fg4 = st.columns(4)
-                fg_ext_d = c_fg1.number_input("Extensão (Dir) [0-5]", min_value=0, max_value=5, value=5)
-                fg_flex_d = c_fg2.number_input("Flexão (Dir) [0-5]", min_value=0, max_value=5, value=5)
-                fg_abd_d = c_fg3.number_input("Abdução (Dir) [0-5]", min_value=0, max_value=5, value=5)
-                fg_add_d = c_fg4.number_input("Adução (Dir) [0-5]", min_value=0, max_value=5, value=5)
+                fg_ext_d = c_fg1.number_input("Extensão (Dir) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Dir", "Ext", 5))
+                fg_flex_d = c_fg2.number_input("Flexão (Dir) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Dir", "Flex", 5))
+                fg_abd_d = c_fg3.number_input("Abdução (Dir) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Dir", "Abd", 5))
+                fg_add_d = c_fg4.number_input("Adução (Dir) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Dir", "Add", 5))
                 
                 c_fg5, c_fg6, c_fg7, c_fg8 = st.columns(4)
-                fg_ext_e = c_fg5.number_input("Extensão (Esq) [0-5]", min_value=0, max_value=5, value=5)
-                fg_flex_e = c_fg6.number_input("Flexão (Esq) [0-5]", min_value=0, max_value=5, value=5)
-                fg_abd_e = c_fg7.number_input("Abdução (Esq) [0-5]", min_value=0, max_value=5, value=5)
-                fg_add_e = c_fg8.number_input("Adução (Esq) [0-5]", min_value=0, max_value=5, value=5)
+                fg_ext_e = c_fg5.number_input("Extensão (Esq) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Esq", "Ext", 5))
+                fg_flex_e = c_fg6.number_input("Flexão (Esq) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Esq", "Flex", 5))
+                fg_abd_e = c_fg7.number_input("Abdução (Esq) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Esq", "Abd", 5))
+                fg_add_e = c_fg8.number_input("Adução (Esq) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Esq", "Add", 5))
 
                 # 2. Dinamometria Quantitativa
                 st.markdown(f"<h5 style='color: {CORES_GENUA['primaria']};'>Dinamometria (kg)</h5>", unsafe_allow_html=True)
                 c_din1, c_din2, c_din3, c_din4 = st.columns(4)
-                din_ext_d = c_din1.number_input("Extensão (Dir)", min_value=0.0, step=1.0)
-                din_flex_d = c_din2.number_input("Flexão (Dir)", min_value=0.0, step=1.0)
-                din_abd_d = c_din3.number_input("Abdução (Dir)", min_value=0.0, step=1.0)
-                din_add_d = c_din4.number_input("Adução (Dir)", min_value=0.0, step=1.0)
+                din_ext_d = c_din1.number_input("Extensão (Dir)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Dir", "Ext", 0.0, float))
+                din_flex_d = c_din2.number_input("Flexão (Dir)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Dir", "Flex", 0.0, float))
+                din_abd_d = c_din3.number_input("Abdução (Dir)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Dir", "Abd", 0.0, float))
+                din_add_d = c_din4.number_input("Adução (Dir)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Dir", "Add", 0.0, float))
                 
                 c_din5, c_din6, c_din7, c_din8 = st.columns(4)
-                din_ext_e = c_din5.number_input("Extensão (Esq)", min_value=0.0, step=1.0)
-                din_flex_e = c_din6.number_input("Flexão (Esq)", min_value=0.0, step=1.0)
-                din_abd_e = c_din7.number_input("Abdução (Esq)", min_value=0.0, step=1.0)
-                din_add_e = c_din8.number_input("Adução (Esq)", min_value=0.0, step=1.0)
+                din_ext_e = c_din5.number_input("Extensão (Esq)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Esq", "Ext", 0.0, float))
+                din_flex_e = c_din6.number_input("Flexão (Esq)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Esq", "Flex", 0.0, float))
+                din_abd_e = c_din7.number_input("Abdução (Esq)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Esq", "Abd", 0.0, float))
+                din_add_e = c_din8.number_input("Adução (Esq)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Esq", "Add", 0.0, float))
 
                 # --- CÁLCULO DE DÉFICIT DA DINAMOMETRIA ---
                 if any([din_ext_d, din_ext_e, din_flex_d, din_flex_e, din_abd_d, din_abd_e, din_add_d, din_add_e]):
@@ -884,8 +909,8 @@ elif st.session_state.pagina == 'painel_clinico':
                 # 3. Mobilidade e Lunge Test
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>📐 Mobilidade Articular (Goniometria)</h4>", unsafe_allow_html=True)
                 c_lunge1, c_lunge2 = st.columns(2)
-                lunge_d = c_lunge1.number_input("Lunge Test (Dir) - cm", min_value=0.0, step=0.5)
-                lunge_e = c_lunge2.number_input("Lunge Test (Esq) - cm", min_value=0.0, step=0.5)
+                lunge_d = c_lunge1.number_input("Lunge Test (Dir) - cm", min_value=0.0, step=0.5, value=get_val_str("Lunge_Test", "Dir", 0.0, float))
+                lunge_e = c_lunge2.number_input("Lunge Test (Esq) - cm", min_value=0.0, step=0.5, value=get_val_str("Lunge_Test", "Esq", 0.0, float))
                 
                 if lunge_d > 0 or lunge_e > 0:
                     diff_lunge = lunge_d - lunge_e
@@ -903,53 +928,59 @@ elif st.session_state.pagina == 'painel_clinico':
                 
                 opcoes_cm = ["3 - Normal", "2 - Regular", "1 - Ruim", "0 - Incapaz"]
                 
+                def get_cm_idx(chave_db, prefix):
+                    val = get_val_cm(chave_db, prefix)
+                    return opcoes_cm.index(val) if val in opcoes_cm else 0
+                
                 cm1, cm2, cm3 = st.columns(3)
                 
                 with cm1:
                     st.markdown("**Globais**")
-                    cm_marcha = st.selectbox("Marcha", opcoes_cm)
-                    cm_corrida = st.selectbox("Corrida", opcoes_cm)
-                    cm_salto = st.selectbox("Salto", opcoes_cm)
-                    cm_agach_bi = st.selectbox("Agachamento Bi", opcoes_cm)
+                    cm_marcha = st.selectbox("Marcha", opcoes_cm, index=get_cm_idx("CM_Globais", "Marcha"))
+                    cm_corrida = st.selectbox("Corrida", opcoes_cm, index=get_cm_idx("CM_Globais", "Corrida"))
+                    cm_salto = st.selectbox("Salto", opcoes_cm, index=get_cm_idx("CM_Globais", "Salto"))
+                    cm_agach_bi = st.selectbox("Agachamento Bi", opcoes_cm, index=get_cm_idx("CM_Globais", "Agach_Bi"))
                     
                 with cm2:
                     st.markdown("**Membro Direito**")
-                    cm_agach_uni_d = st.selectbox("Agachamento Uni (D)", opcoes_cm)
-                    cm_step_down_d = st.selectbox("Step Down (D)", opcoes_cm)
-                    cm_step_up_d = st.selectbox("Step Up (D)", opcoes_cm)
-                    cm_afundo_d = st.selectbox("Afundo (D)", opcoes_cm)
-                    cm_eq_uni_d = st.selectbox("Equilíbrio Uni (D)", opcoes_cm)
+                    cm_agach_uni_d = st.selectbox("Agachamento Uni (D)", opcoes_cm, index=get_cm_idx("CM_Membro_Dir", "Agach"))
+                    cm_step_down_d = st.selectbox("Step Down (D)", opcoes_cm, index=get_cm_idx("CM_Membro_Dir", "StepDown"))
+                    cm_step_up_d = st.selectbox("Step Up (D)", opcoes_cm, index=get_cm_idx("CM_Membro_Dir", "StepUp"))
+                    cm_afundo_d = st.selectbox("Afundo (D)", opcoes_cm, index=get_cm_idx("CM_Membro_Dir", "Afundo"))
+                    cm_eq_uni_d = st.selectbox("Equilíbrio Uni (D)", opcoes_cm, index=get_cm_idx("CM_Membro_Dir", "Eq"))
                     
                 with cm3:
                     st.markdown("**Membro Esquerdo**")
-                    cm_agach_uni_e = st.selectbox("Agachamento Uni (E)", opcoes_cm)
-                    cm_step_down_e = st.selectbox("Step Down (E)", opcoes_cm)
-                    cm_step_up_e = st.selectbox("Step Up (E)", opcoes_cm)
-                    cm_afundo_e = st.selectbox("Afundo (E)", opcoes_cm)
-                    cm_eq_uni_e = st.selectbox("Equilíbrio Uni (E)", opcoes_cm)
-                
-                flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
-                    ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], default=["Nenhuma"])
+                    cm_agach_uni_e = st.selectbox("Agachamento Uni (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "Agach"))
+                    cm_step_down_e = st.selectbox("Step Down (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "StepDown"))
+                    cm_step_up_e = st.selectbox("Step Up (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "StepUp"))
+                    cm_afundo_e = st.selectbox("Afundo (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "Afundo"))
+                    cm_eq_uni_e = st.selectbox("Equilíbrio Uni (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "Eq"))
 
-            # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
+                flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", 
+                    ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"], 
+                    default=get_list("Flexibilidade"))
+
+            with t_exames:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
+                tipos_exames = st.multiselect("Exames Apresentados *", 
+                    ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"], 
+                    default=get_list("Exames_Apresentados"))
+                
+                laudo_exames = st.text_area("Laudo / Achados Importantes *", value=dados.get("Laudo_Exames", "Nenhum"), placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
+
+                # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
                 st.markdown("---")
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Alvos Funcionais para Monitorização</h4>", unsafe_allow_html=True)
                 st.caption("Selecione os testes que farão parte do Check-in Diário deste paciente.")
                 
                 lista_testes_disp = ["Agachamento Bipodal", "Agachamento Unipodal", "Step Down", "Lunge (Afundo)", "Salto (Hop Test)", "Corrida", "Marcha"]
-                testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=["Agachamento Bipodal", "Step Down"])
-
-            with t_exames:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
-                tipos_exames = st.multiselect("Exames Apresentados *", 
-                    ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"], default=["Nenhum"])
                 
-                laudo_exames = st.text_area("Laudo / Achados Importantes *", value="Nenhum", 
-                    placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
-
-            with t_quest:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Bateria de Questionários Funcionais (PBE)</h4>", unsafe_allow_html=True)
-                st.caption("Expanda o questionário desejado. A pontuação e a interpretação clínica são geradas em tempo real. Preencha apenas as escalas adequadas ao fenótipo do paciente atual.")
+                def_alvos = get_list("Testes_Alvo")
+                if not def_alvos:
+                    def_alvos = ["Agachamento Bipodal", "Step Down"]
+                    
+                testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=def_alvos)
 
                 # --- 1. LEFS (Geral) ---
                 with st.expander("📝 LEFS (Escala Funcional da Extremidade Inferior)"):
