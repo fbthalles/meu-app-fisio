@@ -981,15 +981,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 op_flex = ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"]
                 flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", op_flex, default=get_list(op_flex, "Flexibilidade"))
 
-            # --- ABA 6: EXAMES COMPLEMENTARES (FORA DA ABA FUNCIONAL) ---
-            with t_exames:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
-                op_exames = ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"]
-                tipos_exames = st.multiselect("Exames Apresentados *", op_exames, default=get_list(op_exames, "Exames_Apresentados"))
-                
-                laudo_exames = st.text_area("Laudo / Achados Importantes *", value=dados.get("Laudo_Exames", "Nenhum"), placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
-
-                # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
+            # --- ALVOS FUNCIONAIS PARA MONITORIZAÇÃO (CHECK-IN DIÁRIO) ---
                 st.markdown("---")
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Alvos Funcionais para Monitorização</h4>", unsafe_allow_html=True)
                 st.caption("Selecione os testes que farão parte do Check-in Diário deste paciente.")
@@ -1001,6 +993,14 @@ elif st.session_state.pagina == 'painel_clinico':
                     def_alvos = ["Agachamento Bipodal", "Step Down"]
                     
                 testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=def_alvos)
+
+            # --- ABA 6: EXAMES COMPLEMENTARES (FORA DA ABA FUNCIONAL) ---
+            with t_exames:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
+                op_exames = ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"]
+                tipos_exames = st.multiselect("Exames Apresentados *", op_exames, default=get_list(op_exames, "Exames_Apresentados"))
+                
+                laudo_exames = st.text_area("Laudo / Achados Importantes *", value=dados.get("Laudo_Exames", "Nenhum"), placeholder="Descreva os achados relevantes ou mantenha 'Nenhum' se não houver exames de imagem.")
 
             # --- ABA 7: QUESTIONÁRIOS ---
             with t_quest:
