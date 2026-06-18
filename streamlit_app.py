@@ -997,7 +997,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 op_flex = ["Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral", "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"]
                 flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", op_flex, default=get_list(op_flex, "Flexibilidade"))
 
-            with t_exames:
+                with t_exames:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
                 op_exames = ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"]
                 tipos_exames = st.multiselect("Exames Apresentados *", op_exames, default=get_list(op_exames, "Exames_Apresentados"))
@@ -1017,7 +1017,7 @@ elif st.session_state.pagina == 'painel_clinico':
                     
                 testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=def_alvos)
 
-            with t_quest:
+                with t_quest:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Questionários de Desfecho Clínico (PROMs)</h4>", unsafe_allow_html=True)
                 st.warning("⚠️ **Atenção:** O sistema carrega os dados clínicos automaticamente. No entanto, as perguntas individuais dos questionários não são pré-preenchidas, pois o sistema guarda apenas a pontuação final na nuvem para manter a base de dados leve.")
 
