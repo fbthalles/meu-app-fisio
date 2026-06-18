@@ -7,6 +7,7 @@ from fpdf import FPDF
 from PIL import Image
 import matplotlib.pyplot as plt
 import io
+import google.generativeai as genai
 
 # 1. CORES DA MARCA (Extraídas do novo Logo GENUA Transparente)
 CORES_GENUA = {
