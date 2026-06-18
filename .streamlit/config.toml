@@ -1,0 +1,10 @@
+[theme]
+# Trava o aplicativo no Modo Claro
+base="light"
+
+# Cores da Marca GENUA
+primaryColor="#103E55"
+backgroundColor="#F4F7F9"
+secondaryBackgroundColor="#FFFFFF"
+textColor="#1A252C"
+font="sans serif"
