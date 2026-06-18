@@ -998,7 +998,7 @@ elif st.session_state.pagina == 'painel_clinico':
                 flexibilidade = st.multiselect("Flexibilidade / Retrações (Testes Positivos) *", op_flex, default=get_list(op_flex, "Flexibilidade"))
 
                 with t_exames:
-                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
+                    st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>Exames Complementares e Imagem</h4>", unsafe_allow_html=True)
                 op_exames = ["Nenhum", "Raio-X", "Ressonância Magnética (RM)", "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"]
                 tipos_exames = st.multiselect("Exames Apresentados *", op_exames, default=get_list(op_exames, "Exames_Apresentados"))
                 
