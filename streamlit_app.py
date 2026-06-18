@@ -693,47 +693,31 @@ elif st.session_state.pagina == 'painel_clinico':
                     return opcoes.index(dados.get(chave)) if dados.get(chave) in opcoes else 0
                     
                 def get_list(*args):
-                    # Aceita 1 ou 2 argumentos automaticamente para não quebrar o código antigo
-                    chave = args[1] if len(args) == 2 else args[0]
-                    val = dados.get(chave, [])
+                    chave = args[-1]
+                    opcoes = args[0] if len(args) > 1 else None
                     
-                    # 1. Trata a diferença entre Listas e Textos
+                    val = dados.get(chave, [])
+                    # Se for vazio ou texto solto de negação
                     if not val or val in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]:
                         return []
+                        
+                    # Garante que é uma lista
                     lista_bruta = val if isinstance(val, list) else [v.strip() for v in str(val).split(',')]
                     
-                    # 2. Dicionário Mestre (Escudo Anti-Crash)
-                    opcoes_validas = {
-                        'Step Up', '6. Correr em terreno plano', 'Cicatrizes', 'Agachamento Bipodal', 'Sintomas depressivos / Ansiedade', 
-                        'Anterior (Tendão)', 'Histórico de Câncer', 'Posterior (Poplítea)', 'Nociplástica (Sensibilização Central)', 
-                        'Nociceptiva (Mecânica/Inflamatória)', 'Difusa', 'Anterior', 'Hematoma', 'Neuropática (Irradiação/Queimação)', 
-                        'Obesidade (IMC > 30)', 'Leve', 'Falta de suporte familiar', 'Positivo', 'Posterior', 'Baixa auto-eficácia', 
-                        'Trabalho braçal/Carga pesada', 'Gaveta Anterior', 'Anterior (Patelar)', 'Valgo', 'Medial (Interlinha)', 
-                        'Normal', 'Diminuída', 'Incapacidade total de descarga de peso', 'Ressonância Magnética (RM)', 'Não Aplicável', 
-                        'Medial', 'Moderado', 'Cardiopatia', 'Step Down', 'Thomas (+) - Reto Femoral', 'Hipertensão', 'Ege', 
-                        'Dial Test', 'Thomas (+) - Iliopsoas', 'Salto (Hop Test)', 'Expectativas irreais de recuperação', 'McMurray', 
-                        'Sinal de Clarke', 'Nenhum', 'Flexo', 'Equimose', 'Hipotrófico', 'Doença Autoimune', '5. Ficar em pé por 1 hora', 
-                        'Déficit Neurológico Progressivo', 'Extensão CCA', 'Claudicante', 'Litígio/Processo judicial', 'Lunge (Afundo)', 
-                        'Recurvatum', 'Raio-X', 'Gaveta Posterior', 'Diabetes', 'Marcha', '8. Mudança rápida de direção (Corte)', 
-                        'Estresse Varo', 'Febre/Calafrios (Infecção)', 'Tesale', 'Apley', 'Distúrbio Vascular', 'Ober (+) - Trato Iliotibial', 
-                        'Estresse Valgo', 'Insidiosa / Sobrecarga', 'Eletroneuromiografia', 'Nenhuma', 'Sentar e Alcançar (Isquios)', 
-                        'Lateral (Interlinha)', 'Varo', 'Lachman', 'Teste de Noble (Trato Iliotibial)', 'Corrida', 'Antálgica', 
-                        'Tomografia Computadorizada (TC)', 'Agachamento Unipodal', 'Traumática', 'Apreensão Patelar', 'Sedentarismo', 
-                        'Afastado pelo INSS', 'Trauma Agudo com deformidade', 'Lateral', 'Osteoporose', 'Ausente', '2. Andar 2 quarteirões', 
-                        'Decline Squat (Tendinopatia)', 'Aumentada', 'Degenerativa', '3. Subir um lance de escadas', 'Fístulas', 'Grave', 
-                        '1. Agachar ou ajoelhar', 'Tabagismo', 'Pós-operatória', 'Normal/Restaurador', 'Pivot Shift', 'Perda de peso inexplicada', 
-                        '7. Fazer trabalho pesado', 'Ely (+) - Reto Femoral', 'Sinais de TVP (Calor/Edema panturrilha)', 'Ruim (Insônia/Acorda com dor)', 
-                        'Ultrassonografia (USG)', '4. Descer um lance de escadas', 'Negativo', 'Cinesiofobia (Medo de movimento)', 'Catastrofização', 
-                        'Uso de dispositivo', 'Irregular'
-                    }
-                    
-                    lista_limpa = []
+                    # 1. Auto-Correção de Legado (O que causou o erro da Verónica)
+                    lista_corrigida = []
                     for v in lista_bruta:
-                        if v == "Difusa/Articular": v = "Difusa" # Corrige o erro antigo instantaneamente
-                        if v in opcoes_validas:
-                            lista_limpa.append(v)
-                            
-                    return lista_limpa
+                        if v == "Difusa/Articular": v = "Difusa"
+                        if v == "Nenhum" and opcoes and "Nenhuma" in opcoes: v = "Nenhuma"
+                        if v == "Nenhuma" and opcoes and "Nenhum" in opcoes: v = "Nenhum"
+                        lista_corrigida.append(v)
+                    
+                    # 2. O Filtro Supremo: Só devolve a palavra se ela existir na lista daquela caixa específica!
+                    if opcoes:
+                        return [v for v in lista_corrigida if v in opcoes]
+                    
+                    # Se for um campo sem opções (como os Testes_Alvo antigos)
+                    return [v for v in lista_corrigida if v not in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]]
                 
                 # --- PREENCHIMENTO DA ANAMNESE ---
                 qp = st.text_input("Queixa Principal (QP) *", value=dados.get("QP", ""), placeholder="O que você deixou de fazer devido à dor?")
