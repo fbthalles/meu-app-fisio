@@ -1339,47 +1339,47 @@ elif st.session_state.pagina == 'painel_clinico':
                     with c_r1:
                         st.markdown("**Anamnese e Dor:**")
                         st.markdown(f"- **QP:** {av_qp}")
-                        st.markdown(f"- **Origem:** {dados_avaliacao.get('Origem_Dor', 'N/A')}")
+                        st.markdown(f"- **Origem:** {av_p.get('Origem_Dor', 'N/A')}")
                         st.markdown(f"- **Tipo de Dor:** {av_classdor}")
                         st.markdown(f"- **Red Flags:** {av_red}")
                     with c_r2:
                         st.markdown("**Exames de Imagem:**")
-                        st.markdown(f"- **Apresentados:** {dados_avaliacao.get('Exames_Apresentados', 'Nenhum')}")
-                        st.markdown(f"- **Laudo Principal:** {dados_avaliacao.get('Laudo_Exames', 'Não relatado')}")
+                        st.markdown(f"- **Apresentados:** {av_p.get('Exames_Apresentados', 'Nenhum')}")
+                        st.markdown(f"- **Laudo Principal:** {av_p.get('Laudo_Exames', 'Não relatado')}")
 
                 with t_fisico:
                     c_f1, c_f2 = st.columns(2)
                     with c_f1:
                         st.markdown("**Inspeção:**")
                         st.markdown(f"- **Derrame Articular:** {av_derrame}")
-                        st.markdown(f"- **Alinhamento:** {dados_avaliacao.get('Alinhamento', 'N/A')}")
-                        st.markdown(f"- **Marcha:** {dados_avaliacao.get('Marcha', 'N/A')}")
+                        st.markdown(f"- **Alinhamento:** {av_p.get('Alinhamento', 'N/A')}")
+                        st.markdown(f"- **Marcha:** {av_p.get('Marcha', 'N/A')}")
                     with c_f2:
                         st.markdown("**Testes Especiais:**")
                         st.markdown(f"- **Ligamentares:** {av_tlig if av_tlig and av_tlig != 'Nenhum' else 'Nenhum achado'}")
                         st.markdown(f"- **Meniscais:** {av_tmen if av_tmen and av_tmen != 'Nenhum' else 'Nenhum achado'}")
-                        st.markdown(f"- **Femoropatelar:** {dados_avaliacao.get('Testes_Femoropatelar', 'Não testado')}")
+                        st.markdown(f"- **Femoropatelar:** {av_p.get('Testes_Femoropatelar', 'Não testado')}")
 
                 with t_funcional:
                     st.markdown("**Força e Mobilidade:**")
                     c_fun1, c_fun2 = st.columns(2)
                     with c_fun1:
                         st.caption("Dinamometria")
-                        st.markdown(f"- **Direita:** {dados_avaliacao.get('Dinamometria_Dir', 'N/A')}")
-                        st.markdown(f"- **Esquerda:** {dados_avaliacao.get('Dinamometria_Esq', 'N/A')}")
+                        st.markdown(f"- **Direita:** {av_p.get('Dinamometria_Dir', 'N/A')}")
+                        st.markdown(f"- **Esquerda:** {av_p.get('Dinamometria_Esq', 'N/A')}")
                     with c_fun2:
                         st.caption("Mobilidade (Lunge Test)")
-                        st.markdown(f"- **Dir / Esq:** {dados_avaliacao.get('Lunge_Test', 'N/A')}")
+                        st.markdown(f"- **Dir / Esq:** {av_p.get('Lunge_Test', 'N/A')}")
 
                 with t_proms:
                     st.markdown("**Questionários de Desfecho (Baseline):**")
                     c_p1, c_p2, c_p3, c_p4 = st.columns(4)
                     
                     # Usa st.metric para um visual de "Dashboard" moderno
-                    c_p1.metric("LEFS", f"{dados_avaliacao.get('LEFS_Pct', 0):.1f}%")
-                    c_p2.metric("Lysholm", f"{dados_avaliacao.get('Lysholm_Pts', 0)} pts")
-                    c_p3.metric("VISA-P", f"{dados_avaliacao.get('VISA_P_Pts', 0)} pts")
-                    c_p4.metric("WOMAC", f"{dados_avaliacao.get('WOMAC_Pct', 0):.1f}%")
+                    c_p1.metric("LEFS", f"{av_p.get('LEFS_Pct', 0):.1f}%")
+                    c_p2.metric("Lysholm", f"{av_p.get('Lysholm_Pts', 0)} pts")
+                    c_p3.metric("VISA-P", f"{av_p.get('VISA_P_Pts', 0)} pts")
+                    c_p4.metric("WOMAC", f"{av_p.get('WOMAC_Pct', 0):.1f}%")
         else:
             st.info("⚠️ Nenhuma Avaliação Inicial rica registrada no sistema para este paciente.")
         
