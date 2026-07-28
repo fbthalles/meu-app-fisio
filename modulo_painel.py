@@ -13,6 +13,10 @@ from datetime import datetime
 from config import CORES_GENUA, titulo
 from firebase_client import conn, db, invalidar_cache
 
+from ia_clinica import analisar_paciente
+insights = analisar_paciente(st.session_state.paciente)
+renderizar_insights(insights)
+
 def render():
     # Lazy imports — só carregam quando o painel é realmente aberto
     import matplotlib.pyplot as plt
