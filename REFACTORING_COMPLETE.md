@@ -1,1 +1,0 @@
-# Refatoração aplicada com sucesso - Ver documentação em README.md
