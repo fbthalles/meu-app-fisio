@@ -14,15 +14,80 @@ from firebase_client import conn, db, invalidar_cache
 def render():
     st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
 
-    # --- MOTOR DE CONSULTA E EDIÇÃO (PASSO 1) ---
+    # --- MOTOR DE CONSULTA E EDIÇÃO (com seletor explícito) ---
+    st.session_state.setdefault('doc_id_avaliacao', None)
+    st.session_state.setdefault('dados_antigos', None)
+
+    avaliacoes_existentes = []
     if 'paciente' in st.session_state and st.session_state.paciente:
-        docs = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
+        try:
+            docs = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
+            avaliacoes_existentes = [{"id": d.id, "data": d.to_dict()} for d in docs]
+            # Ordena da mais recente pra mais antiga
+            avaliacoes_existentes.sort(
+                key=lambda x: datetime.strptime(x["data"].get("Data_Avaliacao", "01/01/2000"), "%d/%m/%Y"),
+                reverse=True
+            )
+        except Exception:
+            avaliacoes_existentes = []
+
+    # ============================================================
+    # SELETOR DE MODO (Novo x Editar) — bloco visual no topo
+    # ============================================================
+    with st.container():
+        col_modo1, col_modo2 = st.columns([2, 1])
+        with col_modo1:
+            if avaliacoes_existentes:
+                opcoes = ["➕ Nova Avaliação"] + [
+                    f"✏️ Editar: {a['data'].get('Data_Avaliacao', '?')} — QP: {a['data'].get('QP', 'Sem descrição')[:40]}"
+                    for a in avaliacoes_existentes
+                ]
+                escolha = st.selectbox(
+                    "🎯 Modo de operação:",
+                    opcoes,
+                    key="seletor_avaliacao",
+                    help="Selecione 'Nova' para criar uma avaliação do zero ou uma existente para editar."
+                )
+            else:
+                st.info("ℹ️ Este paciente ainda não tem avaliação inicial. Preencha os campos abaixo para criar a primeira.")
+                escolha = "➕ Nova Avaliação"
+
+        with col_modo2:
+            if avaliacoes_existentes and escolha != "➕ Nova Avaliação":
+                if st.button("🗑️ Excluir esta avaliação", type="secondary"):
+                    st.session_state['confirmar_exclusao_aval'] = True
+
+        # Confirmação de exclusão (aparece se pediu)
+        if st.session_state.get('confirmar_exclusao_aval'):
+            st.warning("⚠️ Tem certeza? Esta ação NÃO pode ser desfeita.")
+            cc1, cc2, _ = st.columns([1, 1, 3])
+            with cc1:
+                if st.button("✅ Sim, excluir", type="primary"):
+                    try:
+                        idx = opcoes.index(escolha) - 1  # -1 porque "Nova" está no idx 0
+                        doc_id = avaliacoes_existentes[idx]["id"]
+                        db.collection("Avaliacao_Inicial").document(doc_id).delete()
+                        invalidar_cache("Avaliacao_Inicial")
+                        st.session_state['confirmar_exclusao_aval'] = False
+                        st.success("Avaliação excluída.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao excluir: {e}")
+            with cc2:
+                if st.button("❌ Cancelar"):
+                    st.session_state['confirmar_exclusao_aval'] = False
+                    st.rerun()
+
+    # Define modo de operação
+    if escolha == "➕ Nova Avaliação":
         st.session_state.doc_id_avaliacao = None
         st.session_state.dados_antigos = None
-        for doc in docs:
-            st.session_state.dados_antigos = doc.to_dict()
-            st.session_state.doc_id_avaliacao = doc.id
-            break
+    else:
+        idx = opcoes.index(escolha) - 1
+        st.session_state.dados_antigos = avaliacoes_existentes[idx]["data"]
+        st.session_state.doc_id_avaliacao = avaliacoes_existentes[idx]["id"]
+
+    st.markdown("---")
 
     with st.container():
         # Estrutura expandida com as duas novas abas
