@@ -153,4 +153,4 @@ Fisioterapia esportiva e ortopédica particular, 11 anos de operação, foco em 
 
 ---
 
-**Desenvolvido por Edgar Nunes** — Fisioterapeuta, empresário e diretor clínico
+**Desenvolvido por Thalles Biondi** — Fisioterapeuta, empresário e diretor clínico
