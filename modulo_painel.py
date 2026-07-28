@@ -134,7 +134,7 @@ def render():
     df_p['Data_dt'] = pd.to_datetime(df_p['Data'], dayfirst=True)
     df_p = df_p.sort_values('Data_dt')
     # --- 1. PROCESSAMENTO LONGITUDINAL (PREPARAÇÃO PARA GRÁFICOS) ---
-    df_p['Sessão_Num'] = [f"S{i+1}" for i in range(len(df_p))]
+    df_p['Sessão_Num'] = [f"S{i+1} ({d.strftime('%d/%m')})" for i, d in enumerate(df_p['Data_dt'])]
 
     if 'Dor' not in df_p.columns: df_p['Dor'] = 0
     df_p['Dor'] = pd.to_numeric(df_p['Dor'], errors='coerce').fillna(0)
@@ -204,7 +204,7 @@ def render():
     st.progress(lsi_atual / 100)
 
     # --- 4. ABAS GRÁFICAS DE ALTA PERFORMANCE (MATPLOTLIB) ---
-    t1, t2, t3, t4, t_ia = st.tabs(["📊 Correlação Dor x Função", "📉 Evolução Biomecânica", "🧠 Raciocínio Clínico", "🎯 Gatilhos", "🤖 IA Clínica"])
+    t1, t2, t_ic = st.tabs(["📊 Correlação Dor x Função", "📉 Evolução Biomecânica", "🧠 Inteligência Clínica"])
 
     with t1:
         st.markdown("**Gráfico de Dispersão: Tolerância ao Movimento**")
@@ -238,38 +238,48 @@ def render():
         ax3.set_ylim(0, 160)
     
         ax2.spines['top'].set_visible(False); ax3.spines['top'].set_visible(False)
+        # Rotação para caber os rótulos com datas
+        plt.setp(ax2.get_xticklabels(), rotation=35, ha='right', fontsize=9)
+        fig2.tight_layout()
         st.pyplot(fig2)
 
-    with t3:
-        st.info("A Inteligência Artificial cruza inchaço, dor em padrões de carga elástica/excêntrica e déficits articulares. **O diagnóstico final pertence ao Fisioterapeuta.**")
-        st.markdown(f"**🔬 Análise do Algoritmo:** {fenotipo}")
-        st.markdown(f"**💡 Conduta Baseada em Evidência:** {diretriz}")
-    
-        st.markdown("---")
-        col_b1, col_b2 = st.columns(2)
-        col_b1.metric("Amplitude de Flexão", f"{ultima.get('Flexao', 90)}°")
-        col_b2.info(f"Extensão Terminal Atual: {ultima.get('Extensao', 'Sem dados')}")
-
-    with t4:
-        st.success(f"💡 **Variável Bio-Psico-Social (Sono):** Paciente apresentou padrão predominante '{sono_atual}' na avaliação.")
-        st.caption("O sistema rastreia oscilações de dor que não respondem à carga mecânica para deduzir possível Sensibilização Central baseada no sono.")
-
-    with t_ia:
+    with t_ic:
         # ============================================================
-        # 🤖 IA CLÍNICA — Análise baseada em evidência (FASE 2)
+        # 🧠 INTELIGÊNCIA CLÍNICA — Central única de insights
+        # Combina 3 camadas complementares:
+        #   1) Análise Automatizada (motor Fase 2, baseado em evidência)
+        #   2) Raciocínio Clínico (interpretação da IA sobre fenótipo/conduta)
+        #   3) Gatilhos Bio-Psico-Sociais (sono, sensibilização central)
         # ============================================================
-        # Chama o módulo ia_clinica.py que executa:
-        #   • Detector de estagnação por MCID (5 sessões sem melhora ≥ MCID)
-        #   • Cálculo automático de LSI com thresholds Grindem 2016
-        #   • Análise de bandeiras clínicas (vermelha/amarela/azul/negra)
-        # Toda regra tem referência científica documentada e é auditável.
+
+        # ---------- CAMADA 1: Motor de IA baseado em evidência ----------
         try:
             with st.spinner("🧠 Executando análise clínica baseada em evidência..."):
                 insights = analisar_paciente(st.session_state.paciente)
             renderizar_insights(insights, CORES_GENUA)
         except Exception as e:
-            st.error(f"❌ Erro ao gerar insights clínicos: {e}")
+            st.error(f"❌ Erro ao gerar insights: {e}")
             st.caption("Verifique se o paciente possui avaliação inicial e sessões de check-in registradas.")
+
+        st.markdown("---")
+
+        # ---------- CAMADA 2: Raciocínio Clínico narrativo ----------
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🔬 Raciocínio Clínico do Algoritmo</h4>", unsafe_allow_html=True)
+        st.info("A Inteligência Artificial cruza inchaço, dor em padrões de carga elástica/excêntrica e déficits articulares. **O diagnóstico final pertence ao Fisioterapeuta.**")
+        st.markdown(f"**🔬 Análise do Algoritmo:** {fenotipo}")
+        st.markdown(f"**💡 Conduta Baseada em Evidência:** {diretriz}")
+
+        col_b1, col_b2 = st.columns(2)
+        col_b1.metric("Amplitude de Flexão", f"{ultima.get('Flexao', 90)}°")
+        col_b2.info(f"Extensão Terminal Atual: {ultima.get('Extensao', 'Sem dados')}")
+
+        st.markdown("---")
+
+        # ---------- CAMADA 3: Gatilhos Bio-Psico-Sociais ----------
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']};'>🎯 Gatilhos Bio-Psico-Sociais</h4>", unsafe_allow_html=True)
+        st.success(f"💡 **Variável Bio-Psico-Social (Sono):** Paciente apresentou padrão predominante '{sono_atual}' na avaliação.")
+        st.caption("O sistema rastreia oscilações de dor que não respondem à carga mecânica para deduzir possível Sensibilização Central baseada no sono.")
+
     # --- MÓDULO DE EXPORTAÇÃO COMPLEXO (LAUDO MÉDICO + MATRIZ DE GRÁFICOS) ---
     st.markdown("---")
     titulo("📄 Exportação de Laudo Clínico Avançado")

@@ -71,6 +71,113 @@ LSI_ALTA_FUNCIONAL = 90.0     # ≥90% = critério de alta funcional
 LSI_ATENCAO = 85.0            # 85-89% = zona de atenção
 LSI_REF = "Grindem 2016 (doi:10.1136/bjsports-2016-096031)"
 
+
+# ============================================================
+# NORMALIZAÇÃO DE DIAGNÓSTICO (preparação p/ gráficos contextuais)
+# ============================================================
+# Detecta o fenótipo clínico a partir do texto livre digitado pelo fisio.
+# Cada fenótipo define quais métricas devem ser plotadas no painel:
+#   - Tendinopatia: dor + carga excêntrica (não ADM!)
+#   - Pós-LCA: dor + flexão + extensão + LSI
+#   - Condromalácia: dor + dor em funcionais (agachamento, escada)
+#   - Meniscopatia: dor + ADM + bloqueio articular
+#   - Artrose: dor + rigidez matinal + WOMAC
+FENOTIPOS = {
+    "pos_lca": {
+        "label": "Pós-LCA (Reconstrução do Ligamento Cruzado Anterior)",
+        "keywords": ["lca", "cruzado anterior", "cruzado ant", "reconstrucao lca", "reconstrução lca", "acl"],
+        "metricas_relevantes": ["Dor", "Flexao", "Extensao", "LSI"],
+        "prom_principal": "IKDC",
+        "tempo_esperado_semanas": 36,
+    },
+    "tendinopatia_patelar": {
+        "label": "Tendinopatia Patelar (Jumper's Knee)",
+        "keywords": ["tendinopatia patelar", "jumper", "tendinite patelar", "tendinose patelar", "visa-p", "visa_p"],
+        "metricas_relevantes": ["Dor", "Carga_Excentrica"],
+        "prom_principal": "VISA_P",
+        "tempo_esperado_semanas": 24,
+    },
+    "tendinopatia_quadriceps": {
+        "label": "Tendinopatia do Quadríceps",
+        "keywords": ["tendinopatia quadriceps", "tendinopatia quadrícipe", "tendinite quadriceps"],
+        "metricas_relevantes": ["Dor", "Carga_Excentrica"],
+        "prom_principal": "VISA_P",
+        "tempo_esperado_semanas": 24,
+    },
+    "condromalacia": {
+        "label": "Condromalácia / Síndrome Patelofemoral",
+        "keywords": ["condromalacia", "condromalácia", "patelofemoral", "condropatia", "sfp"],
+        "metricas_relevantes": ["Dor", "Testes_Funcionais"],
+        "prom_principal": "KOOS",
+        "tempo_esperado_semanas": 12,
+    },
+    "meniscopatia": {
+        "label": "Lesão Meniscal",
+        "keywords": ["menisco", "meniscopatia", "meniscectomia", "sutura meniscal"],
+        "metricas_relevantes": ["Dor", "Flexao", "Extensao"],
+        "prom_principal": "Lysholm",
+        "tempo_esperado_semanas": 16,
+    },
+    "artrose_joelho": {
+        "label": "Osteoartrose do Joelho",
+        "keywords": ["artrose", "osteoartrose", "osteoartrite", "oa", "gonartrose"],
+        "metricas_relevantes": ["Dor", "Rigidez", "Funcao"],
+        "prom_principal": "WOMAC",
+        "tempo_esperado_semanas": 24,
+    },
+    "lcm_lcl": {
+        "label": "Lesão de Ligamento Colateral (LCM/LCL)",
+        "keywords": ["colateral", "lcm", "lcl", "ligamento colateral"],
+        "metricas_relevantes": ["Dor", "Flexao", "Extensao"],
+        "prom_principal": "IKDC",
+        "tempo_esperado_semanas": 12,
+    },
+}
+
+
+def normalizar_diagnostico(texto_diagnostico: str) -> dict:
+    """
+    Detecta o fenótipo clínico a partir do texto livre de diagnóstico.
+
+    Args:
+        texto_diagnostico: texto digitado pelo fisio no cadastro
+                           (ex: "Pós-op LCA", "condromalácia", "VISA-P baixo")
+
+    Returns:
+        dict com {fenotipo, label, metricas_relevantes, prom_principal, tempo_esperado_semanas}
+        Se não reconhecer, retorna fenotipo "generico" com métricas padrão.
+    """
+    if not texto_diagnostico:
+        return {
+            "fenotipo": "generico",
+            "label": "Não especificado",
+            "metricas_relevantes": ["Dor", "Flexao"],
+            "prom_principal": "Lysholm",
+            "tempo_esperado_semanas": None,
+        }
+
+    texto = str(texto_diagnostico).lower().strip()
+
+    for fenotipo, cfg in FENOTIPOS.items():
+        for keyword in cfg["keywords"]:
+            if keyword in texto:
+                return {
+                    "fenotipo": fenotipo,
+                    "label": cfg["label"],
+                    "metricas_relevantes": cfg["metricas_relevantes"],
+                    "prom_principal": cfg["prom_principal"],
+                    "tempo_esperado_semanas": cfg["tempo_esperado_semanas"],
+                }
+
+    return {
+        "fenotipo": "generico",
+        "label": f"Não reconhecido ({texto_diagnostico})",
+        "metricas_relevantes": ["Dor", "Flexao"],
+        "prom_principal": "Lysholm",
+        "tempo_esperado_semanas": None,
+    }
+
+
 # --- Bandeiras clínicas ---
 BANDEIRAS = {
     "vermelha": {
@@ -329,12 +436,23 @@ def analisar_paciente(paciente_nome: str) -> dict:
     resultado = {
         "paciente": paciente_nome,
         "gerado_em": datetime.now().isoformat(),
+        "fenotipo": None,
         "estagnacao": None,
         "estagnacao_funcional": None,
         "lsi": None,
         "bandeiras": [],
         "sessoes_registradas": 0
     }
+
+    # --- 0. FENÓTIPO CLÍNICO (leitura do Cadastro) ---
+    try:
+        df_cad = conn.read("Cadastro")
+        registro = df_cad[df_cad["Nome"].astype(str).str.strip() == paciente_nome]
+        if not registro.empty:
+            dx_texto = registro.iloc[-1].get("Diagnostico_Clinico", "")
+            resultado["fenotipo"] = normalizar_diagnostico(dx_texto)
+    except Exception:
+        resultado["fenotipo"] = normalizar_diagnostico("")
 
     # --- 1. LEITURA DO HISTÓRICO (Evolucao) ---
     try:
@@ -417,6 +535,22 @@ def renderizar_insights(insights: dict, cores: dict):
     if insights["sessoes_registradas"] == 0:
         st.info("ℹ️ Paciente ainda sem sessões de check-in registradas. Os insights aparecerão após os primeiros atendimentos.")
         return
+
+    # ==== FENÓTIPO CLÍNICO ====
+    fen = insights.get("fenotipo") or {}
+    if fen.get("fenotipo") and fen["fenotipo"] != "generico":
+        st.markdown(
+            f"<div style='background: {cores['fundo_claro']}; border-left: 4px solid {cores['secundaria']}; "
+            f"padding: 12px 16px; border-radius: 8px; margin-bottom: 15px;'>"
+            f"<strong style='color: {cores['primaria']};'>🎯 Fenótipo Clínico Identificado:</strong> {fen['label']}<br>"
+            f"<small style='color: {cores['texto_suave']};'>Foco de análise: {', '.join(fen['metricas_relevantes'])} "
+            f"| PROM principal: {fen['prom_principal']} "
+            f"| Tempo esperado de reabilitação: {fen['tempo_esperado_semanas']} semanas</small>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    elif fen.get("fenotipo") == "generico":
+        st.caption(f"ℹ️ Fenótipo não reconhecido pelo algoritmo. Considere padronizar o Diagnóstico Clínico no Cadastro para análise contextual.")
 
     # ==== KPIs no topo ====
     col1, col2, col3 = st.columns(3)
