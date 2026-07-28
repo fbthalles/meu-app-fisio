@@ -12,10 +12,7 @@ import numpy as np
 from datetime import datetime
 from config import CORES_GENUA, titulo
 from firebase_client import conn, db, invalidar_cache
-
-from ia_clinica import analisar_paciente
-insights = analisar_paciente(st.session_state.paciente)
-renderizar_insights(insights)
+from ia_clinica import analisar_paciente, renderizar_insights
 
 def render():
     # Lazy imports — só carregam quando o painel é realmente aberto
@@ -207,7 +204,7 @@ def render():
     st.progress(lsi_atual / 100)
 
     # --- 4. ABAS GRÁFICAS DE ALTA PERFORMANCE (MATPLOTLIB) ---
-    t1, t2, t3, t4 = st.tabs(["📊 Correlação Dor x Função", "📉 Evolução Biomecânica", "🧠 Raciocínio Clínico", "🎯 Gatilhos"])
+    t1, t2, t3, t4, t_ia = st.tabs(["📊 Correlação Dor x Função", "📉 Evolução Biomecânica", "🧠 Raciocínio Clínico", "🎯 Gatilhos", "🤖 IA Clínica"])
 
     with t1:
         st.markdown("**Gráfico de Dispersão: Tolerância ao Movimento**")
@@ -257,6 +254,22 @@ def render():
         st.success(f"💡 **Variável Bio-Psico-Social (Sono):** Paciente apresentou padrão predominante '{sono_atual}' na avaliação.")
         st.caption("O sistema rastreia oscilações de dor que não respondem à carga mecânica para deduzir possível Sensibilização Central baseada no sono.")
 
+    with t_ia:
+        # ============================================================
+        # 🤖 IA CLÍNICA — Análise baseada em evidência (FASE 2)
+        # ============================================================
+        # Chama o módulo ia_clinica.py que executa:
+        #   • Detector de estagnação por MCID (5 sessões sem melhora ≥ MCID)
+        #   • Cálculo automático de LSI com thresholds Grindem 2016
+        #   • Análise de bandeiras clínicas (vermelha/amarela/azul/negra)
+        # Toda regra tem referência científica documentada e é auditável.
+        try:
+            with st.spinner("🧠 Executando análise clínica baseada em evidência..."):
+                insights = analisar_paciente(st.session_state.paciente)
+            renderizar_insights(insights, CORES_GENUA)
+        except Exception as e:
+            st.error(f"❌ Erro ao gerar insights clínicos: {e}")
+            st.caption("Verifique se o paciente possui avaliação inicial e sessões de check-in registradas.")
     # --- MÓDULO DE EXPORTAÇÃO COMPLEXO (LAUDO MÉDICO + MATRIZ DE GRÁFICOS) ---
     st.markdown("---")
     titulo("📄 Exportação de Laudo Clínico Avançado")
