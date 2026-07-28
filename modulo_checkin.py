@@ -2,7 +2,7 @@
 import streamlit as st
 from datetime import datetime
 from config import CORES_GENUA, titulo
-from firebase_client import conn, db
+from firebase_client import conn, db, invalidar_cache
 
 def render():
     st.markdown(f"<h3 style='color: {CORES_GENUA['primaria']};'>📝 Check-in Diário e Evolução</h3>", unsafe_allow_html=True)
@@ -74,6 +74,7 @@ def render():
         with st.spinner("A registar a sessão na nuvem..."):
             try:
                 db.collection("Evolucao").add(dados_sessao)
+                invalidar_cache("Evolucao")
                 st.success("✅ Check-in diário registado com sucesso! Os gráficos e o PDF já foram atualizados.")
             except Exception as e:
                 st.error(f"❌ Erro ao guardar os dados: {e}")

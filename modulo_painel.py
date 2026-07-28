@@ -1,18 +1,24 @@
-"""GENUA | Módulo 3: Painel Analítico (Cérebro Clínico — Joelho)."""
+"""GENUA | Módulo 3: Painel Analítico (Cérebro Clínico — Joelho).
+
+Performance: matplotlib, FPDF e PIL ficam em lazy import dentro de render(),
+para não pesar o startup do app quando o usuário ainda não abriu o painel.
+"""
 import io
 import base64
 import urllib.parse
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from datetime import datetime
-from fpdf import FPDF
-from PIL import Image
 from config import CORES_GENUA, titulo
-from firebase_client import conn, db
+from firebase_client import conn, db, invalidar_cache
 
 def render():
+    # Lazy imports — só carregam quando o painel é realmente aberto
+    import matplotlib.pyplot as plt
+    from fpdf import FPDF
+    from PIL import Image
+
     p_sel = st.session_state.paciente
 
     # --- A. RESGATE DO CADASTRO ---

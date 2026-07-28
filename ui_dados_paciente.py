@@ -2,7 +2,7 @@
 import streamlit as st
 from datetime import datetime
 from config import CORES_GENUA, titulo
-from firebase_client import conn, db
+from firebase_client import conn, db, invalidar_cache
 
 def render():
         st.header("👤 Gestão de Pacientes")
@@ -57,6 +57,7 @@ def render():
                             
                                 # O COMANDO DE SALVAMENTO ABSOLUTO
                                 db.collection("Cadastro").add(novo_cad)
+                                invalidar_cache("Cadastro")
                             
                                 st.session_state.paciente = nome.strip()
                                 st.session_state.membro_ativo = "Joelho" 

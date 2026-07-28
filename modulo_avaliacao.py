@@ -9,7 +9,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw
 from streamlit_image_coordinates import streamlit_image_coordinates
 from config import CORES_GENUA, titulo
-from firebase_client import conn, db
+from firebase_client import conn, db, invalidar_cache
 
 def render():
     st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
@@ -540,10 +540,12 @@ def render():
                         if modo_edicao:
                             # ATUALIZA O DOCUMENTO EXISTENTE
                             db.collection("Avaliacao_Inicial").document(st.session_state.doc_id_avaliacao).update(dados_avaliacao)
+                            invalidar_cache("Avaliacao_Inicial")
                             st.success("🔄 Prontuário atualizado com sucesso! As alterações foram guardadas.")
                         else:
                             # CRIA UM NOVO DOCUMENTO
                             db.collection("Avaliacao_Inicial").add(dados_avaliacao)
+                            invalidar_cache("Avaliacao_Inicial")
                             st.success("✅ Nova Avaliação criada com sucesso!")
                         
                     except Exception as e:
