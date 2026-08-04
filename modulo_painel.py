@@ -207,39 +207,158 @@ def render():
     t1, t2, t_ic = st.tabs(["📊 Correlação Dor x Função", "📉 Evolução Biomecânica", "🧠 Inteligência Clínica"])
 
     with t1:
-        st.markdown("**Gráfico de Dispersão: Tolerância ao Movimento**")
-        st.caption("Verifica se a redução da dor resultou em ganhos reais de funcionalidade (LSI).")
-        fig1, ax1 = plt.subplots(figsize=(10, 4))
-        ax1.scatter(df_p['Dor'], df_p['LSI'], color=CORES_GENUA['secundaria'], s=100, alpha=0.8, edgecolors='white')
-    
-        # Tendência Linar (Regressão)
+        # ============================================================
+        # GRÁFICO 1: DOR × FUNÇÃO (Linhas Cruzadas — o que Edgar pediu)
+        # Se a dor cai e a função melhora, as linhas se cruzam = sucesso terapêutico
+        # ============================================================
+        st.markdown("**📊 Correlação Dor × Função ao Longo do Tratamento**")
+        st.caption("Se as linhas se cruzam (dor caindo, função subindo), o tratamento está funcionando.")
+
+        # Converte Testes_Funcionais para score numérico (0-10)
+        mapa_func_score = {
+            "Sem Dor (0)": 10, "Sem Dor": 10,
+            "Dor Leve (1 - 3)": 7, "Dor Leve": 7,
+            "Dor Moderada (4 - 7)": 4, "Dor Moderada": 4,
+            "Dor Grave (8 - 10)": 1, "Dor Grave": 1,
+            "Incapaz (Não realiza)": 0, "Incapaz": 0, "Não testado": None
+        }
+
+        # Extrai score funcional por sessão (média dos testes registrados)
+        func_scores = []
+        testes_nomes = set()
+        for _, row in df_p.iterrows():
+            testes = row.get('Testes_Funcionais', {})
+            if isinstance(testes, dict) and testes:
+                scores_sessao = []
+                for teste_nome, resultado in testes.items():
+                    testes_nomes.add(teste_nome)
+                    score = mapa_func_score.get(resultado)
+                    if score is not None:
+                        scores_sessao.append(score)
+                func_scores.append(sum(scores_sessao) / len(scores_sessao) if scores_sessao else None)
+            else:
+                func_scores.append(None)
+
+        df_p['Func_Score'] = func_scores
+
+        fig1, ax1 = plt.subplots(figsize=(10, 4.5))
+
+        # Linha de Dor (vermelha, caindo = bom)
+        ax1.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'],
+                 marker='o', lw=2.5, label="Dor (EVA)", zorder=3)
+        ax1.fill_between(range(len(df_p)), df_p['Dor'], alpha=0.08, color=CORES_GENUA['alerta_erro'])
+        ax1.set_ylabel("Dor (EVA 0-10)", color=CORES_GENUA['alerta_erro'], fontweight='bold')
+        ax1.set_ylim(-0.5, 10.5)
+
+        # Linha de Função (verde/teal, subindo = bom) — eixo secundário
+        ax1b = ax1.twinx()
+        func_plot = df_p['Func_Score'].interpolate() if df_p['Func_Score'].notna().sum() > 1 else df_p['Func_Score']
+        ax1b.plot(df_p['Sessão_Num'], func_plot, color='#28a745',
+                  marker='s', lw=2.5, linestyle='--', label="Função (média testes)", zorder=3)
+        ax1b.fill_between(range(len(df_p)), func_plot.fillna(0), alpha=0.08, color='#28a745')
+        ax1b.set_ylabel("Função (0-10)", color='#28a745', fontweight='bold')
+        ax1b.set_ylim(-0.5, 10.5)
+
+        ax1.spines['top'].set_visible(False)
+        ax1b.spines['top'].set_visible(False)
+        plt.setp(ax1.get_xticklabels(), rotation=35, ha='right', fontsize=9)
+
+        # Legenda combinada
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax1b.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper center', ncol=2, framealpha=0.9, fontsize=9)
+
+        fig1.tight_layout()
+        st.pyplot(fig1)
+
+        # Mini-tabela: evolução por teste funcional individual
+        if testes_nomes:
+            st.markdown("---")
+            st.markdown("**Detalhamento por Teste Funcional**")
+            for teste_nome in sorted(testes_nomes):
+                valores_teste = []
+                for _, row in df_p.iterrows():
+                    testes = row.get('Testes_Funcionais', {})
+                    if isinstance(testes, dict):
+                        valores_teste.append(testes.get(teste_nome, "—"))
+                    else:
+                        valores_teste.append("—")
+                primeira = valores_teste[0] if valores_teste else "—"
+                ultima_val = valores_teste[-1] if valores_teste else "—"
+                st.caption(f"**{teste_nome}:** {primeira} → {ultima_val}")
+
+        # Scatter Dor vs LSI (mantém o original)
+        st.markdown("---")
+        st.markdown("**Dispersão: Tolerância ao Movimento (Dor × Prontidão)**")
+        fig1b, ax1c = plt.subplots(figsize=(10, 3.5))
+        ax1c.scatter(df_p['Dor'], df_p['LSI'], color=CORES_GENUA['secundaria'], s=100, alpha=0.8, edgecolors='white')
         if len(df_p) > 2:
             z = np.polyfit(df_p['Dor'], df_p['LSI'], 1)
             p = np.poly1d(z)
-            ax1.plot(df_p['Dor'], p(df_p['Dor']), color=CORES_GENUA['primaria'], linestyle='--', lw=1)
-        
-        ax1.set_xlabel("Dor (EVA 0-10)"); ax1.set_ylabel("Prontidão (LSI %)")
-        ax1.set_xlim(-0.5, 10.5); ax1.set_ylim(-5, 105)
-        ax1.spines['top'].set_visible(False); ax1.spines['right'].set_visible(False)
-        st.pyplot(fig1)
+            ax1c.plot(df_p['Dor'], p(df_p['Dor']), color=CORES_GENUA['primaria'], linestyle='--', lw=1)
+        ax1c.set_xlabel("Dor (EVA 0-10)"); ax1c.set_ylabel("Prontidão (LSI %)")
+        ax1c.set_xlim(-0.5, 10.5); ax1c.set_ylim(-5, 105)
+        ax1c.spines['top'].set_visible(False); ax1c.spines['right'].set_visible(False)
+        fig1b.tight_layout()
+        st.pyplot(fig1b)
 
     with t2:
-        st.markdown("**Evolução Longitudinal de Sintomas e Mobilidade**")
-        fig2, ax2 = plt.subplots(figsize=(10, 4))
-    
-        # Eixo Duplo: Dor (Esquerda) e Flexão (Direita)
-        ax2.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'], marker='o', lw=2, label="Dor")
-        ax2.set_ylabel("Dor", color=CORES_GENUA['alerta_erro'], fontweight='bold')
+        # ============================================================
+        # GRÁFICO 2: EVOLUÇÃO CONTEXTUAL (adapta ao diagnóstico)
+        # Se o fenótipo for tendinopatia, não mostra Flexão.
+        # Se for Pós-LCA, mostra Flexão + Extensão.
+        # ============================================================
+        st.markdown("**📉 Evolução Longitudinal (Contextual ao Diagnóstico)**")
+
+        # Detecta fenótipo via ia_clinica
+        try:
+            from ia_clinica import normalizar_diagnostico
+            fen = normalizar_diagnostico(dx_clinico_base)
+            metricas = fen.get("metricas_relevantes", ["Dor", "Flexao"])
+            st.caption(f"🎯 Fenótipo: **{fen['label']}** — Métricas priorizadas: {', '.join(metricas)}")
+        except Exception:
+            metricas = ["Dor", "Flexao"]
+
+        fig2, ax2 = plt.subplots(figsize=(10, 4.5))
+
+        # Sempre mostra Dor
+        ax2.plot(df_p['Sessão_Num'], df_p['Dor'], color=CORES_GENUA['alerta_erro'],
+                 marker='o', lw=2.5, label="Dor (EVA)")
+        ax2.set_ylabel("Dor (EVA 0-10)", color=CORES_GENUA['alerta_erro'], fontweight='bold')
         ax2.set_ylim(-0.5, 10.5)
-    
+
+        # Eixo secundário: adapta ao fenótipo
         ax3 = ax2.twinx()
-        ax3.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'], marker='s', lw=2, linestyle=':', label="Flexão (°)")
-        ax3.set_ylabel("Flexão (°)", color=CORES_GENUA['secundaria'], fontweight='bold')
-        ax3.set_ylim(0, 160)
-    
-        ax2.spines['top'].set_visible(False); ax3.spines['top'].set_visible(False)
-        # Rotação para caber os rótulos com datas
+
+        if "Flexao" in metricas:
+            ax3.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'],
+                     marker='s', lw=2, linestyle=':', label="Flexão (°)")
+            ax3.set_ylabel("Flexão (°)", color=CORES_GENUA['secundaria'], fontweight='bold')
+            ax3.set_ylim(0, 160)
+        elif "Carga_Excentrica" in metricas or "Testes_Funcionais" in metricas:
+            # Para tendinopatias e condromalácia: mostra score funcional
+            if 'Func_Score' in df_p.columns:
+                func_data = df_p['Func_Score'].interpolate() if df_p['Func_Score'].notna().sum() > 1 else df_p['Func_Score']
+                ax3.plot(df_p['Sessão_Num'], func_data, color='#28a745',
+                         marker='s', lw=2, linestyle=':', label="Função (Score)")
+                ax3.set_ylabel("Função (0-10)", color='#28a745', fontweight='bold')
+                ax3.set_ylim(-0.5, 10.5)
+        else:
+            # Default: mostra Flexão
+            ax3.plot(df_p['Sessão_Num'], df_p['Flexao'], color=CORES_GENUA['secundaria'],
+                     marker='s', lw=2, linestyle=':', label="Flexão (°)")
+            ax3.set_ylabel("Flexão (°)", color=CORES_GENUA['secundaria'], fontweight='bold')
+            ax3.set_ylim(0, 160)
+
+        ax2.spines['top'].set_visible(False)
+        ax3.spines['top'].set_visible(False)
         plt.setp(ax2.get_xticklabels(), rotation=35, ha='right', fontsize=9)
+
+        # Legenda combinada
+        lines1, labels1 = ax2.get_legend_handles_labels()
+        lines2, labels2 = ax3.get_legend_handles_labels()
+        ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper right', framealpha=0.9, fontsize=9)
+
         fig2.tight_layout()
         st.pyplot(fig2)
 
