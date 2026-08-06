@@ -108,41 +108,57 @@ class LaudoGenua(FPDF):
         self.set_fill_color(*cor)
         self.rect(x, y, 3, h, 'F')
         # Label
-        self.set_xy(x + 6, y + 2)
+        inner_w = w - 8
+        if inner_w < 10:
+            inner_w = 10
+        self.set_xy(x + 5, y + 2)
         self.set_font('Arial', '', 8)
         self.set_text_color(*CINZA)
-        self.cell(w - 8, 4, _limpar_texto(label), 0, 2)
+        self.cell(inner_w, 4, _limpar_texto(str(label))[:30], 0, 2)
         # Valor grande
-        self.set_font('Arial', 'B', 22)
+        self.set_font('Arial', 'B', 20)
         self.set_text_color(*cor)
-        self.cell(w - 8, 12, _limpar_texto(str(valor)), 0, 2)
+        self.cell(inner_w, 11, _limpar_texto(str(valor))[:20], 0, 2)
         # Subtexto
         if subtexto:
-            self.set_font('Arial', '', 7)
+            self.set_font('Arial', '', 6)
             self.set_text_color(*CINZA)
-            self.cell(w - 8, 4, _limpar_texto(subtexto), 0, 2)
+            self.cell(inner_w, 4, _limpar_texto(str(subtexto))[:40], 0, 2)
 
     def tabela_simples(self, headers, rows, col_widths=None):
         """Renderiza tabela com header azul e linhas alternadas."""
         if not col_widths:
             col_widths = [190 // len(headers)] * len(headers)
+
+        # Garante que x começa na margem esquerda
+        self.set_x(10)
+
         # Header
-        self.set_font('Arial', 'B', 9)
+        self.set_font('Arial', 'B', 8)
         self.set_fill_color(*AZUL)
         self.set_text_color(*BRANCO)
         for i, h in enumerate(headers):
-            self.cell(col_widths[i], 7, _limpar_texto(h), 1, 0, 'C', fill=True)
+            w = col_widths[i]
+            # Trunca texto ao tamanho máximo que cabe na célula (~2 chars por mm)
+            max_chars = max(3, int(w * 0.5))
+            txt = _limpar_texto(h)[:max_chars]
+            self.cell(w, 7, txt, 1, 0, 'C', fill=True)
         self.ln()
+
         # Rows
-        self.set_font('Arial', '', 8)
+        self.set_font('Arial', '', 7)
         self.set_text_color(*PRETO)
         for r_idx, row in enumerate(rows):
+            self.set_x(10)
             if r_idx % 2 == 0:
                 self.set_fill_color(*CINZA_CLARO)
             else:
                 self.set_fill_color(*BRANCO)
-            for i, cell in enumerate(row):
-                self.cell(col_widths[i], 6, _limpar_texto(str(cell)), 1, 0, 'C', fill=True)
+            for i, cell_val in enumerate(row):
+                w = col_widths[i]
+                max_chars = max(3, int(w * 0.5))
+                txt = _limpar_texto(str(cell_val))[:max_chars]
+                self.cell(w, 6, txt, 1, 0, 'C', fill=True)
             self.ln()
 
 
@@ -235,9 +251,9 @@ def gerar_laudo(paciente_nome, dados_aval, historico, insights=None, fenotipo=No
                 f'{flex_atual:.0f} graus', sinal_flex, cor_flex)
 
     pdf.kpi_box(138, y_kpi, w_kpi, 28, 'SESSOES REALIZADAS',
-                str(n_sessoes), f'Periodo: {hist[0].get("Data", "?")[:10]} a {hist[-1].get("Data", "?")[:10]}' if hist else '', AZUL)
+                str(n_sessoes), f'{hist[0].get("Data", "?")[:10]} a {hist[-1].get("Data", "?")[:10]}' if hist else '', AZUL)
 
-    pdf.ln(35)
+    pdf.set_xy(10, y_kpi + 35)
 
     # Tabela resumo últimas 5 sessões
     if hist:
