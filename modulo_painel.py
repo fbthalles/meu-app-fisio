@@ -402,151 +402,45 @@ def render():
     # --- MÓDULO DE EXPORTAÇÃO COMPLEXO (LAUDO MÉDICO + MATRIZ DE GRÁFICOS) ---
     st.markdown("---")
     titulo("📄 Exportação de Laudo Clínico Avançado")
-    st.caption("Gera um relatório oficial em formato PDF contendo os dados da Avaliação Inicial, Scores PBE e os gráficos reais de evolução clínica.")
+    st.caption("Gera um relatório profissional (5-6 páginas) com gráficos, PROMs, análise de IA e referências científicas.")
 
     if st.button("⚙️ GERAR RELATÓRIO COM GRÁFICOS", width='stretch'):
-        with st.spinner("Buscando dados na nuvem e renderizando gráficos no laudo..."):
+        with st.spinner("🧠 Compilando laudo clínico avançado com gráficos e análise de IA..."):
             try:
-                # 1. Busca Segura dos Dados no Firebase Firestore
+                from pdf_laudo import gerar_laudo
+                from ia_clinica import analisar_paciente as _analisar, normalizar_diagnostico as _normalizar
+
+                # 1. Busca dados
                 docs_aval = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
                 lista_aval = [doc.to_dict() for doc in docs_aval]
                 dados_aval = lista_aval[-1] if lista_aval else {}
-            
+
                 docs_evo = db.collection("Evolucao").where("Paciente", "==", st.session_state.paciente).stream()
                 historico = [doc.to_dict() for doc in docs_evo]
-            
-                # 2. Inicialização do Documento PDF
-                pdf = FPDF()
-                pdf.add_page()
-            
-                # Cabeçalho Institucional
-                pdf.set_font('Arial', 'B', 16)
-                pdf.set_text_color(16, 62, 85) # Azul Genua
-                pdf.cell(0, 10, 'GENUA - Inteligencia Clinica Integrada', 0, 1, 'C')
-                pdf.set_font('Arial', 'I', 10)
-                pdf.set_text_color(100, 100, 100)
-                pdf.cell(0, 5, 'Laudo de Evolucao Funcional e Biomecanica', 0, 1, 'C')
-                pdf.ln(10)
-            
-                # Identificação Clínica do Paciente
-                pdf.set_font('Arial', 'B', 12)
-                pdf.set_text_color(0, 0, 0)
-                pdf.cell(0, 8, f"Paciente: {st.session_state.paciente}", 0, 1)
-                pdf.set_font('Arial', '', 10)
-                pdf.cell(0, 6, f"Membro Alvo: {st.session_state.get('membro_ativo', 'Joelho')}", 0, 1)
-                pdf.cell(0, 6, f"Data de Emissao: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
-                pdf.ln(5)
-            
-                # 3. Bloco da Avaliação Inicial e Scores Funcionais
-                if dados_aval:
-                    pdf.set_font('Arial', 'B', 11)
-                    pdf.set_fill_color(240, 240, 240)
-                    pdf.cell(0, 8, ' MARCOS DA AVALIACAO INICIAL', 0, 1, fill=True)
-                    pdf.set_font('Arial', '', 10)
-                
-                    qp_texto = str(dados_aval.get("QP", "N/A")).encode('ascii', 'ignore').decode('ascii')
-                    pdf.multi_cell(0, 6, f"Queixa Principal: {qp_texto}")
-                
-                    pdf.ln(2)
-                    pdf.set_font('Arial', 'B', 10)
-                    pdf.cell(0, 6, 'Métricas Baseadas em Evidência (PROMs):', 0, 1)
-                    pdf.set_font('Arial', '', 10)
-                
-                    if float(dados_aval.get('LEFS_Pct', 0)) > 0:
-                        pdf.cell(0, 6, f"- LEFS (Funcionalidade Geral): {float(dados_aval.get('LEFS_Pct', 0)):.1f}% ({dados_aval.get('Interpretacao_LEFS', '')})", 0, 1)
-                    if float(dados_aval.get('WOMAC_Pct', 0)) > 0:
-                        pdf.cell(0, 6, f"- WOMAC (Osteoartrite): {float(dados_aval.get('WOMAC_Pct', 0)):.1f}%", 0, 1)
-                    if float(dados_aval.get('VISA_P_Pts', 0)) > 0:
-                        pdf.cell(0, 6, f"- VISA-P (Tendinopatia Patelar): {float(dados_aval.get('VISA_P_Pts', 0))} pts", 0, 1)
-                    if float(dados_aval.get('Lysholm_Pts', 0)) > 0:
-                        pdf.cell(0, 6, f"- Lysholm (Lesao de Menisco/Ligamento): {float(dados_aval.get('Lysholm_Pts', 0))} pts", 0, 1)
-                    if float(dados_aval.get('KOOS_Pct', 0)) > 0:
-                        pdf.cell(0, 6, f"- KOOS (Score Agregado): {float(dados_aval.get('KOOS_Pct', 0)):.1f}%", 0, 1)
-                    if float(dados_aval.get('IKDC_Pct', 0)) > 0:
-                        pdf.cell(0, 6, f"- IKDC Subjetivo: {float(dados_aval.get('IKDC_Pct', 0)):.1f}%", 0, 1)
-            
-                # 4. Geração Dinâmica da Matriz Gráfica
-                if historico:
-                    # Ordena o histórico por data para os gráficos fazerem sentido cronológico
-                    historico_ordenado = sorted(historico, key=lambda x: x.get('Data', ''))
-                
-                    datas = [ev.get('Data', 'N/A')[:5] for ev in historico_ordenado]
-                    dores = [float(ev.get('Dor', 0)) for ev in historico_ordenado]
-                    flexoes = [float(ev.get('Flexao', 0)) for ev in historico_ordenado]
-                
-                    # --- GRÁFICO 1: EVOLUÇÃO DA DOR (EVA) ---
-                    pdf.ln(5)
-                    pdf.set_font('Arial', 'B', 11)
-                    pdf.cell(0, 8, ' CURVA DE EVOLUCAO DA DOR (EVA)', 0, 1, fill=True)
-                
-                    fig, ax = plt.subplots(figsize=(6.5, 2.2))
-                    ax.plot(datas, dores, marker='o', color='#103E55', linewidth=2.5, label='Intensidade da Dor')
-                    ax.set_ylabel('Escala EVA (0-10)', color='#1A252C')
-                    ax.set_ylim(-0.5, 10.5)
-                    ax.grid(True, linestyle='--', alpha=0.5)
-                    plt.tight_layout()
-                
-                    img_buf_dor = io.BytesIO()
-                    plt.savefig(img_buf_dor, format='png', dpi=200)
-                    img_buf_dor.seek(0)
-                    plt.close(fig)
-                
-                    # Desenha o gráfico de dor direto na página atual
-                    pdf.image(img_buf_dor, w=180, h=60)
-                
-                    # --- GRÁFICO 2: AMPLITUDE DE MOVIMENTO (ADM FLEXÃO) ---
-                    pdf.add_page() # Move os gráficos biomecânicos para a página 2
-                    pdf.set_font('Arial', 'B', 11)
-                    pdf.cell(0, 8, ' EVOLUCAO DA AMPLITUDE DE MOVIMENTO (FLEXAO)', 0, 1, fill=True)
-                
-                    fig2, ax2 = plt.subplots(figsize=(6.5, 2.2))
-                    ax2.plot(datas, flexoes, marker='s', color='#398E9B', linewidth=2.5, label='Flexao Voluntaria')
-                    ax2.set_ylabel('Graus ()', color='#1A252C')
-                    ax2.grid(True, linestyle='--', alpha=0.5)
-                    plt.tight_layout()
-                
-                    img_buf_flex = io.BytesIO()
-                    plt.savefig(img_buf_flex, format='png', dpi=200)
-                    img_buf_flex.seek(0)
-                    plt.close(fig2)
-                
-                    # Desenha o gráfico de ADM na página 2
-                    pdf.image(img_buf_flex, w=180, h=60)
-                    pdf.ln(5)
-                
-                    # Tabela Textual de Apoio das últimas sessões
-                    pdf.set_font('Arial', 'B', 10)
-                    pdf.cell(0, 6, 'Historico Consolidado das Últimas Sessões:', 0, 1)
-                    pdf.set_font('Arial', '', 9)
-                    for ev in historico[-8:]:
-                        linha = f"Data: {ev.get('Data', 'N/A')[:10]} | Dor: {ev.get('Dor', '-')} | Flexao: {ev.get('Flexao', '-')} | Carga Cles.: {ev.get('Agachamento', '-')}"
-                        pdf.cell(0, 5, linha, 0, 1)
-                else:
-                    pdf.ln(5)
-                    pdf.cell(0, 6, "Nenhum registro evolutivo encontrado para geracao de graficos.", 0, 1)
-                
-                # 5. Encerramento e Assinatura do Profissional
-                pdf.ln(15)
-                pdf.set_font('Arial', 'B', 10)
-                pdf.cell(0, 6, '___________________________________________________', 0, 1, 'C')
-                prof = st.session_state.get('user_email', 'Fisioterapeuta Responsavel')
-                pdf.cell(0, 6, prof, 0, 1, 'C')
 
-                # Empacotamento de Saída Estável
-                try:
-                    pdf_bytes = pdf.output(dest='S').encode('latin-1')
-                except:
-                    pdf_bytes = bytes(pdf.output())
-            
+                # 2. Insights IA + Fenótipo
+                insights_pdf = _analisar(st.session_state.paciente)
+                fenotipo_pdf = _normalizar(dados_aval.get('Diagnostico_Clinico', '') if dados_aval else '')
+
+                # 3. Gera PDF
+                pdf_bytes = gerar_laudo(
+                    paciente_nome=st.session_state.paciente,
+                    dados_aval=dados_aval,
+                    historico=historico,
+                    insights=insights_pdf,
+                    fenotipo=fenotipo_pdf
+                )
+
                 st.download_button(
-                    label="📥 BAIXAR LAUDO COMPLETO COM GRÁFICOS (PDF)",
+                    label="📥 BAIXAR LAUDO COMPLETO (PDF)",
                     data=pdf_bytes,
                     file_name=f"Laudo_Clinico_{st.session_state.paciente.replace(' ', '_')}.pdf",
                     mime="application/pdf",
                     type="primary",
                     width='stretch'
                 )
-                st.success("✅ Laudo clínico completo compilado! Clique no botão verde acima para baixar.")
-            
+                st.success("✅ Laudo clínico avançado compilado com sucesso!")
+
             except Exception as e:
-                st.error(f"❌ Erro crítico ao processar o laudo gráfico: {e}")
+                st.error(f"❌ Erro ao gerar o laudo: {e}")
+                st.caption("Verifique se o paciente possui avaliação inicial e sessões de check-in registradas.")
