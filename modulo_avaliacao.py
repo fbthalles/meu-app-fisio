@@ -7,7 +7,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 from PIL import Image, ImageDraw
-from streamlit_image_coordinates import streamlit_image_coordinates
+try:
+    from streamlit_image_coordinates import streamlit_image_coordinates
+    _HAS_IMAGE_COORDS = True
+except (ImportError, Exception):
+    _HAS_IMAGE_COORDS = False
 from config import CORES_GENUA, titulo
 from firebase_client import conn, db, invalidar_cache
 
@@ -175,7 +179,11 @@ def render():
                         raio = 6
                         draw.ellipse((x - raio, y - raio, x + raio, y + raio), fill="red", outline="darkred")
 
-                    value = streamlit_image_coordinates(img_base, key=f"joelho_map_{st.session_state.map_key}")
+                    if _HAS_IMAGE_COORDS:
+                        value = streamlit_image_coordinates(img_base, key=f"joelho_map_{st.session_state.map_key}")
+                    else:
+                        st.image(img_base, caption="Mapa de Dor (clique indisponível — atualize streamlit-image-coordinates)")
+                        value = None
 
                     if value is not None:
                         current_click = (value['x'], value['y'])
@@ -337,34 +345,6 @@ def render():
 
             # 3. Mobilidade e Lunge Test
             st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>📐 Mobilidade Articular (Goniometria)</h4>", unsafe_allow_html=True)
-
-            # 3a. Goniometria: Flexão e Extensão Bilateral
-            st.caption("**Amplitude de Movimento (ADM) — Goniometria Passiva/Ativa**")
-            c_gon1, c_gon2, c_gon3, c_gon4 = st.columns(4)
-            gon_flex_d = c_gon1.number_input("Flexão (Dir) °", min_value=0, max_value=160, step=5, value=get_val_str("Goniometria", "Flex_Dir", 130))
-            gon_flex_e = c_gon2.number_input("Flexão (Esq) °", min_value=0, max_value=160, step=5, value=get_val_str("Goniometria", "Flex_Esq", 130))
-            gon_ext_d = c_gon3.number_input("Extensão (Dir) °", min_value=-15, max_value=10, step=1, value=get_val_str("Goniometria", "Ext_Dir", 0))
-            gon_ext_e = c_gon4.number_input("Extensão (Esq) °", min_value=-15, max_value=10, step=1, value=get_val_str("Goniometria", "Ext_Esq", 0))
-
-            # Análise automática de assimetria goniométrica
-            diff_flex = gon_flex_d - gon_flex_e
-            diff_ext = gon_ext_d - gon_ext_e
-            if abs(diff_flex) >= 10 or abs(diff_ext) >= 5:
-                lado_flex = "Direito" if diff_flex > 0 else "Esquerdo"
-                lado_ext = "Direito" if diff_ext > 0 else "Esquerdo"
-                msg = []
-                if abs(diff_flex) >= 10:
-                    msg.append(f"Flexão: diferença de {abs(diff_flex)}° (lado {lado_flex} com maior ADM)")
-                if abs(diff_ext) >= 5:
-                    msg.append(f"Extensão: diferença de {abs(diff_ext)}° (lado {lado_ext} com maior ADM)")
-                st.warning(f"⚠️ **Assimetria Goniométrica Detectada:** {' | '.join(msg)}")
-            elif gon_flex_d > 0 or gon_flex_e > 0:
-                st.success("📊 **Goniometria:** Simetria bilateral dentro da normalidade.")
-
-            st.markdown("---")
-
-            # 3b. Lunge Test
-            st.caption("**Lunge Test (Weight-Bearing Dorsiflexion)**")
             c_lunge1, c_lunge2 = st.columns(2)
             lunge_d = c_lunge1.number_input("Lunge Test (Dir) - cm", min_value=0.0, step=0.5, value=get_val_str("Lunge_Test", "Dir", 0.0, float))
             lunge_e = c_lunge2.number_input("Lunge Test (Esq) - cm", min_value=0.0, step=0.5, value=get_val_str("Lunge_Test", "Esq", 0.0, float))
@@ -607,7 +587,6 @@ def render():
                     "Dinamometria_Dir": f"Ext:{din_ext_d} Flex:{din_flex_d} Abd:{din_abd_d} Add:{din_add_d}",
                     "Dinamometria_Esq": f"Ext:{din_ext_e} Flex:{din_flex_e} Abd:{din_abd_e} Add:{din_add_e}",
                     "Lunge_Test": f"Dir:{lunge_d} Esq:{lunge_e}",
-                    "Goniometria": f"Flex_Dir:{gon_flex_d} Flex_Esq:{gon_flex_e} Ext_Dir:{gon_ext_d} Ext_Esq:{gon_ext_e}",
                 
                     "Flexibilidade": ", ".join(flexibilidade) if flexibilidade else "Normal",
                 
