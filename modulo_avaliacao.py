@@ -343,20 +343,89 @@ def render():
                     diff_add = din_add_d - din_add_e
                     c_res2.caption(f"**Adução:** Diferença de {abs(diff_add):.1f} kg ({'Dir mais forte' if diff_add > 0 else 'Esq mais forte' if diff_add < 0 else 'Simétrico'})")
 
-            # 3. Mobilidade e Lunge Test
-            st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>📐 Mobilidade Articular (Goniometria)</h4>", unsafe_allow_html=True)
-            c_lunge1, c_lunge2 = st.columns(2)
-            lunge_d = c_lunge1.number_input("Lunge Test (Dir) - cm", min_value=0.0, step=0.5, value=get_val_str("Lunge_Test", "Dir", 0.0, float))
-            lunge_e = c_lunge2.number_input("Lunge Test (Esq) - cm", min_value=0.0, step=0.5, value=get_val_str("Lunge_Test", "Esq", 0.0, float))
+            # 3. Mobilidade Articular (Goniometria e Lunge Test)
+        st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 15px;'>📐 Mobilidade Articular (Goniometria)</h4>", unsafe_allow_html=True)
         
-            if lunge_d > 0 or lunge_e > 0:
-                diff_lunge = lunge_d - lunge_e
-                if diff_lunge > 0:
-                    st.info(f"📊 **Análise Lunge Test:** O lado **Direito** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
-                elif diff_lunge < 0:
-                    st.info(f"📊 **Análise Lunge Test:** O lado **Esquerdo** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
-                else:
-                    st.success("📊 **Análise Lunge Test:** Mobilidade perfeitamente simétrica.")
+        # --- ADM de Joelho (Flexão e Extensão) ---
+        st.markdown("**ADM de Joelho (Graus °):**")
+        c_flex1, c_flex2 = st.columns(2)
+        adm_flex_d = c_flex1.number_input(
+            "Flexão de Joelho (Dir) - graus (°)",
+            min_value=0.0,
+            max_value=160.0,
+            step=1.0,
+            value=get_val_str("ADM_Joelho_Flexao", "Dir", 0.0, float),
+            key="adm_flex_d"
+        )
+        adm_flex_e = c_flex2.number_input(
+            "Flexão de Joelho (Esq) - graus (°)",
+            min_value=0.0,
+            max_value=160.0,
+            step=1.0,
+            value=get_val_str("ADM_Joelho_Flexao", "Esq", 0.0, float),
+            key="adm_flex_e"
+        )
+
+        c_ext1, c_ext2 = st.columns(2)
+        adm_ext_d = c_ext1.number_input(
+            "Extensão de Joelho (Dir) - graus (°)",
+            min_value=-15.0,
+            max_value=30.0,
+            step=1.0,
+            value=get_val_str("ADM_Joelho_Extensao", "Dir", 0.0, float),
+            help="0° = extensão neutra completa. Valores positivos indicam déficit de extensão; valores negativos indicam hiperextensão.",
+            key="adm_ext_d"
+        )
+        adm_ext_e = c_ext2.number_input(
+            "Extensão de Joelho (Esq) - graus (°)",
+            min_value=-15.0,
+            max_value=30.0,
+            step=1.0,
+            value=get_val_str("ADM_Joelho_Extensao", "Esq", 0.0, float),
+            help="0° = extensão neutra completa. Valores positivos indicam déficit de extensão; valores negativos indicam hiperextensão.",
+            key="adm_ext_e"
+        )
+
+        # Feedback clínico de assimetria de ADM de Joelho
+        if adm_flex_d > 0 and adm_flex_e > 0:
+            diff_flex = abs(adm_flex_d - adm_flex_e)
+            if diff_flex >= 10:
+                st.warning(f"⚠️ **Assimetria de Flexão:** Diferença de {diff_flex:.1f}° entre os joelhos (relevância clínica ≥ 10°).")
+            elif diff_flex == 0:
+                st.caption("✅ **Flexão de Joelho:** Simetria completa bilateral.")
+
+        if (adm_ext_d != 0 or adm_ext_e != 0) and (adm_ext_d > 0 or adm_ext_e > 0):
+            if adm_ext_d >= 5:
+                st.warning(f"⚠️ **Déficit de Extensão no Joelho Direito:** {adm_ext_d:.1f}° (risco de sobrecarga patelofemoral e alteração de marcha).")
+            if adm_ext_e >= 5:
+                st.warning(f"⚠️ **Déficit de Extensão no Joelho Esquerdo:** {adm_ext_e:.1f}° (risco de sobrecarga patelofemoral e alteração de marcha).")
+
+        # --- Mobilidade de Tornozelo (Lunge Test) ---
+        st.markdown("**Mobilidade de Tornozelo (Lunge Test):**")
+        c_lunge1, c_lunge2 = st.columns(2)
+        lunge_d = c_lunge1.number_input(
+            "Lunge Test (Dir) - cm",
+            min_value=0.0,
+            step=0.5,
+            value=get_val_str("Lunge_Test", "Dir", 0.0, float),
+            key="lunge_d"
+        )
+        lunge_e = c_lunge2.number_input(
+            "Lunge Test (Esq) - cm",
+            min_value=0.0,
+            step=0.5,
+            value=get_val_str("Lunge_Test", "Esq", 0.0, float),
+            key="lunge_e"
+        )
+        
+        if lunge_d > 0 or lunge_e > 0:
+            diff_lunge = lunge_d - lunge_e
+            if diff_lunge > 0:
+                st.info(f"📊 **Análise Lunge Test:** O lado **Direito** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
+            elif diff_lunge < 0:
+                st.info(f"📊 **Análise Lunge Test:** O lado **Esquerdo** tem {abs(diff_lunge):.1f} cm a MAIS de mobilidade.")
+            else:
+                st.success("📊 **Análise Lunge Test:** Mobilidade perfeitamente simétrica.")
 
             # 4. CONTROLE MOTOR E TESTES RELACIONAIS
             st.markdown("---")
@@ -586,6 +655,8 @@ def render():
                     "Forca_Geral_Esq": f"Ext:{fg_ext_e} Flex:{fg_flex_e} Abd:{fg_abd_e} Add:{fg_add_e}",
                     "Dinamometria_Dir": f"Ext:{din_ext_d} Flex:{din_flex_d} Abd:{din_abd_d} Add:{din_add_d}",
                     "Dinamometria_Esq": f"Ext:{din_ext_e} Flex:{din_flex_e} Abd:{din_abd_e} Add:{din_add_e}",
+            "ADM_Joelho_Flexao": f"Dir:{adm_flex_d} Esq:{adm_flex_e}",
+            "ADM_Joelho_Extensao": f"Dir:{adm_ext_d} Esq:{adm_ext_e}",
                     "Lunge_Test": f"Dir:{lunge_d} Esq:{lunge_e}",
                 
                     "Flexibilidade": ", ".join(flexibilidade) if flexibilidade else "Normal",

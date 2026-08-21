@@ -101,8 +101,10 @@ def render():
                     st.markdown(f"- **Direita:** {av_p.get('Dinamometria_Dir', 'N/A')}")
                     st.markdown(f"- **Esquerda:** {av_p.get('Dinamometria_Esq', 'N/A')}")
                 with c_fun2:
-                    st.caption("Mobilidade (Lunge Test)")
-                    st.markdown(f"- **Dir / Esq:** {av_p.get('Lunge_Test', 'N/A')}")
+                    st.caption("Mobilidade Articular (Goniometria)")
+                    st.markdown(f"- **ADM Flexão (Dir / Esq):** {av_p.get('ADM_Joelho_Flexao', 'N/A')}")
+                    st.markdown(f"- **ADM Extensão (Dir / Esq):** {av_p.get('ADM_Joelho_Extensao', 'N/A')}")
+                    st.markdown(f"- **Lunge Test (Dir / Esq):** {av_p.get('Lunge_Test', 'N/A')}")
 
             with t_proms:
                 st.markdown("**Questionários de Desfecho (Baseline):**")
