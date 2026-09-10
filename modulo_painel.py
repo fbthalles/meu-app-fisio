@@ -403,8 +403,8 @@ def render():
 
     # --- MÓDULO DE EXPORTAÇÃO COMPLEXO (LAUDO MÉDICO + MATRIZ DE GRÁFICOS) ---
     st.markdown("---")
-    titulo("📄 Exportação de Laudo Clínico Avançado")
-    st.caption("Gera um relatório profissional (5-6 páginas) com gráficos, PROMs, análise de IA e referências científicas.")
+    titulo("📄 Exportação de Laudo Clínico Completo")
+    st.caption("Gera um laudo profissional com TODOS os dados do prontuário: anamnese, exame físico completo, goniometria, força, testes especiais, controle motor, PROMs, gráficos de evolução e análise de IA — tudo com identidade visual GENUA.")
 
     if st.button("⚙️ GERAR RELATÓRIO COM GRÁFICOS", width='stretch'):
         with st.spinner("🧠 Compilando laudo clínico avançado com gráficos e análise de IA..."):

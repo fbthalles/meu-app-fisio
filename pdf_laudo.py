@@ -1,22 +1,25 @@
 """
-GENUA | Gerador de Laudo Clínico Avançado (PDF)
+GENUA | Gerador de Laudo Clínico Completo (PDF)
 ================================================
-Gera relatório profissional para dois públicos:
-  - PACIENTE: visual, mostra progresso, gera confiança
-  - MÉDICO: científico, PROMs com MCID, referências
+Gera um laudo profissional que reflete TODOS os dados preenchidos no app:
+cadastro, avaliação inicial completa, evolução (check-ins), PROMs e IA.
 
-Estrutura (5-6 páginas):
-  P1. Capa + Sumário Executivo (KPIs grandes)
-  P2. Evolução da Dor (gráfico + MCID)
-  P3. Correlação Dor × Função (linhas cruzadas)
-  P4. PROMs e Scores (tabela comparativa)
-  P5. Insights IA + Bandeiras + LSI
-  P6. Assinatura
+Design: identidade visual GENUA (azul-petróleo + teal), tipografia consistente,
+tabelas com cabeçalho colorido, KPIs e gráficos em alta resolução.
 
-Dependências: fpdf2, matplotlib, io, datetime
+Robustez (nível produção):
+  - Toda escrita de texto passa por helpers que respeitam a largura útil da
+    página (never "Not enough horizontal space").
+  - Larguras de coluna sempre normalizadas para caber na área útil.
+  - Strings compostas do Firestore (ex.: "Ext:0 Flex:0 Abd:0") são parseadas
+    e exibidas de forma legível.
+  - Campos ausentes/vazios são omitidos ou exibidos como "-", nunca quebram.
+
+Dependências: fpdf2, matplotlib
 """
 import io
 from datetime import datetime
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -25,27 +28,91 @@ from fpdf import FPDF
 
 
 # ============================================================
-# CORES GENUA (RGB)
+# PALETA GENUA (RGB)
 # ============================================================
-AZUL = (16, 62, 85)
-TEAL = (57, 142, 155)
-CINZA = (100, 100, 100)
-CINZA_CLARO = (240, 244, 248)
+AZUL = (16, 62, 85)        # #103E55 primária
+TEAL = (57, 142, 155)      # #398E9B secundária
+CINZA = (108, 117, 125)    # texto suave
+CINZA_CLARO = (244, 247, 249)
+CINZA_MEDIO = (210, 218, 224)
 VERDE = (40, 167, 69)
+AMARELO = (200, 150, 0)
 VERMELHO = (220, 53, 69)
 BRANCO = (255, 255, 255)
 PRETO = (26, 37, 44)
 
+# Geometria da página A4 (mm)
+MARGEM_ESQ = 10
+MARGEM_DIR = 10
+LARGURA_PAGINA = 210
+LARGURA_UTIL = LARGURA_PAGINA - MARGEM_ESQ - MARGEM_DIR  # 190 mm
 
-def _limpar_texto(texto):
-    """Remove caracteres não-ASCII para evitar crash do FPDF."""
-    if not texto:
+
+# ============================================================
+# HELPERS DE DADOS
+# ============================================================
+def _txt(valor):
+    """Converte para string ASCII-safe (FPDF core fonts = latin-1)."""
+    if valor is None:
         return ""
-    return str(texto).encode('ascii', 'replace').decode('ascii')
+    return str(valor).encode('latin-1', 'replace').decode('latin-1')
+
+
+def _vazio(valor):
+    """True se o valor é vazio/nulo/placeholder."""
+    if valor is None:
+        return True
+    s = str(valor).strip().lower()
+    return s in ("", "-", "n/a", "na", "none", "nan")
+
+
+def _fmt(valor, default="-"):
+    """Valor limpo para exibição, com default se vazio."""
+    return _txt(valor) if not _vazio(valor) else default
+
+
+def _num(valor, default=0.0):
+    """Converte para float com segurança."""
+    try:
+        return float(valor)
+    except (ValueError, TypeError):
+        return default
+
+
+def _parse_composto(texto):
+    """
+    Converte "Ext:0.0 Flex:12.5 Abd:3.0 Add:1.0" em
+    [("Ext", "0.0"), ("Flex", "12.5"), ...].
+    """
+    if _vazio(texto):
+        return []
+    pares = []
+    for token in str(texto).replace("|", " ").split():
+        if ":" in token:
+            chave, _, val = token.partition(":")
+            pares.append((chave.strip(), val.strip()))
+    return pares
+
+
+def _parse_bilateral(texto):
+    """Converte 'Dir:5.0 Esq:4.5' em (dir, esq)."""
+    pares = dict(_parse_composto(texto))
+    return pares.get("Dir", "-"), pares.get("Esq", "-")
+
+
+def _mapa_func_score(resultado_texto):
+    """Converte texto do teste funcional em score 0-10 (maior = melhor função)."""
+    mapa = {
+        "Sem Dor (0)": 10, "Sem Dor": 10,
+        "Dor Leve (1 - 3)": 7, "Dor Leve": 7,
+        "Dor Moderada (4 - 7)": 4, "Dor Moderada": 4,
+        "Dor Grave (8 - 10)": 1, "Dor Grave": 1,
+        "Incapaz (Não realiza)": 0, "Incapaz": 0, "Não testado": None,
+    }
+    return mapa.get(resultado_texto)
 
 
 def _fig_to_bytes(fig, dpi=200):
-    """Converte matplotlib figure para bytes PNG."""
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight', facecolor='white')
     buf.seek(0)
@@ -53,509 +120,580 @@ def _fig_to_bytes(fig, dpi=200):
     return buf
 
 
-def _mapa_func_score(resultado_texto):
-    """Converte texto do teste funcional pra score 0-10."""
-    mapa = {
-        "Sem Dor (0)": 10, "Sem Dor": 10,
-        "Dor Leve (1 - 3)": 7, "Dor Leve": 7,
-        "Dor Moderada (4 - 7)": 4, "Dor Moderada": 4,
-        "Dor Grave (8 - 10)": 1, "Dor Grave": 1,
-        "Incapaz (Não realiza)": 0, "Incapaz": 0,
-    }
-    return mapa.get(resultado_texto)
+def _norm_larguras(col_widths):
+    """
+    Normaliza a lista de larguras para somar exatamente LARGURA_UTIL,
+    garantindo que nenhuma tabela estoure a página.
+    """
+    total = sum(col_widths)
+    if total <= 0:
+        return [LARGURA_UTIL / len(col_widths)] * len(col_widths)
+    fator = LARGURA_UTIL / total
+    return [w * fator for w in col_widths]
 
 
 # ============================================================
-# CLASSE PRINCIPAL DO PDF
+# CLASSE PDF
 # ============================================================
 class LaudoGenua(FPDF):
-    """PDF com cabeçalho e rodapé customizados."""
+    def __init__(self):
+        super().__init__(orientation='P', unit='mm', format='A4')
+        self.set_margins(MARGEM_ESQ, 12, MARGEM_DIR)
+        self.set_auto_page_break(auto=True, margin=18)
 
+    # ---------- Cabeçalho / Rodapé ----------
     def header(self):
+        self.set_y(6)
         self.set_font('Arial', 'B', 9)
         self.set_text_color(*TEAL)
-        self.cell(0, 5, 'GENUA | Inteligencia Clinica Integrada', 0, 0, 'L')
+        self.cell(LARGURA_UTIL / 2, 5, 'GENUA | Inteligencia Clinica', 0, 0, 'L')
         self.set_font('Arial', '', 8)
         self.set_text_color(*CINZA)
-        self.cell(0, 5, f'Emitido em {datetime.now().strftime("%d/%m/%Y %H:%M")}', 0, 1, 'R')
+        self.cell(LARGURA_UTIL / 2, 5, datetime.now().strftime('%d/%m/%Y %H:%M'), 0, 1, 'R')
         self.set_draw_color(*TEAL)
-        self.line(10, 12, 200, 12)
-        self.ln(4)
+        self.set_line_width(0.4)
+        self.line(MARGEM_ESQ, 12, LARGURA_PAGINA - MARGEM_DIR, 12)
+        self.set_y(16)
 
     def footer(self):
-        self.set_y(-15)
-        self.set_draw_color(*CINZA_CLARO)
-        self.line(10, self.get_y(), 200, self.get_y())
+        self.set_y(-14)
+        self.set_draw_color(*CINZA_MEDIO)
+        self.set_line_width(0.2)
+        self.line(MARGEM_ESQ, self.get_y(), LARGURA_PAGINA - MARGEM_DIR, self.get_y())
+        self.set_y(-11)
         self.set_font('Arial', 'I', 7)
         self.set_text_color(*CINZA)
-        self.cell(0, 10, f'GENUA HealthTech - Documento confidencial - Pagina {self.page_no()}/{{nb}}', 0, 0, 'C')
+        self.cell(0, 6, _txt(f'GENUA HealthTech - Documento confidencial (LGPD) - Pagina {self.page_no()}/{{nb}}'), 0, 0, 'C')
 
-    def secao(self, titulo, cor_fundo=CINZA_CLARO):
-        """Bloco de título de seção estilizado."""
-        self.set_font('Arial', 'B', 12)
-        self.set_text_color(*AZUL)
-        self.set_fill_color(*cor_fundo)
-        self.cell(0, 9, f'  {titulo}', 0, 1, fill=True)
+    # ---------- Blocos de layout ----------
+    def titulo_secao(self, texto):
+        """Faixa de título de seção."""
+        if self.get_y() > 250:
+            self.add_page()
+        self.set_font('Arial', 'B', 11)
+        self.set_fill_color(*AZUL)
+        self.set_text_color(*BRANCO)
+        self.set_x(MARGEM_ESQ)
+        self.cell(LARGURA_UTIL, 8, _txt('  ' + texto), 0, 1, 'L', fill=True)
         self.ln(2)
 
-    def kpi_box(self, x, y, w, h, label, valor, subtexto="", cor=AZUL):
-        """Renderiza uma caixa de KPI com label, valor grande e subtexto."""
-        self.set_xy(x, y)
-        self.set_draw_color(*cor)
-        self.set_line_width(0.8)
-        self.rect(x, y, w, h)
-        # Barra lateral colorida
-        self.set_fill_color(*cor)
-        self.rect(x, y, 3, h, 'F')
-        # Label
-        inner_w = w - 8
-        if inner_w < 10:
-            inner_w = 10
-        self.set_xy(x + 5, y + 2)
-        self.set_font('Arial', '', 8)
-        self.set_text_color(*CINZA)
-        self.cell(inner_w, 4, _limpar_texto(str(label))[:30], 0, 2)
-        # Valor grande
-        self.set_font('Arial', 'B', 20)
+    def subtitulo(self, texto):
+        self.set_font('Arial', 'B', 9)
+        self.set_text_color(*TEAL)
+        self.set_x(MARGEM_ESQ)
+        self.cell(LARGURA_UTIL, 5, _txt(texto), 0, 1, 'L')
+
+    def paragrafo(self, texto, cor=PRETO, tam=9, estilo=''):
+        self.set_font('Arial', estilo, tam)
         self.set_text_color(*cor)
-        self.cell(inner_w, 11, _limpar_texto(str(valor))[:20], 0, 2)
-        # Subtexto
-        if subtexto:
-            self.set_font('Arial', '', 6)
+        self.set_x(MARGEM_ESQ)
+        self.multi_cell(LARGURA_UTIL, 4.5, _txt(texto))
+
+    def campo(self, label, valor, label_w=48):
+        """Linha 'Label: valor' com quebra automática no valor."""
+        if _vazio(valor):
+            return
+        y0 = self.get_y()
+        self.set_x(MARGEM_ESQ)
+        self.set_font('Arial', 'B', 9)
+        self.set_text_color(*AZUL)
+        self.multi_cell(label_w, 5, _txt(label), 0, 'L')
+        y1 = self.get_y()
+        self.set_xy(MARGEM_ESQ + label_w, y0)
+        self.set_font('Arial', '', 9)
+        self.set_text_color(*PRETO)
+        self.multi_cell(LARGURA_UTIL - label_w, 5, _fmt(valor))
+        self.set_y(max(y1, self.get_y()))
+
+    def kpi(self, x, y, w, h, label, valor, sub="", cor=AZUL):
+        """Cartão de KPI (nunca estoura: usa área interna fixa)."""
+        self.set_draw_color(*cor)
+        self.set_line_width(0.6)
+        self.set_fill_color(*BRANCO)
+        self.rect(x, y, w, h, 'D')
+        self.set_fill_color(*cor)
+        self.rect(x, y, 2.5, h, 'F')
+        iw = w - 7
+        self.set_xy(x + 5, y + 2.5)
+        self.set_font('Arial', '', 7.5)
+        self.set_text_color(*CINZA)
+        self.cell(iw, 4, _txt(label)[:34], 0, 2)
+        self.set_font('Arial', 'B', 18)
+        self.set_text_color(*cor)
+        self.cell(iw, 9, _txt(valor)[:18], 0, 2)
+        if sub:
+            self.set_font('Arial', '', 6.5)
             self.set_text_color(*CINZA)
-            self.cell(inner_w, 4, _limpar_texto(str(subtexto))[:40], 0, 2)
+            self.cell(iw, 4, _txt(sub)[:42], 0, 2)
 
-    def tabela_simples(self, headers, rows, col_widths=None):
-        """Renderiza tabela com header azul e linhas alternadas."""
-        if not col_widths:
-            col_widths = [190 // len(headers)] * len(headers)
+    def tabela(self, headers, rows, larguras=None, alt=True, fonte=8):
+        """
+        Tabela robusta: larguras normalizadas para LARGURA_UTIL,
+        texto truncado por coluna para nunca faltar espaço horizontal.
+        """
+        n = len(headers)
+        if not larguras:
+            larguras = [1] * n
+        larguras = _norm_larguras(larguras)
 
-        # Garante que x começa na margem esquerda
-        self.set_x(10)
-
-        # Header
-        self.set_font('Arial', 'B', 8)
+        # Cabeçalho
+        self.set_x(MARGEM_ESQ)
+        self.set_font('Arial', 'B', fonte)
         self.set_fill_color(*AZUL)
         self.set_text_color(*BRANCO)
         for i, h in enumerate(headers):
-            w = col_widths[i]
-            # Trunca texto ao tamanho máximo que cabe na célula (~2 chars por mm)
-            max_chars = max(3, int(w * 0.5))
-            txt = _limpar_texto(h)[:max_chars]
-            self.cell(w, 7, txt, 1, 0, 'C', fill=True)
+            max_chars = max(4, int(larguras[i] / 1.7))
+            self.cell(larguras[i], 7, _txt(h)[:max_chars], 1, 0, 'C', fill=True)
         self.ln()
 
-        # Rows
-        self.set_font('Arial', '', 7)
+        # Linhas
+        self.set_font('Arial', '', fonte)
         self.set_text_color(*PRETO)
-        for r_idx, row in enumerate(rows):
-            self.set_x(10)
-            if r_idx % 2 == 0:
+        for r, row in enumerate(rows):
+            # quebra de página preservando cabeçalho
+            if self.get_y() > 262:
+                self.add_page()
+                self.set_x(MARGEM_ESQ)
+                self.set_font('Arial', 'B', fonte)
+                self.set_fill_color(*AZUL)
+                self.set_text_color(*BRANCO)
+                for i, h in enumerate(headers):
+                    max_chars = max(4, int(larguras[i] / 1.7))
+                    self.cell(larguras[i], 7, _txt(h)[:max_chars], 1, 0, 'C', fill=True)
+                self.ln()
+                self.set_font('Arial', '', fonte)
+                self.set_text_color(*PRETO)
+            self.set_x(MARGEM_ESQ)
+            if alt and r % 2 == 0:
                 self.set_fill_color(*CINZA_CLARO)
             else:
                 self.set_fill_color(*BRANCO)
-            for i, cell_val in enumerate(row):
-                w = col_widths[i]
-                max_chars = max(3, int(w * 0.5))
-                txt = _limpar_texto(str(cell_val))[:max_chars]
-                self.cell(w, 6, txt, 1, 0, 'C', fill=True)
+            for i, val in enumerate(row):
+                max_chars = max(4, int(larguras[i] / 1.7))
+                self.cell(larguras[i], 6, _txt(str(val))[:max_chars], 1, 0, 'C', fill=True)
             self.ln()
+        self.ln(2)
+
+    def badge(self, texto, cor):
+        """Rótulo colorido (status)."""
+        self.set_x(MARGEM_ESQ)
+        self.set_font('Arial', 'B', 9)
+        self.set_fill_color(*cor)
+        self.set_text_color(*BRANCO)
+        w = self.get_string_width(_txt(texto)) + 6
+        self.cell(w, 6, _txt(texto), 0, 1, 'C', fill=True)
 
 
 # ============================================================
-# FUNÇÃO PRINCIPAL: gerar_laudo()
+# SEÇÕES DO LAUDO
 # ============================================================
-def gerar_laudo(paciente_nome, dados_aval, historico, insights=None, fenotipo=None):
-    """
-    Gera o PDF completo do laudo clínico.
-
-    Args:
-        paciente_nome: str
-        dados_aval: dict (última Avaliacao_Inicial)
-        historico: list[dict] (sessões de Evolucao, cronológico)
-        insights: dict (resultado de ia_clinica.analisar_paciente) ou None
-        fenotipo: dict (resultado de ia_clinica.normalizar_diagnostico) ou None
-
-    Returns:
-        bytes do PDF pronto para download
-    """
-    pdf = LaudoGenua()
-    pdf.alias_nb_pages()
-    pdf.set_auto_page_break(auto=True, margin=20)
-
-    # Ordena histórico
-    hist = sorted(historico, key=lambda x: x.get('Data', '')) if historico else []
+def _pagina_capa(pdf, paciente_nome, dados_aval, hist, fenotipo):
+    pdf.add_page()
     n_sessoes = len(hist)
 
-    # Dados derivados
-    dor_inicial = float(hist[0].get('Dor', 0)) if hist else 0
-    dor_atual = float(hist[-1].get('Dor', 0)) if hist else 0
-    delta_dor = dor_inicial - dor_atual
-    flex_inicial = float(hist[0].get('Flexao', 0)) if hist else 0
-    flex_atual = float(hist[-1].get('Flexao', 0)) if hist else 0
-    dx_texto = dados_aval.get('Diagnostico_Clinico', '') if dados_aval else ''
-    fen_label = fenotipo.get('label', 'Nao especificado') if fenotipo else 'Nao especificado'
-
-    # ==================================================================
-    # PÁGINA 1: CAPA + SUMÁRIO EXECUTIVO
-    # ==================================================================
-    pdf.add_page()
-
-    # Título grande
-    pdf.set_font('Arial', 'B', 24)
+    pdf.set_font('Arial', 'B', 22)
     pdf.set_text_color(*AZUL)
-    pdf.cell(0, 15, 'Laudo de Evolucao Clinica', 0, 1, 'C')
+    pdf.set_x(MARGEM_ESQ)
+    pdf.cell(LARGURA_UTIL, 12, 'Laudo de Evolucao Clinica', 0, 1, 'C')
     pdf.set_font('Arial', '', 11)
     pdf.set_text_color(*TEAL)
-    pdf.cell(0, 6, 'Fisioterapia Baseada em Evidencia', 0, 1, 'C')
-    pdf.ln(8)
+    pdf.cell(LARGURA_UTIL, 6, 'Fisioterapia Baseada em Evidencia', 0, 1, 'C')
+    pdf.ln(6)
 
-    # Dados do paciente
-    pdf.set_draw_color(*CINZA_CLARO)
+    # Ficha do paciente
+    y = pdf.get_y()
     pdf.set_fill_color(*CINZA_CLARO)
-    pdf.rect(10, pdf.get_y(), 190, 22, 'F')
-    pdf.set_xy(14, pdf.get_y() + 3)
-    pdf.set_font('Arial', 'B', 11)
+    pdf.rect(MARGEM_ESQ, y, LARGURA_UTIL, 26, 'F')
+    pdf.set_xy(MARGEM_ESQ + 4, y + 3)
+    pdf.set_font('Arial', 'B', 12)
     pdf.set_text_color(*PRETO)
-    pdf.cell(90, 6, f'Paciente: {_limpar_texto(paciente_nome)}', 0, 0)
+    pdf.cell(LARGURA_UTIL / 2, 6, _txt(f'Paciente: {paciente_nome}'), 0, 0)
     pdf.set_font('Arial', '', 10)
-    pdf.cell(90, 6, f'Data: {datetime.now().strftime("%d/%m/%Y")}', 0, 1, 'R')
-    pdf.set_x(14)
-    idade = dados_aval.get('Idade', '-') if dados_aval else '-'
-    pdf.cell(90, 6, f'Idade: {idade} anos', 0, 0)
-    pdf.cell(90, 6, f'Dx: {_limpar_texto(str(dx_texto)[:60])}', 0, 1, 'R')
-    pdf.ln(8)
+    pdf.cell(LARGURA_UTIL / 2 - 4, 6, datetime.now().strftime('Emissao: %d/%m/%Y'), 0, 1, 'R')
 
-    # Fenótipo (se identificado)
-    if fenotipo and fenotipo.get('fenotipo') != 'generico':
+    idade = dados_aval.get('Idade', '-') if dados_aval else '-'
+    membro = dados_aval.get('Membro', 'Joelho') if dados_aval else 'Joelho'
+    dx = dados_aval.get('Diagnostico_Clinico', '') if dados_aval else ''
+    pdf.set_x(MARGEM_ESQ + 4)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(LARGURA_UTIL / 2, 6, _txt(f'Idade: {idade}   |   Membro: {membro}'), 0, 0)
+    pdf.cell(LARGURA_UTIL / 2 - 4, 6, _txt(f'Sessoes: {n_sessoes}'), 0, 1, 'R')
+    if not _vazio(dx):
+        pdf.set_x(MARGEM_ESQ + 4)
+        pdf.cell(LARGURA_UTIL - 4, 6, _txt(f'Diagnostico de Triagem: {dx}'), 0, 1)
+    pdf.set_y(y + 30)
+
+    # Fenótipo
+    if fenotipo and fenotipo.get('fenotipo') not in (None, 'generico'):
         pdf.set_font('Arial', 'I', 9)
         pdf.set_text_color(*TEAL)
         tempo = fenotipo.get('tempo_esperado_semanas', '?')
-        pdf.cell(0, 5, f'Fenotipo Clinico: {_limpar_texto(fen_label)} | Tempo esperado: {tempo} semanas', 0, 1, 'C')
-        pdf.ln(3)
+        pdf.set_x(MARGEM_ESQ)
+        pdf.cell(LARGURA_UTIL, 6, _txt(f"Fenotipo: {fenotipo.get('label','-')} | Reabilitacao esperada: {tempo} semanas"), 0, 1, 'C')
+    pdf.ln(3)
 
-    # KPIs grandes (3 caixas)
-    pdf.secao('SUMARIO EXECUTIVO')
-    y_kpi = pdf.get_y() + 2
-    w_kpi = 58
-
-    sinal_dor = f'{delta_dor:+.0f} pts' if delta_dor != 0 else 'Sem variacao'
-    cor_dor = VERDE if delta_dor > 0 else VERMELHO if delta_dor < 0 else CINZA
-    pdf.kpi_box(12, y_kpi, w_kpi, 28, 'REDUCAO DA DOR',
-                f'{dor_inicial:.0f} -> {dor_atual:.0f}', sinal_dor, cor_dor)
-
-    delta_flex = flex_atual - flex_inicial
-    sinal_flex = f'{delta_flex:+.0f} graus' if delta_flex != 0 else 'Sem variacao'
-    cor_flex = VERDE if delta_flex > 0 else VERMELHO if delta_flex < 0 else CINZA
-    pdf.kpi_box(75, y_kpi, w_kpi, 28, 'ADM FLEXAO',
-                f'{flex_atual:.0f} graus', sinal_flex, cor_flex)
-
-    pdf.kpi_box(138, y_kpi, w_kpi, 28, 'SESSOES REALIZADAS',
-                str(n_sessoes), f'{hist[0].get("Data", "?")[:10]} a {hist[-1].get("Data", "?")[:10]}' if hist else '', AZUL)
-
-    pdf.set_xy(10, y_kpi + 35)
-
-    # Tabela resumo últimas 5 sessões
+    # KPIs
+    pdf.titulo_secao('SUMARIO EXECUTIVO')
     if hist:
-        pdf.secao('ULTIMAS SESSOES')
-        headers = ['Data', 'Dor (EVA)', 'Flexao', 'Extensao', 'Inchaco', 'Sono']
+        dor_ini = _num(hist[0].get('Dor', 0))
+        dor_atu = _num(hist[-1].get('Dor', 0))
+        d_dor = dor_ini - dor_atu
+        flex_ini = _num(hist[0].get('Flexao', 0))
+        flex_atu = _num(hist[-1].get('Flexao', 0))
+        d_flex = flex_atu - flex_ini
+
+        yk = pdf.get_y()
+        w_kpi = (LARGURA_UTIL - 8) / 3
+        cor_dor = VERDE if d_dor > 0 else VERMELHO if d_dor < 0 else CINZA
+        pdf.kpi(MARGEM_ESQ, yk, w_kpi, 26, 'REDUCAO DA DOR (EVA)',
+                f'{dor_ini:.0f} -> {dor_atu:.0f}', f'{d_dor:+.0f} pontos', cor_dor)
+        cor_flex = VERDE if d_flex > 0 else VERMELHO if d_flex < 0 else CINZA
+        pdf.kpi(MARGEM_ESQ + w_kpi + 4, yk, w_kpi, 26, 'FLEXAO (ADM)',
+                f'{flex_atu:.0f} graus', f'{d_flex:+.0f} graus', cor_flex)
+        periodo = f"{hist[0].get('Data','?')[:10]} a {hist[-1].get('Data','?')[:10]}"
+        pdf.kpi(MARGEM_ESQ + 2 * (w_kpi + 4), yk, w_kpi, 26, 'SESSOES',
+                str(len(hist)), periodo, AZUL)
+        pdf.set_y(yk + 32)
+    else:
+        pdf.paragrafo('Ainda nao ha sessoes de evolucao registradas para este paciente.', cor=CINZA, estilo='I')
+
+
+def _pagina_avaliacao(pdf, dados_aval):
+    """Página(s) com TODOS os campos da avaliação inicial."""
+    if not dados_aval:
+        return
+    pdf.add_page()
+    pdf.titulo_secao('AVALIACAO INICIAL - ANAMNESE')
+    pdf.campo('Queixa Principal (QP)', dados_aval.get('QP'))
+    pdf.campo('Historia (HMA)', dados_aval.get('HMA'))
+    pdf.campo('Sinais e Sintomas', dados_aval.get('Sinais_Sintomas'))
+    pdf.campo('Fatores de Alivio', dados_aval.get('Fatores_Alivio'))
+    pdf.campo('Fatores de Piora', dados_aval.get('Fatores_Piora'))
+    pdf.campo('Tratamentos Previos', dados_aval.get('Tratamentos_Previos'))
+    pdf.campo('Comorbidades', dados_aval.get('Comorbidades'))
+    pdf.campo('Fatores Sociais', dados_aval.get('Fatores_Sociais'))
+    pdf.campo('Qualidade do Sono', dados_aval.get('Sono'))
+    pdf.ln(1)
+
+    pdf.titulo_secao('CARACTERIZACAO DA DOR')
+    pdf.campo('Classificacao', dados_aval.get('Class_Dor'))
+    pdf.campo('Origem', dados_aval.get('Origem_Dor'))
+    pdf.campo('Zonas de Dor', dados_aval.get('Zonas_Dor'))
+    pdf.campo('Mapa de Dor', dados_aval.get('Mapa_Dor'))
+    pdf.ln(1)
+
+    pdf.titulo_secao('BANDEIRAS (TRIAGEM DE RISCO)')
+    pdf.campo('Bandeiras Vermelhas', dados_aval.get('Red_Flags'))
+    pdf.campo('Bandeiras Amarelas', dados_aval.get('Yellow_Cog'))
+    pdf.ln(1)
+
+    pdf.titulo_secao('EXAME FISICO - INSPECAO E PALPACAO')
+    pdf.campo('Derrame Articular', dados_aval.get('Derrame'))
+    pdf.campo('Sinal de Godet', dados_aval.get('Godet'))
+    pdf.campo('Temperatura', dados_aval.get('Temperatura'))
+    pdf.campo('Pele', dados_aval.get('Pele'))
+    pdf.campo('Alinhamento', dados_aval.get('Alinhamento'))
+    pdf.campo('Marcha', dados_aval.get('Marcha'))
+    pdf.campo('Trofismo', dados_aval.get('Trofismo'))
+    pdf.campo('Perimetria', dados_aval.get('Perimetria'))
+    pdf.campo('Palpacao', dados_aval.get('Palpacao'))
+    pdf.campo('Flexibilidade', dados_aval.get('Flexibilidade'))
+
+
+def _pagina_exame_fisico(pdf, dados_aval):
+    """Goniometria, força, dinamometria, testes especiais e controle motor — em tabelas."""
+    if not dados_aval:
+        return
+    pdf.add_page()
+
+    # --- Goniometria (ADM) ---
+    pdf.titulo_secao('MOBILIDADE ARTICULAR (GONIOMETRIA)')
+    flex_d, flex_e = _parse_bilateral(dados_aval.get('ADM_Joelho_Flexao'))
+    ext_d, ext_e = _parse_bilateral(dados_aval.get('ADM_Joelho_Extensao'))
+    lunge_d, lunge_e = _parse_bilateral(dados_aval.get('Lunge_Test'))
+    pdf.tabela(
+        ['Medida', 'Direito', 'Esquerdo'],
+        [
+            ['Flexao (graus)', flex_d, flex_e],
+            ['Extensao (graus)', ext_d, ext_e],
+            ['Lunge Test (cm)', lunge_d, lunge_e],
+        ],
+        larguras=[2, 1.3, 1.3]
+    )
+
+    # --- Força Geral e Dinamometria ---
+    pdf.titulo_secao('FORCA MUSCULAR')
+    fg_d = dict(_parse_composto(dados_aval.get('Forca_Geral_Dir')))
+    fg_e = dict(_parse_composto(dados_aval.get('Forca_Geral_Esq')))
+    din_d = dict(_parse_composto(dados_aval.get('Dinamometria_Dir')))
+    din_e = dict(_parse_composto(dados_aval.get('Dinamometria_Esq')))
+    movimentos = [('Ext', 'Extensao'), ('Flex', 'Flexao'), ('Abd', 'Abducao'), ('Add', 'Aducao')]
+    if any(fg_d) or any(din_d):
         rows = []
-        for ev in hist[-5:]:
+        for chave, nome in movimentos:
             rows.append([
-                ev.get('Data', '-')[:10],
-                str(ev.get('Dor', '-')),
-                str(ev.get('Flexao', '-')),
-                str(ev.get('Extensao', '-'))[:12],
-                str(ev.get('Inchaço', ev.get('Inchaco', '-')))[:10],
-                str(ev.get('Sono', '-'))[:10]
+                nome,
+                fg_d.get(chave, '-'), fg_e.get(chave, '-'),
+                din_d.get(chave, '-'), din_e.get(chave, '-'),
             ])
-        pdf.tabela_simples(headers, rows, [30, 25, 25, 35, 35, 40])
+        pdf.tabela(
+            ['Movimento', 'Grau Dir', 'Grau Esq', 'Dinam. Dir', 'Dinam. Esq'],
+            rows,
+            larguras=[1.6, 1, 1, 1, 1], fonte=8
+        )
+        pdf.paragrafo('Grau = forca manual (0-5); Dinam. = dinamometria (kgf).', cor=CINZA, tam=7, estilo='I')
 
-    # ==================================================================
-    # PÁGINA 2: EVOLUÇÃO DA DOR
-    # ==================================================================
-    if hist and n_sessoes >= 2:
-        pdf.add_page()
-        pdf.secao('CURVA DE EVOLUCAO DA DOR (EVA)')
+    # --- Testes Especiais ---
+    pdf.titulo_secao('TESTES ESPECIAIS ORTOPEDICOS')
+    pdf.campo('Ligamentares', dados_aval.get('Testes_Ligamentares'))
+    pdf.campo('Meniscais', dados_aval.get('Testes_Meniscais'))
+    pdf.campo('Femoropatelar', dados_aval.get('Testes_Femoropatelar'))
+    pdf.ln(1)
 
-        datas = [ev.get('Data', '')[:5] for ev in hist]
-        dores = [float(ev.get('Dor', 0)) for ev in hist]
+    # --- Controle Motor ---
+    pdf.titulo_secao('CONTROLE MOTOR')
+    pdf.campo('Globais', dados_aval.get('CM_Globais'), label_w=30)
+    pdf.campo('Membro Direito', dados_aval.get('CM_Membro_Dir'), label_w=30)
+    pdf.campo('Membro Esquerdo', dados_aval.get('CM_Membro_Esq'), label_w=30)
 
-        fig, ax = plt.subplots(figsize=(7, 3))
-        ax.plot(datas, dores, marker='o', color='#103E55', linewidth=2.5, markersize=6, zorder=3)
+
+def _pagina_proms(pdf, dados_aval):
+    if not dados_aval:
+        return
+    pdf.add_page()
+    pdf.titulo_secao('METRICAS BASEADAS EM EVIDENCIA (PROMs)')
+    pdf.paragrafo('Patient-Reported Outcome Measures: questionarios validados que medem a '
+                  'perspectiva do paciente. MCID = menor diferenca clinicamente relevante.',
+                  cor=CINZA, tam=8)
+    pdf.ln(1)
+
+    proms = [
+        ("LEFS", "Funcao Geral MMII", dados_aval.get("LEFS_Pct"), "%", "9 pts (Binkley 1999)", dados_aval.get("Interpretacao_LEFS")),
+        ("VISA-P", "Tendinopatia Patelar", dados_aval.get("VISA_P_Pts"), "pts", "13 pts (Hernandez 2014)", dados_aval.get("Interpretacao_VISA_P")),
+        ("Lysholm", "Ligamento/Menisco", dados_aval.get("Lysholm_Pts"), "pts", "10 pts (Briggs 2009)", dados_aval.get("Interpretacao_Lysholm")),
+        ("WOMAC", "Osteoartrite", dados_aval.get("WOMAC_Pct"), "%", "~12% (Angst 2001)", dados_aval.get("Interpretacao_WOMAC")),
+        ("KOOS", "Score Agregado", dados_aval.get("KOOS_Pct"), "%", "8-10 pts (Roos 2003)", None),
+        ("IKDC", "Subjetivo Joelho", dados_aval.get("IKDC_Pct"), "%", "9 pts (Irrgang 2006)", None),
+    ]
+    rows = []
+    for nome, indic, score, un, mcid, interp in proms:
+        if _num(score) > 0:
+            rows.append([nome, indic, f'{_num(score):.0f}{un}', mcid, _fmt(interp)])
+    if rows:
+        pdf.tabela(['PROM', 'Indicacao', 'Score', 'MCID', 'Interpretacao'],
+                   rows, larguras=[1.1, 1.9, 1, 1.9, 2.1], fonte=8)
+    else:
+        pdf.paragrafo('Nenhum PROM preenchido nesta avaliacao.', cor=CINZA, estilo='I')
+
+    # Exames de imagem
+    pdf.ln(1)
+    pdf.titulo_secao('EXAMES COMPLEMENTARES')
+    pdf.campo('Exames Apresentados', dados_aval.get('Exames_Apresentados'))
+    pdf.campo('Laudo dos Exames', dados_aval.get('Laudo_Exames'))
+
+
+def _pagina_evolucao(pdf, hist):
+    """Gráficos de evolução: dor, dor x função, e tabela completa de sessões."""
+    if not hist or len(hist) < 1:
+        return
+    pdf.add_page()
+
+    datas = [ev.get('Data', '')[5:] if ev.get('Data') else '?' for ev in hist]
+    dores = [_num(ev.get('Dor', 0)) for ev in hist]
+
+    # --- Gráfico 1: Evolução da Dor ---
+    pdf.titulo_secao('CURVA DE EVOLUCAO DA DOR (EVA)')
+    if len(hist) >= 2:
+        fig, ax = plt.subplots(figsize=(7, 2.8))
+        ax.plot(datas, dores, marker='o', color='#103E55', lw=2.5, ms=6, zorder=3)
         ax.fill_between(range(len(datas)), dores, alpha=0.1, color='#103E55')
-
-        # Linha MCID (2 pontos)
-        if dor_inicial > 2:
-            ax.axhline(y=dor_inicial - 2, color='#28a745', linestyle='--', lw=1.5, alpha=0.7, label='Meta MCID (-2 pts)')
+        dor_ini = dores[0]
+        if dor_ini > 2:
+            ax.axhline(y=dor_ini - 2, color='#28a745', ls='--', lw=1.3, alpha=0.7, label='Meta MCID (-2)')
             ax.legend(fontsize=8, loc='upper right')
-
-        ax.set_ylabel('Dor (EVA 0-10)', fontweight='bold')
+        ax.set_ylabel('Dor (EVA 0-10)', fontweight='bold', fontsize=9)
         ax.set_ylim(-0.5, 10.5)
-        ax.grid(True, linestyle='--', alpha=0.3)
+        ax.grid(True, ls='--', alpha=0.3)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        plt.xticks(rotation=35, ha='right', fontsize=8)
-        fig.tight_layout()
-
-        buf = _fig_to_bytes(fig)
-        pdf.image(buf, x=10, w=190, h=65)
+        plt.xticks(rotation=35, ha='right', fontsize=7)
+        pdf.image(_fig_to_bytes(fig), x=MARGEM_ESQ, w=LARGURA_UTIL)
         pdf.ln(2)
+    else:
+        pdf.paragrafo('Minimo de 2 sessoes necessario para gerar o grafico de evolucao.', cor=CINZA, estilo='I')
 
-        # Interpretação textual
-        pdf.set_font('Arial', '', 9)
-        pdf.set_text_color(*PRETO)
-        if delta_dor >= 2:
-            pdf.multi_cell(0, 5, f'Interpretacao: Reducao clinicamente significativa de {delta_dor:.0f} pontos na EVA (MCID = 2 pts, Salaffi 2004). Evolucao positiva.')
-        elif delta_dor > 0:
-            pdf.multi_cell(0, 5, f'Interpretacao: Reducao de {delta_dor:.0f} ponto(s) na EVA, porem abaixo do limiar de significancia clinica (MCID = 2 pts, Salaffi 2004).')
-        elif delta_dor == 0:
-            pdf.multi_cell(0, 5, 'Interpretacao: Dor estavel ao longo do periodo. Considerar revisao do plano terapeutico.')
+    # --- Gráfico 2: Dor x Função ---
+    func_scores = []
+    testes_evol = {}
+    for ev in hist:
+        testes = ev.get('Testes_Funcionais', {})
+        if isinstance(testes, dict) and testes:
+            scores = []
+            for nome, res in testes.items():
+                s = _mapa_func_score(res)
+                if s is not None:
+                    scores.append(s)
+                testes_evol.setdefault(nome, []).append(res)
+            func_scores.append(sum(scores) / len(scores) if scores else np.nan)
         else:
-            pdf.multi_cell(0, 5, f'Interpretacao: Piora de {abs(delta_dor):.0f} ponto(s) na EVA. Investigar adesao, sobrecarga ou novo trauma.')
+            func_scores.append(np.nan)
 
-    # ==================================================================
-    # PÁGINA 3: CORRELAÇÃO DOR × FUNÇÃO
-    # ==================================================================
-    if hist and n_sessoes >= 2:
-        pdf.add_page()
-        pdf.secao('CORRELACAO DOR x FUNCAO')
-        pdf.set_font('Arial', '', 9)
-        pdf.set_text_color(*CINZA)
-        pdf.multi_cell(0, 4, 'Este grafico mostra se a reducao da dor foi acompanhada de melhora funcional. Quando as linhas se cruzam (dor caindo, funcao subindo), o tratamento esta sendo eficaz.')
-        pdf.ln(3)
-
-        datas = [ev.get('Data', '')[:5] for ev in hist]
-        dores = [float(ev.get('Dor', 0)) for ev in hist]
-
-        # Calcula score funcional por sessão
-        func_scores = []
-        testes_evolucao = {}
-        for ev in hist:
-            testes = ev.get('Testes_Funcionais', {})
-            if isinstance(testes, dict) and testes:
-                scores = []
-                for nome, resultado in testes.items():
-                    s = _mapa_func_score(resultado)
-                    if s is not None:
-                        scores.append(s)
-                    if nome not in testes_evolucao:
-                        testes_evolucao[nome] = []
-                    testes_evolucao[nome].append(resultado)
-                func_scores.append(sum(scores) / len(scores) if scores else None)
-            else:
-                func_scores.append(None)
-
-        fig, ax1 = plt.subplots(figsize=(7, 3.2))
+    tem_funcao = any(not np.isnan(f) for f in func_scores)
+    if len(hist) >= 2 and tem_funcao:
+        pdf.titulo_secao('CORRELACAO DOR x FUNCAO')
+        pdf.paragrafo('Quando a dor cai e a funcao sobe, as linhas se cruzam: sinal de eficacia terapeutica.',
+                      cor=CINZA, tam=8)
+        fig2, ax1 = plt.subplots(figsize=(7, 2.9))
         ax1.plot(datas, dores, color='#dc3545', marker='o', lw=2.5, label='Dor (EVA)', zorder=3)
-        ax1.fill_between(range(len(datas)), dores, alpha=0.08, color='#dc3545')
-        ax1.set_ylabel('Dor (EVA 0-10)', color='#dc3545', fontweight='bold')
+        ax1.set_ylabel('Dor (EVA)', color='#dc3545', fontweight='bold', fontsize=9)
         ax1.set_ylim(-0.5, 10.5)
-
         ax2 = ax1.twinx()
-        # Interpola valores None
-        func_clean = []
-        for v in func_scores:
-            func_clean.append(v if v is not None else np.nan)
-        func_arr = np.array(func_clean, dtype=float)
-        mask = ~np.isnan(func_arr)
+        arr = np.array(func_scores, dtype=float)
+        mask = ~np.isnan(arr)
         if mask.sum() >= 2:
-            func_interp = np.interp(range(len(func_arr)), np.where(mask)[0], func_arr[mask])
-            ax2.plot(datas, func_interp, color='#28a745', marker='s', lw=2.5, linestyle='--', label='Funcao', zorder=3)
-            ax2.fill_between(range(len(datas)), func_interp, alpha=0.08, color='#28a745')
-
-        ax2.set_ylabel('Funcao (0-10)', color='#28a745', fontweight='bold')
+            interp = np.interp(range(len(arr)), np.where(mask)[0], arr[mask])
+            ax2.plot(datas, interp, color='#28a745', marker='s', lw=2.5, ls='--', label='Funcao', zorder=3)
+        ax2.set_ylabel('Funcao (0-10)', color='#28a745', fontweight='bold', fontsize=9)
         ax2.set_ylim(-0.5, 10.5)
-
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper center', ncol=2, fontsize=8, framealpha=0.9)
-
+        l1, lab1 = ax1.get_legend_handles_labels()
+        l2, lab2 = ax2.get_legend_handles_labels()
+        ax1.legend(l1 + l2, lab1 + lab2, loc='upper center', ncol=2, fontsize=8)
         ax1.spines['top'].set_visible(False)
         ax2.spines['top'].set_visible(False)
-        plt.xticks(rotation=35, ha='right', fontsize=8)
-        fig.tight_layout()
+        plt.xticks(rotation=35, ha='right', fontsize=7)
+        pdf.image(_fig_to_bytes(fig2), x=MARGEM_ESQ, w=LARGURA_UTIL)
+        pdf.ln(2)
 
-        buf = _fig_to_bytes(fig)
-        pdf.image(buf, x=10, w=190, h=70)
-        pdf.ln(3)
-
-        # Tabela evolução por teste funcional
-        if testes_evolucao:
-            pdf.secao('EVOLUCAO POR TESTE FUNCIONAL')
-            headers = ['Teste', 'Inicio', 'Atual', 'Variacao']
+        # Tabela evolução por teste
+        if testes_evol:
             rows = []
-            for nome, resultados in testes_evolucao.items():
-                primeiro = resultados[0] if resultados else '-'
-                ultimo = resultados[-1] if resultados else '-'
-                s_primeiro = _mapa_func_score(primeiro)
-                s_ultimo = _mapa_func_score(ultimo)
-                if s_primeiro is not None and s_ultimo is not None:
-                    delta = s_ultimo - s_primeiro
-                    var_text = f'{delta:+.0f} pts' if delta != 0 else 'Igual'
-                else:
-                    var_text = '-'
-                rows.append([_limpar_texto(nome)[:25], _limpar_texto(str(primeiro))[:20],
-                             _limpar_texto(str(ultimo))[:20], var_text])
-            pdf.tabela_simples(headers, rows, [55, 50, 50, 35])
+            for nome, res_list in testes_evol.items():
+                ini, fim = res_list[0], res_list[-1]
+                si, sf = _mapa_func_score(ini), _mapa_func_score(fim)
+                var = f'{sf - si:+.0f} pts' if (si is not None and sf is not None) else '-'
+                rows.append([nome, ini, fim, var])
+            pdf.subtitulo('Evolucao por Teste Funcional')
+            pdf.tabela(['Teste', 'Inicio', 'Atual', 'Variacao'],
+                       rows, larguras=[2, 1.6, 1.6, 1], fonte=8)
 
-    # ==================================================================
-    # PÁGINA 4: PROMs E SCORES
-    # ==================================================================
-    if dados_aval:
-        pdf.add_page()
-        pdf.secao('METRICAS BASEADAS EM EVIDENCIA (PROMs)')
-        pdf.set_font('Arial', '', 8)
-        pdf.set_text_color(*CINZA)
-        pdf.multi_cell(0, 4, 'Patient-Reported Outcome Measures (PROMs) sao questionarios validados cientificamente para mensurar a perspectiva do paciente sobre sua condicao.')
-        pdf.ln(3)
+    # --- Tabela completa de sessões ---
+    pdf.titulo_secao('HISTORICO COMPLETO DE SESSOES')
+    headers = ['Data', 'Dor', 'EVA Sem', 'Flexao', 'Extensao', 'Inchaco', 'Sono']
+    rows = []
+    for ev in hist:
+        rows.append([
+            ev.get('Data', '-')[:10],
+            ev.get('Dor', '-'),
+            ev.get('EVA_Semanal', '-'),
+            ev.get('Flexao', '-'),
+            _fmt(ev.get('Extensao'), '-'),
+            _fmt(ev.get('Inchaço', ev.get('Inchaco')), '-'),
+            _fmt(ev.get('Sono'), '-'),
+        ])
+    pdf.tabela(headers, rows, larguras=[1.6, 0.8, 1, 1, 1.6, 1.4, 1.4], fonte=7.5)
 
-        proms_data = [
-            ("LEFS", "Funcionalidade Geral MMII", dados_aval.get("LEFS_Pct", 0), "%", "9 pts (Binkley 1999)", dados_aval.get("Interpretacao_LEFS", "-")),
-            ("VISA-P", "Tendinopatia Patelar", dados_aval.get("VISA_P_Pts", 0), "pts", "13 pts (Hernandez 2014)", dados_aval.get("Interpretacao_VISA_P", "-")),
-            ("Lysholm", "Lesao Ligamentar/Meniscal", dados_aval.get("Lysholm_Pts", 0), "pts", "10 pts (Briggs 2009)", dados_aval.get("Interpretacao_Lysholm", "-")),
-            ("WOMAC", "Osteoartrite", dados_aval.get("WOMAC_Pct", 0), "%", "~12% (Angst 2001)", dados_aval.get("Interpretacao_WOMAC", "-")),
-            ("KOOS", "Score Agregado Joelho", dados_aval.get("KOOS_Pct", 0), "%", "8-10 pts (Roos 2003)", "-"),
-            ("IKDC", "Subjetivo Joelho", dados_aval.get("IKDC_Pct", 0), "%", "9 pts (Irrgang 2006)", "-"),
-        ]
 
-        headers = ['PROM', 'Indicacao', 'Score', 'MCID', 'Interpretacao']
-        rows = []
-        for nome, indicacao, score, un, mcid, interp in proms_data:
-            try:
-                score_f = float(score)
-            except (ValueError, TypeError):
-                score_f = 0
-            if score_f > 0:
-                rows.append([nome, indicacao[:25], f'{score_f:.1f}{un}', mcid[:20], _limpar_texto(str(interp))[:30]])
-
-        if rows:
-            pdf.tabela_simples(headers, rows, [22, 50, 25, 42, 51])
-        else:
-            pdf.set_font('Arial', 'I', 9)
-            pdf.cell(0, 6, 'Nenhum PROM com valor > 0 registrado nesta avaliacao.', 0, 1)
-
-        # Avaliação inicial: dados complementares
-        pdf.ln(5)
-        pdf.secao('DADOS DA AVALIACAO INICIAL')
-        campos = [
-            ("Queixa Principal", dados_aval.get("QP", "-")),
-            ("Classificacao da Dor", dados_aval.get("Class_Dor", "-")),
-            ("Derrame Articular", dados_aval.get("Derrame", "-")),
-            ("Comorbidades", dados_aval.get("Comorbidades", "-")),
-            ("Alinhamento", dados_aval.get("Alinhamento", "-")),
-            ("Exames", dados_aval.get("Exames_Apresentados", "-")),
-        ]
-        pdf.set_font('Arial', '', 9)
-        pdf.set_text_color(*PRETO)
-        for label, valor in campos:
-            pdf.set_font('Arial', 'B', 9)
-            pdf.cell(50, 5, f'{label}:', 0, 0)
-            pdf.set_font('Arial', '', 9)
-            pdf.multi_cell(0, 5, _limpar_texto(str(valor))[:80])
-
-    # ==================================================================
-    # PÁGINA 5: INSIGHTS IA + LSI + BANDEIRAS
-    # ==================================================================
-    if insights:
-        pdf.add_page()
-        pdf.secao('ANALISE DE INTELIGENCIA CLINICA (IA)')
-        pdf.set_font('Arial', '', 8)
-        pdf.set_text_color(*CINZA)
-        pdf.multi_cell(0, 4, 'Analise automatizada baseada em regras clinicas validadas pela literatura. Toda regra e auditavel e transparente.')
-        pdf.ln(3)
-
-        # Estagnação
-        est = insights.get('estagnacao')
-        if est and est.get('status') not in ('insuficiente', None):
-            pdf.set_font('Arial', 'B', 10)
-            if est['status'] == 'estagnacao':
-                pdf.set_text_color(*VERMELHO)
-                pdf.cell(0, 6, 'ESTAGNACAO DETECTADA', 0, 1)
-            elif est['status'] == 'melhora':
-                pdf.set_text_color(*VERDE)
-                pdf.cell(0, 6, 'EVOLUCAO POSITIVA', 0, 1)
-            elif est['status'] == 'piora':
-                pdf.set_text_color(*VERMELHO)
-                pdf.cell(0, 6, 'PIORA CLINICA', 0, 1)
-            pdf.set_font('Arial', '', 9)
-            pdf.set_text_color(*PRETO)
-            pdf.multi_cell(0, 5, _limpar_texto(est.get('racional', '')))
-            pdf.set_font('Arial', 'I', 7)
-            pdf.set_text_color(*CINZA)
-            pdf.cell(0, 4, f'Ref: {_limpar_texto(est.get("referencia", ""))}', 0, 1)
-            pdf.ln(3)
-
-        # LSI
-        lsi_data = insights.get('lsi')
-        if lsi_data and lsi_data.get('valor') is not None:
-            pdf.set_font('Arial', 'B', 10)
-            pdf.set_text_color(*AZUL)
-            pdf.cell(0, 6, f'LIMB SYMMETRY INDEX (LSI): {lsi_data["valor"]}%', 0, 1)
-            pdf.set_font('Arial', '', 9)
-            pdf.set_text_color(*PRETO)
-            pdf.multi_cell(0, 5, _limpar_texto(lsi_data.get('acao', '')))
-            pdf.set_font('Arial', 'I', 7)
-            pdf.set_text_color(*CINZA)
-            pdf.cell(0, 4, f'Ref: {_limpar_texto(lsi_data.get("referencia", ""))}', 0, 1)
-            pdf.ln(3)
-
-        # Bandeiras
-        bandeiras = insights.get('bandeiras', [])
-        if bandeiras:
-            pdf.secao('BANDEIRAS CLINICAS ATIVAS')
-            for b in bandeiras:
-                tipo = str(b.get('tipo', 'info')).upper()
-                if tipo == 'VERMELHA':
-                    pdf.set_text_color(*VERMELHO)
-                elif tipo == 'AMARELA':
-                    pdf.set_text_color(200, 150, 0)
-                else:
-                    pdf.set_text_color(*AZUL)
-                pdf.set_font('Arial', 'B', 9)
-                pdf.cell(0, 5, f'BANDEIRA {tipo}: {_limpar_texto(b.get("gatilho", ""))}', 0, 1)
-                pdf.set_font('Arial', '', 8)
-                pdf.set_text_color(*PRETO)
-                pdf.cell(0, 4, f'Acao: {_limpar_texto(b.get("acao", ""))}', 0, 1)
-                pdf.set_font('Arial', 'I', 7)
-                pdf.set_text_color(*CINZA)
-                pdf.cell(0, 4, f'Ref: {_limpar_texto(b.get("referencia", ""))}', 0, 1)
-                pdf.ln(2)
-        else:
-            pdf.set_font('Arial', '', 9)
-            pdf.set_text_color(*VERDE)
-            pdf.cell(0, 6, 'Nenhuma bandeira clinica ativa. Perfil de baixo risco.', 0, 1)
-
-    # ==================================================================
-    # ÚLTIMA PÁGINA: ASSINATURA
-    # ==================================================================
+def _pagina_ia(pdf, insights):
+    if not insights:
+        return
     pdf.add_page()
-    pdf.ln(20)
-    pdf.set_font('Arial', '', 9)
-    pdf.set_text_color(*CINZA)
-    pdf.multi_cell(0, 5, 'Este laudo foi gerado automaticamente pelo sistema GENUA de Inteligencia Clinica. '
-                         'As analises sao baseadas em regras clinicas validadas pela literatura cientifica (referencias citadas). '
-                         'O diagnostico e a conduta final sao de responsabilidade exclusiva do fisioterapeuta responsavel.')
-    pdf.ln(20)
+    pdf.titulo_secao('ANALISE DE INTELIGENCIA CLINICA (IA)')
+    pdf.paragrafo('Analise automatizada por regras clinicas validadas na literatura. '
+                  'Transparente e auditavel; a decisao final e do fisioterapeuta.',
+                  cor=CINZA, tam=8)
+    pdf.ln(1)
 
-    # Linha de assinatura
+    est = insights.get('estagnacao')
+    if est and est.get('status') not in ('insuficiente', None):
+        mapa = {'estagnacao': ('ESTAGNACAO DETECTADA', AMARELO),
+                'melhora': ('EVOLUCAO POSITIVA', VERDE),
+                'piora': ('PIORA CLINICA', VERMELHO)}
+        rotulo, cor = mapa.get(est['status'], ('ANALISE', AZUL))
+        pdf.badge(rotulo, cor)
+        pdf.paragrafo(est.get('racional', ''))
+        pdf.paragrafo(f"Ref: {est.get('referencia', '')}", cor=CINZA, tam=7, estilo='I')
+        pdf.ln(1)
+
+    lsi = insights.get('lsi')
+    if lsi and lsi.get('valor') is not None:
+        pdf.subtitulo(f"Limb Symmetry Index (LSI): {lsi['valor']}%")
+        pdf.paragrafo(lsi.get('acao', ''))
+        pdf.paragrafo(f"Ref: {lsi.get('referencia', '')}", cor=CINZA, tam=7, estilo='I')
+        pdf.ln(1)
+
+    bandeiras = insights.get('bandeiras', [])
+    if bandeiras:
+        pdf.subtitulo('Bandeiras Clinicas Ativas')
+        for b in bandeiras:
+            tipo = str(b.get('tipo', 'info')).upper()
+            cor = VERMELHO if tipo == 'VERMELHA' else AMARELO if tipo == 'AMARELA' else AZUL
+            pdf.set_x(MARGEM_ESQ)
+            pdf.set_font('Arial', 'B', 9)
+            pdf.set_text_color(*cor)
+            pdf.multi_cell(LARGURA_UTIL, 5, _txt(f"[{tipo}] {b.get('gatilho', '')}"))
+            pdf.paragrafo(f"Acao: {b.get('acao', '')}", tam=8)
+            pdf.paragrafo(f"Ref: {b.get('referencia', '')}", cor=CINZA, tam=7, estilo='I')
+            pdf.ln(1)
+    else:
+        pdf.paragrafo('Nenhuma bandeira clinica ativa. Perfil de baixo risco.', cor=VERDE)
+
+
+def _pagina_assinatura(pdf, dados_aval):
+    pdf.add_page()
+    pdf.ln(15)
+    pdf.paragrafo('Este laudo foi gerado pelo sistema GENUA de Inteligencia Clinica. As analises '
+                  'baseiam-se em regras clinicas validadas pela literatura cientifica citada. O '
+                  'diagnostico e a conduta sao de responsabilidade exclusiva do fisioterapeuta responsavel.',
+                  cor=CINZA)
+    pdf.ln(20)
+    prof = dados_aval.get('Profissional_ID', '') if dados_aval else ''
     pdf.set_draw_color(*PRETO)
-    pdf.line(40, pdf.get_y(), 170, pdf.get_y())
-    pdf.ln(3)
+    pdf.line(50, pdf.get_y(), 160, pdf.get_y())
+    pdf.ln(2)
     pdf.set_font('Arial', 'B', 11)
     pdf.set_text_color(*PRETO)
-    pdf.cell(0, 6, 'Fisioterapeuta Responsavel', 0, 1, 'C')
+    pdf.set_x(MARGEM_ESQ)
+    pdf.cell(LARGURA_UTIL, 6, 'Fisioterapeuta Responsavel', 0, 1, 'C')
     pdf.set_font('Arial', '', 9)
-    pdf.cell(0, 5, 'GENUA Instituto de Fisioterapia Esportiva', 0, 1, 'C')
-    pdf.cell(0, 5, f'CREFITO: ____________  |  Data: {datetime.now().strftime("%d/%m/%Y")}', 0, 1, 'C')
+    if not _vazio(prof):
+        pdf.cell(LARGURA_UTIL, 5, _txt(prof), 0, 1, 'C')
+    pdf.cell(LARGURA_UTIL, 5, 'GENUA Instituto de Fisioterapia Esportiva', 0, 1, 'C')
+    pdf.cell(LARGURA_UTIL, 5, _txt(f'CREFITO: ____________   |   Data: {datetime.now().strftime("%d/%m/%Y")}'), 0, 1, 'C')
 
-    pdf.ln(15)
-    pdf.set_font('Arial', 'I', 7)
-    pdf.set_text_color(*CINZA)
-    pdf.cell(0, 4, 'GENUA HealthTech (c) 2026 | Ambiente seguro | Dados confidenciais protegidos pela LGPD', 0, 1, 'C')
 
-    # Gera bytes
-    try:
-        return pdf.output(dest='S').encode('latin-1')
-    except Exception:
-        return bytes(pdf.output())
+# ============================================================
+# FUNÇÃO PÚBLICA
+# ============================================================
+def gerar_laudo(paciente_nome, dados_aval, historico, insights=None, fenotipo=None):
+    """
+    Monta o laudo completo em PDF e retorna os bytes.
+
+    Args:
+        paciente_nome: str
+        dados_aval: dict da última Avaliacao_Inicial (ou {})
+        historico: list[dict] das sessões de Evolucao
+        insights: dict de ia_clinica.analisar_paciente (ou None)
+        fenotipo: dict de ia_clinica.normalizar_diagnostico (ou None)
+
+    Returns:
+        bytes do PDF
+    """
+    dados_aval = dados_aval or {}
+    hist = sorted(historico, key=lambda x: x.get('Data', '')) if historico else []
+
+    pdf = LaudoGenua()
+    pdf.alias_nb_pages()
+
+    _pagina_capa(pdf, paciente_nome, dados_aval, hist, fenotipo)
+    _pagina_avaliacao(pdf, dados_aval)
+    _pagina_exame_fisico(pdf, dados_aval)
+    _pagina_proms(pdf, dados_aval)
+    _pagina_evolucao(pdf, hist)
+    _pagina_ia(pdf, insights)
+    _pagina_assinatura(pdf, dados_aval)
+
+    saida = pdf.output()
+    # fpdf2 retorna bytearray; normaliza para bytes
+    if isinstance(saida, (bytes, bytearray)):
+        return bytes(saida)
+    return saida.encode('latin-1')
