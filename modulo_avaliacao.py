@@ -13,7 +13,7 @@ try:
 except (ImportError, Exception):
     _HAS_IMAGE_COORDS = False
 from config import CORES_GENUA, titulo
-from firebase_client import conn, db, invalidar_cache
+from firebase_client import db, invalidar_cache
 
 def render():
     st.markdown(f"<p style='color: {CORES_GENUA['texto_suave']}; margin-top: -10px; text-align: center;'>Primeira Consulta | Estabelecimento de Baseline Clínica</p><br>", unsafe_allow_html=True)
@@ -279,8 +279,8 @@ def render():
                     for p in parts:
                         if p.startswith(prefix + ":"):
                             return tipo(p.split(":")[1])
-                except:
-                    pass
+                except (ValueError, TypeError, AttributeError):
+                    pass  # formato inesperado no Firestore -> usa default
                 return default
             
             def get_val_cm(chave_db, prefix):
@@ -291,8 +291,8 @@ def render():
                     for p in parts:
                         if p.startswith(prefix + ":"):
                             return p.split(":")[1]
-                except:
-                    pass
+                except (ValueError, TypeError, AttributeError):
+                    pass  # formato inesperado no Firestore -> usa default
                 return "3 - Normal"
 
             titulo("💪 Força Muscular e Dinamometria")
@@ -655,8 +655,8 @@ def render():
                     "Forca_Geral_Esq": f"Ext:{fg_ext_e} Flex:{fg_flex_e} Abd:{fg_abd_e} Add:{fg_add_e}",
                     "Dinamometria_Dir": f"Ext:{din_ext_d} Flex:{din_flex_d} Abd:{din_abd_d} Add:{din_add_d}",
                     "Dinamometria_Esq": f"Ext:{din_ext_e} Flex:{din_flex_e} Abd:{din_abd_e} Add:{din_add_e}",
-                    "ADM_Joelho_Flexao": f"Dir:{adm_flex_d} Esq:{adm_flex_e}",
-                    "ADM_Joelho_Extensao": f"Dir:{adm_ext_d} Esq:{adm_ext_e}",
+            "ADM_Joelho_Flexao": f"Dir:{adm_flex_d} Esq:{adm_flex_e}",
+            "ADM_Joelho_Extensao": f"Dir:{adm_ext_d} Esq:{adm_ext_e}",
                     "Lunge_Test": f"Dir:{lunge_d} Esq:{lunge_e}",
                 
                     "Flexibilidade": ", ".join(flexibilidade) if flexibilidade else "Normal",

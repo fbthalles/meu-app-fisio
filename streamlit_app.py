@@ -9,7 +9,7 @@ import config  # noqa: F401  — efeitos colaterais: page config + CSS + sidebar
 from config import CORES_GENUA
 
 # 2) Conexão Firebase
-from firebase_client import conn, db  # noqa: F401
+from firebase_client import db  # noqa: F401
 
 # 3) Roteamento (portal cirurgião + session_state inicial)
 from routing import aplicar_roteamento

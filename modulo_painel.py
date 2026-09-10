@@ -4,8 +4,6 @@ Performance: matplotlib, FPDF e PIL ficam em lazy import dentro de render(),
 para não pesar o startup do app quando o usuário ainda não abriu o painel.
 """
 import io
-import base64
-import urllib.parse
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -29,7 +27,7 @@ def render():
         hist_clinica = registro_p.get('Diagnostico_Clinico', registro_p.get('Historia', 'Sem HMA base'))
         idade_p = int(float(registro_p.get('Idade', 0))) if pd.notna(registro_p.get('Idade')) else "N/A"
         dx_clinico_base = registro_p.get('Diagnostico_Clinico', 'Não especificado')
-    except:
+    except (KeyError, IndexError, ValueError, AttributeError):
         hist_clinica = "Não disponível."; idade_p = "-"; dx_clinico_base = "-"
 
     # --- B. RESGATE DA AVALIAÇÃO BASE (TESTES E FLAGS) ---
@@ -44,7 +42,7 @@ def render():
         av_tlig = av_p.get('Testes_Ligamentares', '')
         av_tmen = av_p.get('Testes_Meniscais', '')
         tem_av = True
-    except:
+    except (KeyError, IndexError, ValueError, AttributeError):
         tem_av = False
 
     st.header(f"📊 Painel Analítico: Joelho")
@@ -403,8 +401,8 @@ def render():
 
     # --- MÓDULO DE EXPORTAÇÃO COMPLEXO (LAUDO MÉDICO + MATRIZ DE GRÁFICOS) ---
     st.markdown("---")
-    titulo("📄 Exportação de Laudo Clínico Completo")
-    st.caption("Gera um laudo profissional com TODOS os dados do prontuário: anamnese, exame físico completo, goniometria, força, testes especiais, controle motor, PROMs, gráficos de evolução e análise de IA — tudo com identidade visual GENUA.")
+    titulo("📄 Exportação de Laudo Clínico Avançado")
+    st.caption("Gera um relatório profissional (5-6 páginas) com gráficos, PROMs, análise de IA e referências científicas.")
 
     if st.button("⚙️ GERAR RELATÓRIO COM GRÁFICOS", width='stretch'):
         with st.spinner("🧠 Compilando laudo clínico avançado com gráficos e análise de IA..."):

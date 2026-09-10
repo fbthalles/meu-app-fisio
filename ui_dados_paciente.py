@@ -2,7 +2,7 @@
 import streamlit as st
 from datetime import datetime
 from config import CORES_GENUA, titulo
-from firebase_client import conn, db, invalidar_cache
+from firebase_client import db, invalidar_cache
 
 def render():
         st.header("👤 Gestão de Pacientes")
@@ -11,8 +11,9 @@ def render():
         try:
             docs = db.collection("Cadastro").stream()
             lista = list(set([doc.to_dict().get("Nome") for doc in docs if doc.to_dict().get("Nome")]))
-        except:
+        except Exception as e:
             lista = []
+            st.warning(f"⚠️ Não foi possível carregar a lista de pacientes: {e}")
         
         paciente = st.selectbox("Selecione um paciente existente ou adicione um novo:", ["+ Novo Paciente"] + lista)
     

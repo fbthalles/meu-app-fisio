@@ -2,7 +2,7 @@
 import streamlit as st
 from datetime import datetime
 from config import CORES_GENUA, titulo
-from firebase_client import conn, db, invalidar_cache
+from firebase_client import db, invalidar_cache
 
 
 def render():
