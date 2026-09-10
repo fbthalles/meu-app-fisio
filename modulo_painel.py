@@ -402,12 +402,13 @@ def render():
     # --- MÓDULO DE EXPORTAÇÃO COMPLEXO (LAUDO MÉDICO + MATRIZ DE GRÁFICOS) ---
     st.markdown("---")
     titulo("📄 Exportação de Laudo Clínico Avançado")
-    st.caption("Gera um relatório profissional (5-6 páginas) com gráficos, PROMs, análise de IA e referências científicas.")
+    st.caption("Gera um laudo visual (dark, estilo Apple) com gráficos, PROMs, análise de IA e referências. Pré-visualize abaixo e baixe em HTML — para PDF, use Ctrl+P → Salvar como PDF no navegador.")
 
-    if st.button("⚙️ GERAR RELATÓRIO COM GRÁFICOS", width='stretch'):
-        with st.spinner("🧠 Compilando laudo clínico avançado com gráficos e análise de IA..."):
+    if st.button("⚙️ GERAR LAUDO VISUAL", width='stretch'):
+        with st.spinner("🧠 Compilando laudo clínico com gráficos e análise de IA..."):
             try:
-                from pdf_laudo import gerar_laudo
+                import streamlit.components.v1 as components
+                from pdf_laudo import gerar_laudo_html
                 from ia_clinica import analisar_paciente as _analisar, normalizar_diagnostico as _normalizar
 
                 # 1. Busca dados
@@ -419,27 +420,29 @@ def render():
                 historico = [doc.to_dict() for doc in docs_evo]
 
                 # 2. Insights IA + Fenótipo
-                insights_pdf = _analisar(st.session_state.paciente)
-                fenotipo_pdf = _normalizar(dados_aval.get('Diagnostico_Clinico', '') if dados_aval else '')
+                insights_l = _analisar(st.session_state.paciente)
+                fenotipo_l = _normalizar(dados_aval.get('Diagnostico_Clinico', '') if dados_aval else '')
 
-                # 3. Gera PDF
-                pdf_bytes = gerar_laudo(
+                # 3. Gera HTML
+                laudo_html = gerar_laudo_html(
                     paciente_nome=st.session_state.paciente,
                     dados_aval=dados_aval,
                     historico=historico,
-                    insights=insights_pdf,
-                    fenotipo=fenotipo_pdf
+                    insights=insights_l,
+                    fenotipo=fenotipo_l
                 )
 
                 st.download_button(
-                    label="📥 BAIXAR LAUDO COMPLETO (PDF)",
-                    data=pdf_bytes,
-                    file_name=f"Laudo_Clinico_{st.session_state.paciente.replace(' ', '_')}.pdf",
-                    mime="application/pdf",
+                    label="📥 BAIXAR LAUDO (HTML) — abra e use Ctrl+P para salvar em PDF",
+                    data=laudo_html.encode('utf-8'),
+                    file_name=f"Laudo_GENUA_{st.session_state.paciente.replace(' ', '_')}.html",
+                    mime="text/html",
                     type="primary",
                     width='stretch'
                 )
-                st.success("✅ Laudo clínico avançado compilado com sucesso!")
+                st.success("✅ Laudo gerado! Veja a pré-visualização abaixo.")
+                # Pré-visualização embutida
+                components.html(laudo_html, height=1400, scrolling=True)
 
             except Exception as e:
                 st.error(f"❌ Erro ao gerar o laudo: {e}")
