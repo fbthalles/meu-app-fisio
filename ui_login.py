@@ -1,64 +1,51 @@
-"""GENUA | Tela de Login."""
+"""GENUA | Tela de Login (Estilo Apple iCloud / HIG)."""
 import streamlit as st
 from config import CORES_GENUA, NOVO_LOGO_GENUA
 
 def render():
-        # Injeção de CSS para transformar o design padrão num layout SaaS
-        st.markdown(f"""
-        <style>
-        /* Estilização do Botão de Login */
-        div.stButton > button {{
-            background-color: {CORES_GENUA['primaria']};
-            color: white;
-            border-radius: 8px;
-            height: 50px;
-            font-weight: bold;
-            font-size: 16px;
-            border: none;
-            transition: 0.3s;
-        }}
-        div.stButton > button:hover {{
-            background-color: {CORES_GENUA['secundaria']};
-            color: white;
-            border: none;
-            box-shadow: 0px 4px 10px rgba(57, 142, 155, 0.4);
-        }}
-        /* Centralização Vertical e Fundo do App */
-        .block-container {{
-            padding-top: 4rem;
-            padding-bottom: 0rem;
-        }}
-        </style>
-        """, unsafe_allow_html=True)
+    # Criação de colunas simétricas para centralizar o cartão de login (Efeito Card Apple)
+    _, c_login, _ = st.columns([1, 1.4, 1])
 
-        # Criação de colunas para forçar o formulário a ficar centralizado (Efeito Cartão)
-        c_espaco1, c_login, c_espaco2 = st.columns([1, 1.5, 1])
-
-        with c_login:
-            # Renderiza a Logo Centralizada
+    with c_login:
+        st.markdown("<div style='height: 4vh;'></div>", unsafe_allow_html=True)
+        
+        # Container com borda e fundo elevado (Card Apple)
+        with st.container(border=True):
+            
+            # Renderização da Logo Centralizada
+            st.markdown("<div style='text-align: center; padding-top: 10px;'>", unsafe_allow_html=True)
             try:
-                st.image(NOVO_LOGO_GENUA, width='stretch')
+                st.image(NOVO_LOGO_GENUA, width=120)
             except Exception:
-                st.markdown(f"<h1 style='text-align: center; color: {CORES_GENUA['primaria']}; font-size: 3rem;'>GENUA</h1>", unsafe_allow_html=True)
+                st.markdown(f"<h1 style='color: {CORES_GENUA['primaria']}; font-size: 2.5rem; margin-bottom: 0;'>GENUA</h1>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
-            st.markdown("<h4 style='text-align: center; color: #6c757d; font-weight: normal; margin-top: -15px;'>Inteligência Clínica Integrada</h4><br>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style='text-align: center; margin-bottom: 28px;'>
+                    <h3 style='color: {CORES_GENUA['primaria']}; margin-bottom: 4px; font-size: 1.5rem;'>Entrar no Sistema</h3>
+                    <p style='color: {CORES_GENUA['texto_suave']}; font-size: 0.9rem; margin: 0;'>Inteligência Clínica Integrada</p>
+                </div>
+            """, unsafe_allow_html=True)
         
-            # Caixa de Formulário
-            email = st.text_input("✉️ E-mail Profissional", placeholder="dr.nome@clinica.com")
-            senha = st.text_input("🔑 Senha de Acesso", type="password", placeholder="••••••••")
+            # Campos de Formulário com espaçamento limpo
+            email = st.text_input("✉️ E-mail Profissional", placeholder="dr.nome@clinica.com", key="login_email")
+            senha = st.text_input("🔑 Senha de Acesso", type="password", placeholder="••••••••", key="login_senha")
         
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
-            # Motor de Autenticação (Mantendo a sua lógica atual simplificada ou Firebase Auth)
-            if st.button("ENTRAR NO SISTEMA", width='stretch'):
+            # Motor de Autenticação
+            if st.button("ENTRAR NO SISTEMA", use_container_width=True, type="primary"):
                 if email and senha:
-                    with st.spinner("A autenticar credenciais..."):
-                        # Aqui entra a sua verificação real. Para já, avança o estado:
+                    with st.spinner("Autenticando credenciais..."):
+                        # Simulação / Estado de Autenticação
                         st.session_state.user_email = email
                         st.session_state.pagina = 'dados_paciente'
                         st.rerun()
                 else:
                     st.warning("⚠️ Preencha o e-mail e a senha para aceder.")
                 
-            st.markdown("<p style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 20px;'>GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado</p>", unsafe_allow_html=True)
-
+            st.markdown(f"""
+                <div style='text-align: center; color: {CORES_GENUA['texto_suave']}; font-size: 0.78rem; margin-top: 24px; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 16px;'>
+                    GENUA HealthTech © 2026<br>Ambiente Seguro e Criptografado (LGPD)
+                </div>
+            """, unsafe_allow_html=True)
