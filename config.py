@@ -1,19 +1,21 @@
-"""GENUA | Configuração visual: cores, logo, CSS responsivo e helpers de UI."""
+"""GENUA | Configuração visual: cores, logo, CSS responsivo (Apple HIG) e helpers de UI."""
 import streamlit as st
 
 
 # ============================================================
-# 1. CORES DA MARCA
+# 1. CORES DA MARCA (Padrão Apple Clinical HIG + Identidade GENUA)
 # ============================================================
 CORES_GENUA = {
-    'primaria': '#103E55',       # Azul-Petróleo Escuro
-    'secundaria': '#398E9B',     # Verde-Água/Teal Claro
-    'fundo_claro': '#F4F7F9',    # Cinza Gelo levemente azulado
-    'texto_escuro': '#1A252C',   # Cinza-chumbo profundo
-    'texto_suave': '#6c757d',    # Cinza médio para legendas
-    'alerta_sucesso': '#28a745', # Verde positivo
-    'alerta_aviso': '#ffc107',   # Amarelo atenção
-    'alerta_erro': '#dc3545',    # Vermelho alerta
+    'primaria': '#103E55',       # Azul-Petróleo Profundo (Identidade GENUA)
+    'secundaria': '#2E8B9A',     # Teal Clínico Vibrante (Destaques e Foco)
+    'accent_ios': '#0071E3',     # Azul Interativo Apple (Links e Micro-interações)
+    'fundo_claro': '#F5F5F7',    # Apple System Gray 6 (Fundo acetinado)
+    'card_bg': '#FFFFFF',        # Superfície elevada pura
+    'texto_escuro': '#1D1D1F',   # Apple SF Charcoal (Leitura de alto contraste)
+    'texto_suave': '#86868B',    # Apple SF Secondary Label (Legendas e subtítulos)
+    'alerta_sucesso': '#34C759', # Apple System Green
+    'alerta_aviso': '#FF9F0A',   # Apple System Orange/Amber
+    'alerta_erro': '#FF3B30',    # Apple System Red
 }
 
 # ============================================================
@@ -32,12 +34,12 @@ st.set_page_config(
 )
 
 # ============================================================
-# 4. CSS UNIFICADO E RESPONSIVO (Mobile / Tablet / Desktop)
+# 4. CSS UNIFICADO E RESPONSIVO (Apple iOS / iPadOS / macOS Design System)
 # ============================================================
 st.markdown(f"""
     <style>
     /* ============================================================ */
-    /* GENUA DESIGN SYSTEM  -  Linguagem visual iOS / Apple          */
+    /* GENUA DESIGN SYSTEM 2.0 — Apple Human Interface Guidelines   */
     /* ============================================================ */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
@@ -45,243 +47,319 @@ st.markdown(f"""
         --genua-primaria: {CORES_GENUA['primaria']};
         --genua-secundaria: {CORES_GENUA['secundaria']};
         --genua-fundo: {CORES_GENUA['fundo_claro']};
+        --genua-texto: {CORES_GENUA['texto_escuro']};
+        --genua-suave: {CORES_GENUA['texto_suave']};
         --raio-card: 22px;
-        --raio-input: 14px;
-        --raio-btn: 16px;
-        --sombra-suave: 0 1px 2px rgba(16,62,85,.04), 0 4px 16px rgba(16,62,85,.06);
-        --sombra-media: 0 4px 12px rgba(16,62,85,.08), 0 12px 32px rgba(16,62,85,.10);
-        --transicao: all .25s cubic-bezier(.4,0,.2,1);
+        --raio-input: 12px;
+        --raio-btn: 980px; /* Formato pílula Apple */
+        --sombra-card: 0 2px 8px rgba(0, 0, 0, 0.03), 0 12px 32px rgba(16, 62, 85, 0.05);
+        --sombra-hover: 0 6px 16px rgba(0, 0, 0, 0.06), 0 18px 40px rgba(16, 62, 85, 0.09);
+        --sombra-input: 0 1px 2px rgba(0, 0, 0, 0.03);
+        --transicao: all 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
     }}
 
-    /* ===== BASE ===== */
+    /* ===== BASE & TIPOGRAFIA SF PRO / INTER ===== */
     html, body, [class*="css"] {{
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', sans-serif !important;
         -webkit-text-size-adjust: 100%;
         -webkit-font-smoothing: antialiased;
-        letter-spacing: -0.01em;
+        -moz-osx-font-smoothing: grayscale;
+        letter-spacing: -0.015em;
+        color: var(--genua-texto);
     }}
 
     .stApp {{
-        background:
-            radial-gradient(1200px 600px at 100% -10%, rgba(57,142,155,.06), transparent 60%),
-            radial-gradient(1000px 500px at -10% 10%, rgba(16,62,85,.05), transparent 55%),
-            linear-gradient(180deg, #FBFCFD 0%, #F4F7F9 100%);
-        color: {CORES_GENUA['texto_escuro']};
+        background-color: var(--genua-fundo) !important;
+        background-image:
+            radial-gradient(900px 450px at 95% -5%, rgba(46, 139, 154, 0.06), transparent 60%),
+            radial-gradient(800px 400px at 0% 5%, rgba(16, 62, 85, 0.04), transparent 55%) !important;
+        color: var(--genua-texto);
     }}
 
-    /* Tipografia fluida com pesos iOS */
-    h1 {{ font-size: clamp(1.6rem, 4vw, 2.4rem) !important; font-weight: 800 !important; letter-spacing:-.03em !important; }}
-    h2 {{ font-size: clamp(1.3rem, 3.2vw, 1.9rem) !important; font-weight: 700 !important; letter-spacing:-.02em !important; }}
-    h3 {{ font-size: clamp(1.15rem, 2.6vw, 1.5rem) !important; font-weight: 700 !important; letter-spacing:-.02em !important; }}
-    h4 {{ font-size: clamp(1rem, 2.2vw, 1.2rem) !important; font-weight: 600 !important; }}
-    body, p, label, .stMarkdown {{ font-size: clamp(.92rem, 1.6vw, 1rem) !important; line-height: 1.6 !important; }}
-    h1, h2, h3, h4 {{ color: {CORES_GENUA['primaria']} !important; }}
+    /* Hierarquia Tipográfica Apple */
+    h1 {{ font-size: clamp(1.75rem, 3.5vw, 2.35rem) !important; font-weight: 800 !important; letter-spacing: -0.03em !important; color: var(--genua-texto) !important; }}
+    h2 {{ font-size: clamp(1.35rem, 2.8vw, 1.8rem) !important; font-weight: 700 !important; letter-spacing: -0.025em !important; color: var(--genua-texto) !important; }}
+    h3 {{ font-size: clamp(1.15rem, 2.2vw, 1.4rem) !important; font-weight: 700 !important; letter-spacing: -0.02em !important; color: var(--genua-primaria) !important; }}
+    h4 {{ font-size: clamp(1.0rem, 1.8vw, 1.15rem) !important; font-weight: 600 !important; letter-spacing: -0.015em !important; color: var(--genua-primaria) !important; }}
+    body, p, label, .stMarkdown {{ font-size: 0.96rem !important; line-height: 1.55 !important; }}
 
-    /* Esconde chrome do Streamlit */
+    /* Esconde elementos rústicos do Streamlit e aplica Glass no topo */
     #MainMenu, footer, .stDeployButton, .stStatusWidget {{ display: none !important; }}
-    header {{ background: transparent !important; }}
+    header[data-testid="stHeader"] {{
+        background: rgba(245, 245, 247, 0.72) !important;
+        backdrop-filter: saturate(180%) blur(20px) !important;
+        -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+    }}
 
     [data-testid="block-container"] {{
-        padding-top: clamp(1rem, 3vw, 2.5rem) !important;
-        padding-bottom: clamp(2rem, 4vw, 3rem) !important;
-        padding-left: clamp(1rem, 5vw, 4%) !important;
-        padding-right: clamp(1rem, 5vw, 4%) !important;
-        max-width: 1180px !important;
+        padding-top: clamp(1.2rem, 2.5vw, 2.2rem) !important;
+        padding-bottom: 3rem !important;
+        padding-left: clamp(1rem, 4vw, 3.5%) !important;
+        padding-right: clamp(1rem, 4vw, 3.5%) !important;
+        max-width: 1200px !important;
     }}
 
-    /* ===== INPUTS (estilo iOS: pill suave, foco com halo) ===== */
+    /* ===== CARDS FLUTUANTES APPLE (st.container(border=True)) ===== */
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background-color: #FFFFFF !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        border-radius: var(--raio-card) !important;
+        padding: 24px 26px !important;
+        box-shadow: var(--sombra-card) !important;
+        transition: var(--transicao) !important;
+        margin-bottom: 16px !important;
+    }}
+
+    /* ===== INPUTS E SELETORES (Estilo macOS Sonoma / iOS 18) ===== */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea,
     .stNumberInput > div > div > input,
     .stDateInput > div > div > input,
-    .stSelectbox [data-baseweb="select"] > div {{
+    .stSelectbox [data-baseweb="select"] > div,
+    .stMultiSelect [data-baseweb="select"] > div {{
         border-radius: var(--raio-input) !important;
-        border: 1px solid rgba(16,62,85,.10) !important;
-        background: rgba(255,255,255,.85) !important;
-        backdrop-filter: blur(8px) !important;
-        box-shadow: var(--sombra-suave) !important;
-        padding: 12px 16px !important;
-        min-height: 50px !important;
-        font-size: 16px !important;
+        border: 1px solid rgba(0, 0, 0, 0.09) !important;
+        background-color: #FFFFFF !important;
+        box-shadow: var(--sombra-input) !important;
+        padding: 10px 14px !important;
+        min-height: 46px !important;
+        font-size: 15px !important;
+        color: var(--genua-texto) !important;
         transition: var(--transicao) !important;
     }}
+
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus,
-    .stNumberInput > div > div > input:focus {{
-        border-color: {CORES_GENUA['secundaria']} !important;
-        box-shadow: 0 0 0 4px rgba(57,142,155,.15) !important;
-        background: #fff !important;
+    .stNumberInput > div > div > input:focus,
+    .stSelectbox [data-baseweb="select"] > div:focus-within,
+    .stMultiSelect [data-baseweb="select"] > div:focus-within {{
+        border-color: var(--genua-secundaria) !important;
+        box-shadow: 0 0 0 4px rgba(46, 139, 154, 0.16) !important;
+        background-color: #FFFFFF !important;
     }}
 
-    /* ===== SLIDERS (trilha teal, thumb grande) ===== */
-    .stSlider [data-baseweb="slider"] {{ padding: 12px 0 !important; }}
-    .stSlider [role="slider"] {{
-        height: 30px !important; width: 30px !important;
-        box-shadow: 0 2px 8px rgba(16,62,85,.25) !important;
-        border: 3px solid #fff !important;
-    }}
-    .stSlider [data-baseweb="slider"] > div > div {{
-        background: linear-gradient(90deg, {CORES_GENUA['secundaria']}, {CORES_GENUA['primaria']}) !important;
+    /* Labels dos inputs mais elegantes */
+    .stTextInput label, .stTextArea label, .stNumberInput label,
+    .stDateInput label, .stSelectbox label, .stMultiSelect label, .stSlider label {{
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        color: #3A3A3C !important;
+        margin-bottom: 4px !important;
     }}
 
-    /* ===== RADIO / CHECKBOX (touch-friendly) ===== */
-    .stRadio > div {{ gap: 10px !important; }}
-    .stRadio label, .stCheckbox label {{
-        padding: 10px 6px !important; min-height: 46px !important;
-        display: flex !important; align-items: center !important;
-        border-radius: 12px !important; transition: var(--transicao) !important;
+    /* Tags do Multiselect estilo Chip iOS */
+    span[data-baseweb="tag"] {{
+        background: rgba(16, 62, 85, 0.08) !important;
+        color: var(--genua-primaria) !important;
+        border-radius: 980px !important;
+        font-weight: 600 !important;
+        padding: 4px 10px !important;
+        border: 1px solid rgba(16, 62, 85, 0.12) !important;
     }}
-    .stRadio label:hover {{ background: rgba(57,142,155,.06) !important; }}
 
-    /* ===== BOTÕES (iOS: pill, gradiente, elevação no hover) ===== */
+    /* ===== BOTÕES (Pílula Apple + Micro-interação) ===== */
     .stButton > button {{
-        background: linear-gradient(135deg, {CORES_GENUA['primaria']} 0%, #16506E 100%) !important;
-        color: #fff !important;
+        background: linear-gradient(135deg, {CORES_GENUA['primaria']} 0%, #175473 100%) !important;
+        color: #FFFFFF !important;
         border-radius: var(--raio-btn) !important;
         border: none !important;
-        padding: 15px 26px !important;
+        padding: 12px 24px !important;
         font-weight: 600 !important;
-        font-size: 16px !important;
-        letter-spacing: -.01em !important;
-        width: 100% !important;
-        min-height: 52px !important;
-        box-shadow: 0 4px 14px rgba(16,62,85,.22) !important;
+        font-size: 15px !important;
+        letter-spacing: -0.01em !important;
+        min-height: 48px !important;
+        box-shadow: 0 4px 14px rgba(16, 62, 85, 0.20) !important;
         transition: var(--transicao) !important;
     }}
     .stButton > button:hover {{
-        transform: translateY(-2px) scale(1.005) !important;
-        box-shadow: 0 8px 22px rgba(16,62,85,.30) !important;
-        filter: brightness(1.05) !important;
+        transform: scale(1.012) translateY(-1px) !important;
+        box-shadow: 0 6px 20px rgba(16, 62, 85, 0.28) !important;
+        filter: brightness(1.06) !important;
     }}
-    .stButton > button:active {{ transform: translateY(0) scale(.99) !important; }}
+    .stButton > button:active {{
+        transform: scale(0.985) !important;
+    }}
 
+    /* Botão Secundário (Branco translúcido estilo Apple) */
     .stButton > button[kind="secondary"] {{
-        background: rgba(255,255,255,.7) !important;
-        color: {CORES_GENUA['primaria']} !important;
-        border: 1px solid rgba(16,62,85,.12) !important;
-        box-shadow: var(--sombra-suave) !important;
-        backdrop-filter: blur(8px) !important;
-        min-height: 44px !important;
-        width: auto !important;
+        background: #FFFFFF !important;
+        color: var(--genua-primaria) !important;
+        border: 1px solid rgba(0, 0, 0, 0.10) !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+        min-height: 42px !important;
+        padding: 8px 18px !important;
     }}
     .stButton > button[kind="secondary"]:hover {{
-        background: #fff !important;
-        transform: translateX(-3px) !important;
+        background: #F5F5F7 !important;
+        border-color: rgba(0, 0, 0, 0.18) !important;
+        transform: scale(1.01) !important;
     }}
-    /* Download button = verde de sucesso */
+
+    /* Botão de Download */
     .stDownloadButton > button {{
-        background: linear-gradient(135deg, {CORES_GENUA['secundaria']} 0%, #2E7D8A 100%) !important;
-        color:#fff !important; border:none !important;
-        border-radius: var(--raio-btn) !important; min-height:52px !important;
-        font-weight:600 !important; box-shadow:0 4px 14px rgba(57,142,155,.28) !important;
+        background: linear-gradient(135deg, {CORES_GENUA['secundaria']} 0%, #206B78 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: var(--raio-btn) !important;
+        min-height: 48px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 14px rgba(46, 139, 154, 0.25) !important;
         transition: var(--transicao) !important;
     }}
-    .stDownloadButton > button:hover {{ transform: translateY(-2px) !important; filter:brightness(1.05) !important; }}
 
-    /* ===== CARDS / MÉTRICAS (cantos suaves, glass, elevação) ===== */
+    /* ===== MÉTRICAS / KPIs (Apple Health Cards) ===== */
     [data-testid="stMetric"] {{
-        background: rgba(255,255,255,.75) !important;
-        backdrop-filter: blur(12px) !important;
-        border-radius: var(--raio-card) !important;
+        background: #FFFFFF !important;
+        border-radius: 20px !important;
         padding: 20px 22px !important;
-        box-shadow: var(--sombra-media) !important;
-        border: 1px solid rgba(255,255,255,.6) !important;
+        box-shadow: var(--sombra-card) !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
         transition: var(--transicao) !important;
     }}
-    [data-testid="stMetric"]:hover {{ transform: translateY(-3px) !important; box-shadow: 0 12px 40px rgba(16,62,85,.14) !important; }}
-    [data-testid="stMetricValue"] {{ font-weight: 800 !important; letter-spacing:-.03em !important; color: {CORES_GENUA['primaria']} !important; }}
-    [data-testid="stMetricLabel"] {{ font-weight: 500 !important; color: {CORES_GENUA['texto_suave']} !important; }}
+    [data-testid="stMetric"]:hover {{
+        transform: translateY(-2px) !important;
+        box-shadow: var(--sombra-hover) !important;
+    }}
+    [data-testid="stMetricValue"] {{
+        font-weight: 800 !important;
+        font-size: clamp(1.5rem, 2.5vw, 2.0rem) !important;
+        letter-spacing: -0.03em !important;
+        color: var(--genua-primaria) !important;
+    }}
+    [data-testid="stMetricLabel"] {{
+        font-weight: 600 !important;
+        font-size: 0.80rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.04em !important;
+        color: var(--genua-suave) !important;
+    }}
 
-    /* ===== TABS (segmented control iOS) ===== */
+    /* ===== TABS (Segmented Control Nativo iOS) ===== */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 6px; background: rgba(16,62,85,.05); padding: 6px;
-        border-radius: 16px !important; border: none !important; flex-wrap: wrap !important;
+        gap: 4px !important;
+        background: rgba(118, 118, 128, 0.12) !important; /* Cor exata do Segmented Control iOS */
+        padding: 4px !important;
+        border-radius: 14px !important;
+        border: none !important;
     }}
     .stTabs [data-baseweb="tab"] {{
-        border-radius: 12px !important; padding: 9px 18px !important;
-        background: transparent !important; color: {CORES_GENUA['texto_suave']} !important;
-        font-weight: 600 !important; min-height: 42px !important; white-space: nowrap;
-        transition: var(--transicao) !important; border: none !important;
+        border-radius: 10px !important;
+        padding: 8px 18px !important;
+        background: transparent !important;
+        color: #3A3A3C !important;
+        font-weight: 600 !important;
+        font-size: 0.90rem !important;
+        min-height: 38px !important;
+        transition: var(--transicao) !important;
+        border: none !important;
     }}
     .stTabs [aria-selected="true"] {{
-        background: #fff !important; color: {CORES_GENUA['primaria']} !important;
-        box-shadow: 0 2px 8px rgba(16,62,85,.12) !important;
+        background: #FFFFFF !important;
+        color: var(--genua-primaria) !important;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04) !important;
+    }}
+    /* Remove linha sublinhada padrão do Streamlit nas abas */
+    .stTabs [data-baseweb="tab-highlight"] {{
+        display: none !important;
     }}
 
-    /* ===== EXPANDERS (card suave) ===== */
-    .stExpander, [data-testid="stExpander"] {{
-        border-radius: var(--raio-card) !important;
-        border: 1px solid rgba(16,62,85,.08) !important;
-        background: rgba(255,255,255,.7) !important;
-        backdrop-filter: blur(8px) !important;
-        box-shadow: var(--sombra-suave) !important;
+    /* ===== EXPANDERS (Listas Agrupadas estilo Ajustes do iOS) ===== */
+    [data-testid="stExpander"] {{
+        border-radius: 18px !important;
+        border: 1px solid rgba(0, 0, 0, 0.06) !important;
+        background: #FFFFFF !important;
+        box-shadow: var(--sombra-card) !important;
         overflow: hidden !important;
+        margin-bottom: 12px !important;
     }}
-    .streamlit-expanderHeader {{ font-weight: 600 !important; padding: 16px 20px !important; }}
-
-    /* ===== ALERTAS (cantos suaves) ===== */
-    .stAlert {{ border-radius: 16px !important; padding: 16px 20px !important; border: none !important; box-shadow: var(--sombra-suave) !important; }}
-
-    /* ===== TOAST GENUA ===== */
-    .genua-toast {{
-        padding: 16px 22px; border-radius: 16px; font-weight: 600; margin: 14px 0;
-        display: flex; align-items: center; gap: 14px; box-shadow: var(--sombra-media);
-        animation: toastIn .4s cubic-bezier(.4,0,.2,1);
+    [data-testid="stExpander"] summary {{
+        font-weight: 600 !important;
+        padding: 14px 18px !important;
+        color: var(--genua-texto) !important;
     }}
-    @keyframes toastIn {{ from {{ opacity:0; transform: translateY(-8px); }} to {{ opacity:1; transform: translateY(0); }} }}
-    .genua-toast.success {{ background: linear-gradient(135deg,#E8F8EF,#F0FBF4); color:#136B36; }}
-    .genua-toast.warning {{ background: linear-gradient(135deg,#FFF7E6,#FFFBF0); color:#8A6300; }}
-    .genua-toast.error   {{ background: linear-gradient(135deg,#FDECEA,#FEF4F3); color:#8A1F1F; }}
-    .genua-toast.info    {{ background: linear-gradient(135deg,#E9F4FB,#F2F9FD); color:#0B3B66; }}
 
-    /* ===== SIDEBAR (glass claro) ===== */
+    /* ===== SIDEBAR (macOS Vibrancy / Translúcida) ===== */
     [data-testid="stSidebar"] {{
-        background: rgba(255,255,255,.82) !important;
-        backdrop-filter: blur(20px) !important;
-        border-right: 1px solid rgba(16,62,85,.06) !important;
+        background: rgba(255, 255, 255, 0.86) !important;
+        backdrop-filter: saturate(180%) blur(25px) !important;
+        -webkit-backdrop-filter: saturate(180%) blur(25px) !important;
+        border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
     }}
-    [data-testid="stSidebar"] .stButton > button {{ min-height: 46px !important; }}
 
-    /* Divisores mais leves */
-    hr {{ border-color: rgba(16,62,85,.08) !important; }}
+    /* Estilização do st.radio na Sidebar como Menu macOS Finder */
+    [data-testid="stSidebar"] .stRadio > div {{
+        gap: 6px !important;
+    }}
+    [data-testid="stSidebar"] .stRadio label {{
+        padding: 10px 14px !important;
+        border-radius: 12px !important;
+        font-weight: 500 !important;
+        transition: var(--transicao) !important;
+        cursor: pointer !important;
+    }}
+    [data-testid="stSidebar"] .stRadio label:hover {{
+        background: rgba(16, 62, 85, 0.06) !important;
+    }}
 
-    /* ===== MOBILE ===== */
+    /* ===== SLIDERS E PROGRESS BAR ===== */
+    .stProgress > div > div > div > div {{
+        background: linear-gradient(90deg, {CORES_GENUA['secundaria']}, {CORES_GENUA['primaria']}) !important;
+        border-radius: 980px !important;
+    }}
+
+    /* ===== ALERTAS E TOASTS ===== */
+    .stAlert {{
+        border-radius: 16px !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        box-shadow: var(--sombra-card) !important;
+    }}
+
+    .genua-toast {{
+        padding: 14px 20px; border-radius: 16px; font-weight: 600; margin: 12px 0;
+        display: flex; align-items: center; gap: 12px; box-shadow: var(--sombra-card);
+    }}
+    .genua-toast.success {{ background: #E8F8EF; color: #136B36; }}
+    .genua-toast.warning {{ background: #FFF7E6; color: #8A6300; }}
+    .genua-toast.error   {{ background: #FDECEA; color: #8A1F1F; }}
+    .genua-toast.info    {{ background: #E9F4FB; color: #0B3B66; }}
+
+    hr {{ border-color: rgba(0, 0, 0, 0.06) !important; margin: 1.5rem 0 !important; }}
+
+    /* ===== RESPONSIVIDADE MOBILE ===== */
     @media (max-width: 768px) {{
         [data-testid="block-container"] {{ padding-left: 1rem !important; padding-right: 1rem !important; }}
-        [data-testid="column"] {{ min-width: 100% !important; flex: 1 1 100% !important; }}
-        .stTabs [data-baseweb="tab-list"] {{ overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; }}
-        [data-testid="stSidebar"] {{ width: 86vw !important; }}
-        .stButton > button {{ min-height: 54px !important; }}
-    }}
-    @media (min-width: 769px) and (max-width: 1024px) {{
-        [data-testid="block-container"] {{ padding-left: 3% !important; padding-right: 3% !important; }}
-    }}
-    @media (prefers-reduced-motion: reduce) {{
-        *, *::before, *::after {{ animation-duration:.01ms !important; transition-duration:.01ms !important; }}
+        .stTabs [data-baseweb="tab-list"] {{ overflow-x: auto !important; flex-wrap: nowrap !important; }}
+        div[data-testid="stVerticalBlockBorderWrapper"] {{ padding: 16px !important; border-radius: 18px !important; }}
     }}
     </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# 5. LOGO NA SIDEBAR
+# 5. LOGO NA SIDEBAR (Oculta na tela de Login para não duplicar)
 # ============================================================
-st.sidebar.image(NOVO_LOGO_GENUA, width='stretch')
-st.sidebar.markdown("---")
+if st.session_state.get("pagina", "login") != "login":
+    try:
+        st.sidebar.image(NOVO_LOGO_GENUA, width="stretch")
+        st.sidebar.markdown("---")
+    except Exception:
+        st.sidebar.markdown(f"<h2 style='text-align:center; color:{CORES_GENUA['primaria']};'>GENUA</h2>", unsafe_allow_html=True)
+        st.sidebar.markdown("---")
 
 
 # ============================================================
-# 6. HELPERS DE UI
+# 6. HELPERS DE UI E GRÁFICOS APPLE HEALTH
 # ============================================================
 def titulo(texto: str):
-    """Renderiza um título de seção padronizado (azul Genua)."""
+    """Renderiza um título de seção padronizado com acento visual Apple."""
     st.markdown(
-        f"<h4 style='color: {CORES_GENUA['primaria']};'>{texto}</h4>",
+        f"<h4 style='color: {CORES_GENUA['primaria']}; margin-top: 8px; margin-bottom: 12px; font-weight: 700;'>{texto}</h4>",
         unsafe_allow_html=True,
     )
 
 
 def toast(mensagem: str, tipo: str = "info"):
-    """Toast visual (success/warning/error/info). Mais bonito que st.success."""
+    """Toast visual (success/warning/error/info)."""
     icones = {"success": "✅", "warning": "⚠️", "error": "❌", "info": "ℹ️"}
     icone = icones.get(tipo, "ℹ️")
     st.markdown(
@@ -291,11 +369,30 @@ def toast(mensagem: str, tipo: str = "info"):
 
 
 def secao(titulo_texto: str, descricao: str = None):
-    """Bloco de seção com título + subtítulo opcional, espaçamento padrão."""
+    """Bloco de seção com título + subtítulo opcional."""
     titulo(titulo_texto)
     if descricao:
         st.markdown(
             f"<p style='color: {CORES_GENUA['texto_suave']}; "
-            f"margin-top: -8px; margin-bottom: 16px;'>{descricao}</p>",
+            f"margin-top: -8px; margin-bottom: 16px; font-size: 0.9rem;'>{descricao}</p>",
             unsafe_allow_html=True,
         )
+
+
+def aplicar_tema_matplotlib(plt):
+    """Configura o Matplotlib para renderizar gráficos limpos estilo Apple Health."""
+    plt.rcParams.update({
+        "figure.facecolor": "#FFFFFF",
+        "axes.facecolor": "#FFFFFF",
+        "axes.edgecolor": "#E5E5EA",
+        "axes.linewidth": 0.8,
+        "axes.grid": True,
+        "grid.color": "#F2F2F7",
+        "grid.linestyle": "--",
+        "grid.linewidth": 0.9,
+        "font.sans-serif": ["Inter", "SF Pro Display", "DejaVu Sans", "Arial"],
+        "text.color": CORES_GENUA["texto_escuro"],
+        "axes.labelcolor": CORES_GENUA["texto_suave"],
+        "xtick.color": CORES_GENUA["texto_suave"],
+        "ytick.color": CORES_GENUA["texto_suave"],
+    })
