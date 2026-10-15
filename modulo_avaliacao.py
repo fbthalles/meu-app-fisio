@@ -9,7 +9,7 @@ try:
 except (ImportError, Exception):
     _HAS_IMAGE_COORDS = False
 
-from config import CORES_GENUA, titulo, secao
+from config import CORES_GENUA, titulo, secao, toast
 from firebase_client import db, invalidar_cache
 
 
@@ -19,7 +19,7 @@ def render():
         <div style='margin-bottom: 20px;'>
             <h2 style='margin-bottom: 4px;'>🔎 Avaliação Inicial (Marco Zero)</h2>
             <p style='color: {CORES_GENUA['texto_suave']}; font-size: 0.94rem; margin: 0;'>
-                Primeira Consulta · Estabelecimento de Baseline Clínica, Triagem de Bandeiras, Força e PROMs.
+                Primeira Consulta · Estabelecimento de Baseline Clínica Bilateral, Triagem de Bandeiras, Força, Metas (PSFS) e PROMs.
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -79,10 +79,10 @@ def render():
                         db.collection("Avaliacao_Inicial").document(doc_id).delete()
                         invalidar_cache("Avaliacao_Inicial")
                         st.session_state['confirmar_exclusao_aval'] = False
-                        st.success("Avaliação excluída com sucesso.")
+                        toast("Avaliação excluída com sucesso.", "success")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erro ao excluir: {e}")
+                        toast(f"Erro ao excluir: {e}", "error")
             with cc2:
                 if st.button("❌ Cancelar", type="secondary", width="stretch"):
                     st.session_state['confirmar_exclusao_aval'] = False
@@ -97,11 +97,14 @@ def render():
         st.session_state.dados_antigos = avaliacoes_existentes[idx]["data"]
         st.session_state.doc_id_avaliacao = avaliacoes_existentes[idx]["id"]
 
-    # --- HELPERS DE AUTO-PREENCHIMENTO ---
+    # --- HELPERS DE AUTO-PREENCHIMENTO E RETROCOMPATIBILIDADE ---
     dados = st.session_state.get('dados_antigos') or {}
 
-    def get_idx(opcoes_lista, chave):
-        return opcoes_lista.index(dados.get(chave)) if dados.get(chave) in opcoes_lista else 0
+    def get_idx(opcoes_lista, chave, fallback_chave=None):
+        val = dados.get(chave)
+        if val is None and fallback_chave:
+            val = dados.get(fallback_chave)
+        return opcoes_lista.index(val) if val in opcoes_lista else 0
 
     def get_list(*args):
         chave = args[-1]
@@ -123,6 +126,14 @@ def render():
             return [v for v in lista_corrigida if v in opcoes_lista]
         return [v for v in lista_corrigida if v not in ["Nenhuma", "Nenhum", "Normal", "Sem dor", "Não testado"]]
 
+    # Sincroniza pontos do mapa da dor ao carregar avaliação existente
+    doc_atual_key = st.session_state.get("doc_id_avaliacao") or "nova"
+    if st.session_state.get("_ultimo_doc_mapa") != doc_atual_key:
+        pontos_salvos = dados.get("Pontos_Mapa_Dor", [])
+        st.session_state.pontos_dor = pontos_salvos if isinstance(pontos_salvos, list) else []
+        st.session_state.last_click = None
+        st.session_state["_ultimo_doc_mapa"] = doc_atual_key
+
     # ============================================================
     # 2. NAVEGAÇÃO EM ABAS (Segmented Control iOS)
     # ============================================================
@@ -134,14 +145,25 @@ def render():
     with t_anamnese:
         with st.container(border=True):
             secao(
-                "🗣️ Histórico Clínico e Contexto",
-                "Mapeamento da queixa principal, comportamento mecânico dos sintomas e histórico prévio."
+                "🗣️ Histórico Clínico, Lateralidade e Contexto",
+                "Mapeamento do membro acometido, queixa principal, comportamento mecânico dos sintomas e histórico prévio."
             )
-            qp = st.text_input(
-                "Queixa Principal (QP) *",
-                value=dados.get("QP", ""),
-                placeholder="O que o paciente deixou de fazer devido à dor?"
-            )
+            c_qp, c_lado = st.columns([2.2, 1])
+            with c_qp:
+                qp = st.text_input(
+                    "Queixa Principal (QP) *",
+                    value=dados.get("QP", ""),
+                    placeholder="O que o paciente deixou de fazer devido à dor?"
+                )
+            with c_lado:
+                op_lado = ["Direito", "Esquerdo", "Bilateral (Dir > Esq)", "Bilateral (Esq > Dir)", "Bilateral (Simétrico)"]
+                lado_acometido = st.selectbox(
+                    "🦵 Lado Acometido Principal *",
+                    op_lado,
+                    index=get_idx(op_lado, "Lado_Acometido"),
+                    help="Essencial para o cálculo determinístico do Limb Symmetry Index (LSI) no motor de IA Clínica."
+                )
+
             hma = st.text_area(
                 "História da Moléstia Atual (HMA) *",
                 value=dados.get("HMA", ""),
@@ -180,7 +202,7 @@ def render():
         with st.container(border=True):
             secao(
                 "💥 Classificação Neurofisiológica e Origem",
-                "Defina o mecanismo predominante de dor e o início dos sintomas."
+                "Defina o mecanismo predominante de dor (IASP) e o início dos sintomas."
             )
             c_dor1, c_dor2 = st.columns(2)
             op_class = [
@@ -216,7 +238,6 @@ def render():
                     img_base.thumbnail((350, 600))
                     draw = ImageDraw.Draw(img_base)
 
-                    # Suporte híbrido seguro (dict ou tuple) para evitar TypeError
                     for ponto in st.session_state.pontos_dor:
                         if isinstance(ponto, dict):
                             px, py = ponto.get('x', 0), ponto.get('y', 0)
@@ -251,16 +272,25 @@ def render():
                     "Anterior (Patelar)", "Anterior (Tendão)", "Medial (Interlinha)",
                     "Lateral (Interlinha)", "Posterior (Poplítea)", "Difusa", "Nenhuma"
                 ]
-                zonas_dor = st.multiselect(
-                    "📍 Zonas Anatômicas Relatadas",
-                    op_zonas,
-                    default=get_list(op_zonas, "Zonas_Dor")
-                )
+                c_z1, c_z2 = st.columns(2)
+                with c_z1:
+                    zonas_dor_d = st.multiselect(
+                        "📍 Zonas de Dor — Joelho DIREITO",
+                        op_zonas,
+                        default=get_list(op_zonas, "Zonas_Dor_Dir") or (get_list(op_zonas, "Zonas_Dor") if "Direito" in lado_acometido or "Bilateral" in lado_acometido else [])
+                    )
+                with c_z2:
+                    zonas_dor_e = st.multiselect(
+                        "📍 Zonas de Dor — Joelho ESQUERDO",
+                        op_zonas,
+                        default=get_list(op_zonas, "Zonas_Dor_Esq") or (get_list(op_zonas, "Zonas_Dor") if "Esquerdo" in lado_acometido or "Bilateral" in lado_acometido else [])
+                    )
+
                 mapa_dor = st.text_area(
                     "📝 Notas Detalhadas do Mapa da Dor",
                     value=dados.get("Mapa_Dor", ""),
                     placeholder="Ex: Dor puntiforme no polo inferior da patela direita ao agachar...",
-                    height=130
+                    height=115
                 )
                 if st.button("🗑️ Limpar Marcadores do Mapa", type="secondary"):
                     st.session_state.pontos_dor = []
@@ -310,7 +340,7 @@ def render():
             ]
             with c_fl2:
                 fat_sociais = st.multiselect(
-                    "🔵 Fatores Contextuais / Ocupacionais *",
+                    "🔵 Fatores Contextuais / Ocupacionais (Blue/Black Flags) *",
                     op_sociais,
                     default=get_list(op_sociais, "Fatores_Sociais")
                 )
@@ -325,71 +355,140 @@ def render():
                 default=get_list(op_comorb, "Comorbidades")
             )
 
-    # --- ABA 4: EXAME FÍSICO E TESTES ESPECIAIS ---
+    # --- ABA 4: EXAME FÍSICO E TESTES ESPECIAIS (SEPARADOS ENTRE DIREITO E ESQUERDO) ---
     with t_fisico:
         with st.container(border=True):
-            secao("👁️ Inspeção, Trofismo e Palpação", "Avaliação morfológica, edema e sensibilidade à palpação.")
-            c_f1, c_f2, c_f3 = st.columns(3)
+            secao(
+                "👁️ Inspeção, Trofismo e Palpação (Comparativo Bilateral: Direito × Esquerdo)",
+                "Avaliação morfológica, efusão articular, perimetria de coxa e sensibilidade à palpação separados por dimídio."
+            )
 
-            op_der = ["Ausente", "Leve", "Moderado", "Grave"]
-            with c_f1:
-                derrame = st.selectbox("Derrame Articular (Sinal da Tecla/Onda)", op_der, index=get_idx(op_der, "Derrame"))
+            op_mar = ["Normal", "Antálgica", "Claudicante", "Marcha em Flexo de Joelho", "Uso de dispositivo auxiliar (Muleta/Bengala)"]
+            marcha = st.selectbox("🚶 Padrão Global de Marcha", op_mar, index=get_idx(op_mar, "Marcha"))
 
+            st.markdown("<hr style='margin: 14px 0;'>", unsafe_allow_html=True)
+
+            op_der = ["Ausente", "Vestígio (Onda +)", "Leve (1+)", "Moderado (2+)", "Grave / Tenso (3+)"]
             op_ali = ["Normal", "Valgo", "Varo", "Recurvatum", "Flexo"]
-            with c_f2:
-                alinhamento = st.selectbox("Alinhamento Estático", op_ali, index=get_idx(op_ali, "Alinhamento"))
+            op_trof = ["Normal", "Hipotrofia Leve", "Hipotrofia Moderada", "Hipotrofia Severa"]
+            op_palp = ["Nenhuma / Indolor", "Anterior (Patelar/Tendão)", "Medial (Interlinha/Pata de Ganso)", "Lateral (Interlinha/Trato Iliotibial)", "Posterior (Poplítea)"]
+            op_godet = ["Negativo", "Positivo"]
+            op_temp = ["Normal", "Aumentada (Calor local)", "Diminuída"]
 
-            op_mar = ["Normal", "Antálgica", "Claudicante", "Uso de dispositivo"]
-            with c_f3:
-                marcha = st.selectbox("Padrão de Marcha", op_mar, index=get_idx(op_mar, "Marcha"))
+            col_fis_d, col_fis_e = st.columns(2, gap="large")
 
-            c_f4, c_f5 = st.columns(2)
-            op_trof = ["Normal", "Hipotrófico"]
-            with c_f4:
-                trofismo = st.selectbox("Trofismo Muscular", op_trof, index=get_idx(op_trof, "Trofismo"))
-            with c_f5:
-                perimetria = st.text_input(
-                    "Perimetria de Coxa (se hipotrófico)",
+            # --- COLUNA MEMBRO DIREITO ---
+            with col_fis_d:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-bottom: 8px;'>🦵 Membro Inferior DIREITO</h4>", unsafe_allow_html=True)
+                derrame_d = st.selectbox(
+                    "Derrame Articular — Direito (Tecla/Onda)",
+                    op_der, index=get_idx(op_der, "Derrame_Dir", "Derrame"), key="der_d"
+                )
+                alinhamento_d = st.selectbox(
+                    "Alinhamento Estático — Direito",
+                    op_ali, index=get_idx(op_ali, "Alinhamento_Dir", "Alinhamento"), key="ali_d"
+                )
+                trofismo_d = st.selectbox(
+                    "Trofismo Muscular — Perna Direita",
+                    op_trof, index=get_idx(op_trof, "Trofismo_Dir", "Trofismo"), key="trof_d"
+                )
+                perimetria_d = st.number_input(
+                    "Perimetria Coxa Direita (cm — 10 cm supra-patelar)",
+                    min_value=0.0, max_value=100.0, step=0.5,
+                    value=float(dados.get("Perimetria_Dir_cm", 0.0) or 0.0), key="perim_d"
+                )
+                palpacao_d = st.multiselect(
+                    "Estruturas Dolorosas à Palpação — Direito",
+                    op_palp, default=get_list(op_palp, "Palpacao_Dir") or get_list(op_palp, "Palpacao"), key="palp_d"
+                )
+                c_gd1, c_gd2 = st.columns(2)
+                with c_gd1:
+                    godet_d = st.radio("Sinal de Godet (Dir)", op_godet, index=get_idx(op_godet, "Godet_Dir", "Godet"), key="god_d")
+                with c_gd2:
+                    temp_d = st.radio("Temperatura (Dir)", op_temp, index=get_idx(op_temp, "Temperatura_Dir", "Temperatura"), key="tmp_d")
+
+            # --- COLUNA MEMBRO ESQUERDO ---
+            with col_fis_e:
+                st.markdown(f"<h4 style='color: {CORES_GENUA['secundaria']}; margin-bottom: 8px;'>🦵 Membro Inferior ESQUERDO</h4>", unsafe_allow_html=True)
+                derrame_e = st.selectbox(
+                    "Derrame Articular — Esquerdo (Tecla/Onda)",
+                    op_der, index=get_idx(op_der, "Derrame_Esq", "Derrame"), key="der_e"
+                )
+                alinhamento_e = st.selectbox(
+                    "Alinhamento Estático — Esquerdo",
+                    op_ali, index=get_idx(op_ali, "Alinhamento_Esq", "Alinhamento"), key="ali_e"
+                )
+                trofismo_e = st.selectbox(
+                    "Trofismo Muscular — Perna Esquerda",
+                    op_trof, index=get_idx(op_trof, "Trofismo_Esq", "Trofismo"), key="trof_e"
+                )
+                perimetria_e = st.number_input(
+                    "Perimetria Coxa Esquerda (cm — 10 cm supra-patelar)",
+                    min_value=0.0, max_value=100.0, step=0.5,
+                    value=float(dados.get("Perimetria_Esq_cm", 0.0) or 0.0), key="perim_e"
+                )
+                palpacao_e = st.multiselect(
+                    "Estruturas Dolorosas à Palpação — Esquerdo",
+                    op_palp, default=get_list(op_palp, "Palpacao_Esq") or get_list(op_palp, "Palpacao"), key="palp_e"
+                )
+                c_ge1, c_ge2 = st.columns(2)
+                with c_ge1:
+                    godet_e = st.radio("Sinal de Godet (Esq)", op_godet, index=get_idx(op_godet, "Godet_Esq", "Godet"), key="god_e")
+                with c_ge2:
+                    temp_e = st.radio("Temperatura (Esq)", op_temp, index=get_idx(op_temp, "Temperatura_Esq", "Temperatura"), key="tmp_e")
+
+            # Cálculo automático de assimetria de perimetria de coxa
+            if perimetria_d > 0 and perimetria_e > 0:
+                diff_perim = perimetria_d - perimetria_e
+                if abs(diff_perim) >= 1.5:
+                    menor_lado = "Direita" if diff_perim < 0 else "Esquerda"
+                    st.warning(
+                        f"⚠️ **Assimetria Trofismo/Perimetria Detectada:** Diferença de **{abs(diff_perim):.1f} cm** "
+                        f"(Hipotrofia na coxa **{menor_lado}** — relevância clínica ≥ 1,5 cm)."
+                    )
+                else:
+                    st.caption(f"✅ **Perimetria de Coxa:** Diferença fisiológica ({abs(diff_perim):.1f} cm < 1,5 cm).")
+
+            st.markdown("<hr style='margin: 14px 0;'>", unsafe_allow_html=True)
+            c_pele, c_perim_obs = st.columns(2)
+            op_pele = ["Nenhuma", "Equimose", "Hematoma", "Cicatrizes Cirúrgicas", "Aderência Cicatricial", "Fístulas"]
+            with c_pele:
+                pele = st.multiselect("Alterações Cutâneas / Cicatriciais", op_pele, default=get_list(op_pele, "Pele"))
+            with c_perim_obs:
+                perimetria_obs = st.text_input(
+                    "Notas Adicionais de Perimetria / Edema (ex: 15 cm supra ou linha articular)",
                     value=dados.get("Perimetria", ""),
-                    placeholder="Ex: -2,5 cm a 10 cm da borda superior da patela D"
+                    placeholder="Ex: -2,5 cm a 15 cm da borda superior da patela D"
                 )
 
-            op_pele = ["Nenhuma", "Equimose", "Hematoma", "Cicatrizes", "Fístulas"]
-            pele = st.multiselect("Alterações Cutâneas / Cicatriciais", op_pele, default=get_list(op_pele, "Pele"))
-
-            st.markdown("<hr style='margin: 18px 0;'>", unsafe_allow_html=True)
-            c_p1, c_p2, c_p3 = st.columns(3)
-            op_palp = ["Anterior", "Medial", "Lateral", "Posterior", "Nenhuma"]
-            with c_p1:
-                palpacao_comp = st.multiselect("Estruturas Dolorosas à Palpação", op_palp, default=get_list(op_palp, "Palpacao"))
-
-            op_godet = ["Negativo", "Positivo"]
-            with c_p2:
-                godet = st.radio("Sinal de Cacifo / Godet (Edema)", op_godet, index=get_idx(op_godet, "Godet"))
-
-            op_temp = ["Normal", "Aumentada", "Diminuída"]
-            with c_p3:
-                temp = st.radio("Temperatura Local", op_temp, index=get_idx(op_temp, "Temperatura"))
-
+        # Card 2 da Aba Físico: Testes Especiais Bilaterais
         with st.container(border=True):
             secao(
-                "🧪 Testes Especiais Ortopédicos (Marcar Positivos)",
-                "Clusters diagnósticos ligamentares, meniscais e femoropatelares."
+                "🧪 Testes Especiais Ortopédicos (Separados por Joelho: Direito × Esquerdo)",
+                "Clusters diagnósticos ligamentares, meniscais e femoropatelares/tendíneos."
             )
             op_lig = ["Nenhum", "Lachman", "Gaveta Anterior", "Gaveta Posterior", "Estresse Valgo", "Estresse Varo", "Pivot Shift", "Dial Test"]
-            t_lig = st.multiselect("🔗 Testes Ligamentares Positivos", op_lig, default=get_list(op_lig, "Testes_Ligamentares"), key="t_lig_unico")
-
-            op_men = ["Nenhum", "Ege", "Thessaly", "Tesale", "McMurray", "Apley"]
-            t_men = st.multiselect("🌙 Testes Meniscais Positivos", op_men, default=get_list(op_men, "Testes_Meniscais"), key="t_men_unico")
-
+            op_men = ["Nenhum", "Ege", "Thessaly (20°)", "McMurray", "Apley", "Sensibilidade Interlinha (JLT)"]
             op_pat = [
-                "Nenhum", "Step Up", "Step Down", "Extensão CCA",
+                "Nenhum", "Step Up Doloroso", "Step Down Doloroso", "Extensão CCA Dolorosa",
                 "Sinal de Clarke", "Apreensão Patelar",
                 "Decline Squat (Tendinopatia)", "Teste de Noble (Trato Iliotibial)"
             ]
-            t_pat = st.multiselect("🎯 Testes Femoropatelares / Tendíneos Positivos", op_pat, default=get_list(op_pat, "Testes_Femoropatelar"), key="t_pat_unico")
 
-    # --- ABA 5: AVALIAÇÃO FUNCIONAL, DINAMOMETRIA E GONIOMETRIA ---
+            c_te_d, c_te_e = st.columns(2, gap="large")
+            with c_te_d:
+                st.markdown(f"**🦵 Joelho DIREITO (Marcar Positivos)**")
+                t_lig_d = st.multiselect("🔗 Ligamentares (Direito)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Dir") or get_list(op_lig, "Testes_Ligamentares"), key="t_lig_d")
+                t_men_d = st.multiselect("🌙 Meniscais (Direito)", op_men, default=get_list(op_men, "Testes_Meniscais_Dir") or get_list(op_men, "Testes_Meniscais"), key="t_men_d")
+                t_pat_d = st.multiselect("🎯 Femoropatelares / Tendíneos (Direito)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Dir") or get_list(op_pat, "Testes_Femoropatelar"), key="t_pat_d")
+
+            with c_te_e:
+                st.markdown(f"**🦵 Joelho ESQUERDO (Marcar Positivos)**")
+                t_lig_e = st.multiselect("🔗 Ligamentares (Esquerdo)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Esq"), key="t_lig_e")
+                t_men_e = st.multiselect("🌙 Meniscais (Esquerdo)", op_men, default=get_list(op_men, "Testes_Meniscais_Esq"), key="t_men_e")
+                t_pat_e = st.multiselect("🎯 Femoropatelares / Tendíneos (Esquerdo)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Esq"), key="t_pat_e")
+
+    # --- ABA 5: AVALIAÇÃO FUNCIONAL, OBJETIVO DO PACIENTE (PSFS/SANE), DINAMOMETRIA E GONIOMETRIA ---
     with t_funcional:
         def get_val_str(chave_db, prefix, default, tipo=int):
             try:
@@ -416,6 +515,39 @@ def render():
             except (ValueError, TypeError, AttributeError):
                 pass
             return "3 - Normal"
+
+        # Card 0 (NOVO PBE): Objetivo do Paciente & Distância da Meta (PSFS + SANE)
+        with st.container(border=True):
+            secao(
+                "🎯 Objetivo Funcional do Paciente & Distância da Meta (PSFS + SANE — PBE)",
+                "Patient-Specific Functional Scale (Stratford et al., 1995 — MCID: 2,0 pts) & Single Assessment Numeric Evaluation (Shelbourne et al., 2009)."
+            )
+            obj_paciente = st.text_input(
+                "🏆 Qual é o principal objetivo que o paciente veio buscar na fisioterapia?",
+                value=dados.get("Objetivo_Paciente", ""),
+                placeholder="Ex: Voltar a correr 10 km sem dor, jogar futebol no fim de semana, descer escadas sem travar..."
+            )
+            c_psfs1, c_psfs2 = st.columns(2, gap="large")
+            with c_psfs1:
+                psfs_baseline = st.slider(
+                    "📊 Escala Funcional Específica (PSFS: 0 = Incapaz | 10 = Nível Pré-Lesão)",
+                    min_value=0, max_value=10,
+                    value=int(dados.get("PSFS_Baseline", 3) if dados.get("PSFS_Baseline") is not None else 3),
+                    help="Quão capaz o paciente se sente HOJE de realizar essa atividade específica? (Variacão ≥ 2 pontos = melhora clinicamente relevante)."
+                )
+            with c_psfs2:
+                sane_baseline = st.slider(
+                    "📏 Quão perto do objetivo final ele sente que está hoje? (SANE: 0% a 100%)",
+                    min_value=0, max_value=100, step=5,
+                    value=int(dados.get("SANE_Baseline_Pct", 30) if dados.get("SANE_Baseline_Pct") is not None else 30),
+                    help="0% = No ponto zero / Muito longe da meta | 100% = Objetivo 100% atingido."
+                )
+
+            distancia_meta = 100 - sane_baseline
+            st.info(
+                f"🧭 **Status da Meta Baseline:** Capacidade atual de **{sane_baseline}%** (PSFS: **{psfs_baseline}/10**). "
+                f"Faltam **{distancia_meta}%** de evolução percebida para atingir o objetivo principal."
+            )
 
         # Card 1: Força Muscular e Dinamometria com Cálculo de LSI em Tempo Real
         with st.container(border=True):
@@ -462,9 +594,14 @@ def render():
                 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
                 cols_lsi = st.columns(len(ativos_din))
                 for idx_l, (nome_g, val_d, val_e) in enumerate(ativos_din):
-                    maior = max(val_d, val_e)
-                    menor = min(val_d, val_e)
-                    lsi_g = (menor / maior * 100.0) if maior > 0 else 0.0
+                    if "Direito" in lado_acometido or "Dir > Esq" in lado_acometido:
+                        lesado, saudavel = val_d, val_e
+                    elif "Esquerdo" in lado_acometido or "Esq > Dir" in lado_acometido:
+                        lesado, saudavel = val_e, val_d
+                    else:
+                        lesado, saudavel = min(val_d, val_e), max(val_d, val_e)
+
+                    lsi_g = (lesado / saudavel * 100.0) if saudavel > 0 else 0.0
                     diff_kg = abs(val_d - val_e)
                     lado_forte = "Dir +" if val_d > val_e else "Esq +" if val_e > val_d else "Simétrico"
                     with cols_lsi[idx_l]:
@@ -525,10 +662,10 @@ def render():
                     lado_menor = "Esquerdo" if diff_lunge > 0 else "Direito"
                     st.info(f"📊 **Assimetria no Lunge Test:** Diferença de {abs(diff_lunge):.1f} cm (restrição maior à dorsiflexão no lado **{lado_menor}**).")
 
-        # Card 3: Controle Motor e Alvos do Check-in
+        # Card 3: Controle Motor, Flexibilidade Bilateral e Alvos do Check-in
         with st.container(border=True):
             secao(
-                "⚙️ Controle Motor, Flexibilidade e Alvos de Check-in",
+                "⚙️ Controle Motor, Flexibilidade Bilateral e Alvos de Check-in",
                 "Escala qualitativa de movimento (3 = Normal | 2 = Regular | 1 = Ruim | 0 = Incapaz)."
             )
             opcoes_cm = ["3 - Normal", "2 - Regular", "1 - Ruim", "0 - Incapaz"]
@@ -561,11 +698,22 @@ def render():
                 cm_afundo_e = st.selectbox("Afundo (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "Afundo"))
                 cm_eq_uni_e = st.selectbox("Equilíbrio Uni (E)", opcoes_cm, index=get_cm_idx("CM_Membro_Esq", "Eq"))
 
+            st.markdown("<hr style='margin: 16px 0;'>", unsafe_allow_html=True)
             op_flex = [
                 "Nenhuma", "Thomas (+) - Iliopsoas", "Thomas (+) - Reto Femoral",
-                "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", "Sentar e Alcançar (Isquios)"
+                "Ely (+) - Reto Femoral", "Ober (+) - Trato Iliotibial", " Encurtamento Isquiotibiais ( Ângulo Poplíteo)"
             ]
-            flexibilidade = st.multiselect("Flexibilidade / Retrações Musculares *", op_flex, default=get_list(op_flex, "Flexibilidade"))
+            c_flx_d, c_flx_e = st.columns(2)
+            with c_flx_d:
+                flexibilidade_d = st.multiselect(
+                    "🧘 Flexibilidade / Retrações — Membro DIREITO",
+                    op_flex, default=get_list(op_flex, "Flexibilidade_Dir") or get_list(op_flex, "Flexibilidade"), key="flx_d"
+                )
+            with c_flx_e:
+                flexibilidade_e = st.multiselect(
+                    "🧘 Flexibilidade / Retrações — Membro ESQUERDO",
+                    op_flex, default=get_list(op_flex, "Flexibilidade_Esq") or get_list(op_flex, "Flexibilidade"), key="flx_e"
+                )
 
             st.markdown("<hr style='margin: 18px 0;'>", unsafe_allow_html=True)
             secao(
@@ -573,12 +721,16 @@ def render():
                 "Os movimentos selecionados abaixo aparecerão automaticamente como pílulas de 1 toque no Check-in Diário deste paciente."
             )
             lista_testes_disp = [
-                "Agachamento Bipodal", "Agachamento Unipodal", "Step Down",
-                "Lunge (Afundo)", "Salto (Hop Test)", "Corrida", "Marcha"
+                "Agachamento Bipodal", "Agachamento Unipodal (D)", "Agachamento Unipodal (E)",
+                "Step Down (D)", "Step Down (E)", "Lunge / Afundo", "Salto (Hop Test)", "Corrida", "Marcha"
             ]
             def_alvos = get_list("Testes_Alvo")
+            # Mantém compatibilidade com nomes antigos se já salvos
+            for t_antigo in def_alvos:
+                if t_antigo not in lista_testes_disp:
+                    lista_testes_disp.append(t_antigo)
             if not def_alvos:
-                def_alvos = ["Agachamento Bipodal", "Step Down"]
+                def_alvos = ["Agachamento Bipodal", "Step Down (D)" if "Direito" in lado_acometido else "Step Down (E)"]
             testes_alvo = st.multiselect("Testes Funcionais Diários:", lista_testes_disp, default=def_alvos)
 
     # --- ABA 6: EXAMES COMPLEMENTARES ---
@@ -593,7 +745,7 @@ def render():
             laudo_exames = st.text_area(
                 "Laudo / Achados Estruturais Relevantes *",
                 value=dados.get("Laudo_Exames", "Nenhum"),
-                placeholder="Descreva os achados de imagem ou mantenha 'Nenhum'.",
+                placeholder="Descreva os achados de imagem (especificando lado Direito/Esquerdo) ou mantenha 'Nenhum'.",
                 height=140
             )
 
@@ -623,13 +775,14 @@ def render():
                         score_lefs += opcoes_lefs[st.selectbox(p, list(opcoes_lefs.keys()), key=f"lefs_{i}")]
 
                 pct_lefs = (score_lefs / 32) * 100
+                pts_lefs_80 = round((score_lefs / 32) * 80, 1)
                 interp_lefs = (
                     "🚨 Função Muito Ruim" if pct_lefs < 30 else
                     "🟡 Função Regular" if pct_lefs < 60 else
                     "🟢 Função Boa" if pct_lefs < 85 else
                     "⭐ Função Excelente"
                 )
-                st.info(f"📊 **Resultado LEFS:** {score_lefs}/32 pontos (**{pct_lefs:.1f}%**) — {interp_lefs}")
+                st.info(f"📊 **Resultado LEFS:** {pts_lefs_80}/80 pts equivalentes (**{pct_lefs:.1f}%**) — {interp_lefs} *(MCID: 9 pts | Binkley 1999)*")
 
             # 2. VISA-P
             with st.expander("🎯 VISA-P (Tendinopatia Patelar)"):
@@ -650,7 +803,7 @@ def render():
                     score_visap += 0 if "0 pts" in p8 else 7 if "7 pts" in p8 else 15 if "15 pts" in p8 else 30
 
                 interp_visap = "🚨 Tendinopatia Severa/Aguda" if score_visap < 50 else "🟡 Fase Reativa" if score_visap < 80 else "🟢 Remodelamento/Alta"
-                st.info(f"📊 **Resultado VISA-P:** **{score_visap}/100 pontos** — {interp_visap}")
+                st.info(f"📊 **Resultado VISA-P:** **{score_visap}/100 pontos** — {interp_visap} *(MCID: 13 pts | Hernandez-Sanchez 2014)*")
 
             # 3. LYSHOLM
             with st.expander("🦵 Escala de Lysholm (Ligamentar e Meniscal)"):
@@ -668,7 +821,7 @@ def render():
                     score_lysholm += int(st.selectbox("Agachamento", ["5 - Sem problemas", "4 - Levemente prejudicado", "2 - Não passa de 90 graus", "0 - Impossível"]).split(" -")[0])
 
                 interp_lysholm = "🚨 Ruim (Instabilidade Severa)" if score_lysholm < 65 else "🟡 Regular" if score_lysholm < 84 else "🟢 Bom" if score_lysholm < 95 else "⭐ Excelente"
-                st.info(f"📊 **Resultado Lysholm:** **{score_lysholm}/100 pontos** — {interp_lysholm}")
+                st.info(f"📊 **Resultado Lysholm:** **{score_lysholm}/100 pontos** — {interp_lysholm} *(MCID: 10 pts | Briggs 2009)*")
 
             # 4. WOMAC
             with st.expander("🦴 Índice WOMAC (Osteoartrite)"):
@@ -708,7 +861,7 @@ def render():
 
                 pct_koos = (score_koos / 20) * 100
                 interp_koos = "🚨 Risco Funcional" if pct_koos < 40 else "🟡 Limitação Moderada" if pct_koos < 80 else "🟢 Alta Performance"
-                st.info(f"📊 **Resultado KOOS:** **{pct_koos:.1f}%** — {interp_koos}")
+                st.info(f"📊 **Resultado KOOS:** **{pct_koos:.1f}%** — {interp_koos} *(MCID: 8-10 pts | Roos 2003)*")
 
             # 6. IKDC
             with st.expander("✚ IKDC Subjetivo"):
@@ -723,27 +876,49 @@ def render():
 
                 score_ikdc = min(100, ((ik_dor + ik_pts_freq + (ik_func_atual * 2)) / 40) * 100)
                 interp_ikdc = "🚨 Baixa Função Subjetiva" if score_ikdc < 60 else "🟡 Desempenho Moderado" if score_ikdc < 85 else "🟢 Excelente Desempenho"
-                st.info(f"📊 **Resultado IKDC:** **{score_ikdc:.1f}%** — {interp_ikdc}")
+                st.info(f"📊 **Resultado IKDC:** **{score_ikdc:.1f}%** — {interp_ikdc} *(MCID: 9 pts | Irrgang 2006)*")
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     # ============================================================
-    # 3. MOTOR DE SALVAMENTO INTELIGENTE (UX PBE)
+    # 3. MOTOR DE SALVAMENTO INTELIGENTE (RETROCOMPATÍVEL + IA READY)
     # ============================================================
     modo_edicao = st.session_state.get("doc_id_avaliacao") is not None
     texto_botao = "🔄 ATUALIZAR AVALIAÇÃO INICIAL" if modo_edicao else "💾 SALVAR NOVA AVALIAÇÃO INICIAL"
 
     if st.button(texto_botao, width='stretch', type="primary"):
         def check_vazio(texto):
-            return texto if texto.strip() != "" else "Não relatado"
+            return texto if texto and str(texto).strip() != "" else "Não relatado"
 
         if qp.strip() == "":
-            st.error("⚠️ A 'Queixa Principal (QP)' na aba Anamnese é obrigatória para salvar o prontuário.")
+            toast("A 'Queixa Principal (QP)' na aba Anamnese é obrigatória para salvar o prontuário.", "error")
         else:
+            # Determina Força Lesado vs Saudável para alimentar automaticamente ia_clinica.py (LSI)
+            forca_ref_d = din_ext_d if (din_ext_d > 0 or din_ext_e > 0) else float(fg_ext_d)
+            forca_ref_e = din_ext_e if (din_ext_d > 0 or din_ext_e > 0) else float(fg_ext_e)
+
+            if "Direito" in lado_acometido or "Dir > Esq" in lado_acometido:
+                din_lesado, din_saudavel = forca_ref_d, forca_ref_e
+            elif "Esquerdo" in lado_acometido or "Esq > Dir" in lado_acometido:
+                din_lesado, din_saudavel = forca_ref_e, forca_ref_d
+            else:
+                din_lesado, din_saudavel = min(forca_ref_d, forca_ref_e), max(forca_ref_d, forca_ref_e)
+
+            perim_formatada = f"Dir: {perimetria_d} cm | Esq: {perimetria_e} cm"
+            if perimetria_obs.strip():
+                perim_formatada += f" ({perimetria_obs.strip()})"
+
+            t_lig_comb = f"Dir: {', '.join(t_lig_d) if t_lig_d else 'Nenhum'} | Esq: {', '.join(t_lig_e) if t_lig_e else 'Nenhum'}"
+            t_men_comb = f"Dir: {', '.join(t_men_d) if t_men_d else 'Nenhum'} | Esq: {', '.join(t_men_e) if t_men_e else 'Nenhum'}"
+            t_pat_comb = f"Dir: {', '.join(t_pat_d) if t_pat_d else 'Nenhum'} | Esq: {', '.join(t_pat_e) if t_pat_e else 'Nenhum'}"
+            zonas_comb = f"Dir: {', '.join(zonas_dor_d) if zonas_dor_d else 'Nenhuma'} | Esq: {', '.join(zonas_dor_e) if zonas_dor_e else 'Nenhuma'}"
+            flex_comb = f"Dir: {', '.join(flexibilidade_d) if flexibilidade_d else 'Normal'} | Esq: {', '.join(flexibilidade_e) if flexibilidade_e else 'Normal'}"
+
             dados_avaliacao = {
                 "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
                 "Paciente": st.session_state.paciente,
                 "Membro": st.session_state.membro_ativo,
+                "Lado_Acometido": lado_acometido,
                 "QP": qp,
                 "HMA": check_vazio(hma),
                 "Sinais_Sintomas": check_vazio(sinais_sintomas),
@@ -751,41 +926,78 @@ def render():
                 "Fatores_Piora": check_vazio(fat_piora),
                 "Tratamentos_Previos": check_vazio(trat_previos),
                 "Mapa_Dor": check_vazio(mapa_dor),
+                "Pontos_Mapa_Dor": st.session_state.get("pontos_dor", []),
                 "Laudo_Exames": check_vazio(laudo_exames),
                 "Class_Dor": class_dor,
                 "Origem_Dor": origem_dor,
-                "Zonas_Dor": ", ".join(zonas_dor) if zonas_dor else "Nenhuma",
+                "Zonas_Dor_Dir": ", ".join(zonas_dor_d) if zonas_dor_d else "Nenhuma",
+                "Zonas_Dor_Esq": ", ".join(zonas_dor_e) if zonas_dor_e else "Nenhuma",
+                "Zonas_Dor": zonas_comb,
                 "Red_Flags": ", ".join(red_flags) if red_flags else "Nenhuma",
                 "Yellow_Cog": ", ".join(yellow_cog) if yellow_cog else "Nenhum",
+                "Yellow_Flags": yellow_cog if yellow_cog else ["Nenhum"],
                 "Sono": qualidade_sono,
                 "Fatores_Sociais": ", ".join(fat_sociais) if fat_sociais else "Nenhum",
+                "Blue_Flags": fat_sociais if fat_sociais else ["Nenhum"],
                 "Comorbidades": ", ".join(comorbidades) if comorbidades else "Nenhuma",
-                "Derrame": derrame,
-                "Alinhamento": alinhamento,
+                # Campos Bilaterais Novos + Chaves Combinadas Retrocompatíveis (para Painel e PDF)
+                "Derrame_Dir": derrame_d,
+                "Derrame_Esq": derrame_e,
+                "Derrame": f"Dir: {derrame_d} | Esq: {derrame_e}",
+                "Alinhamento_Dir": alinhamento_d,
+                "Alinhamento_Esq": alinhamento_e,
+                "Alinhamento": f"Dir: {alinhamento_d} | Esq: {alinhamento_e}",
                 "Marcha": marcha,
-                "Trofismo": trofismo,
-                "Perimetria": perimetria,
+                "Trofismo_Dir": trofismo_d,
+                "Trofismo_Esq": trofismo_e,
+                "Trofismo": f"Dir: {trofismo_d} | Esq: {trofismo_e}",
+                "Perimetria_Dir_cm": perimetria_d,
+                "Perimetria_Esq_cm": perimetria_e,
+                "Perimetria": perim_formatada,
                 "Pele": ", ".join(pele) if pele else "Normal",
-                "Palpacao": ", ".join(palpacao_comp) if palpacao_comp else "Sem dor",
-                "Godet": godet,
-                "Temperatura": temp,
-                "Testes_Ligamentares": ", ".join(t_lig) if t_lig else "Não testado",
-                "Testes_Meniscais": ", ".join(t_men) if t_men else "Não testado",
-                "Testes_Femoropatelar": ", ".join(t_pat) if t_pat else "Não testado",
+                "Palpacao_Dir": ", ".join(palpacao_d) if palpacao_d else "Sem dor",
+                "Palpacao_Esq": ", ".join(palpacao_e) if palpacao_e else "Sem dor",
+                "Palpacao": f"Dir: {', '.join(palpacao_d) if palpacao_d else 'Sem dor'} | Esq: {', '.join(palpacao_e) if palpacao_e else 'Sem dor'}",
+                "Godet_Dir": godet_d,
+                "Godet_Esq": godet_e,
+                "Godet": f"Dir: {godet_d} | Esq: {godet_e}",
+                "Temperatura_Dir": temp_d,
+                "Temperatura_Esq": temp_e,
+                "Temperatura": f"Dir: {temp_d} | Esq: {temp_e}",
+                "Testes_Ligamentares_Dir": ", ".join(t_lig_d) if t_lig_d else "Nenhum",
+                "Testes_Ligamentares_Esq": ", ".join(t_lig_e) if t_lig_e else "Nenhum",
+                "Testes_Ligamentares": t_lig_comb,
+                "Testes_Meniscais_Dir": ", ".join(t_men_d) if t_men_d else "Nenhum",
+                "Testes_Meniscais_Esq": ", ".join(t_men_e) if t_men_e else "Nenhum",
+                "Testes_Meniscais": t_men_comb,
+                "Testes_Femoropatelar_Dir": ", ".join(t_pat_d) if t_pat_d else "Nenhum",
+                "Testes_Femoropatelar_Esq": ", ".join(t_pat_e) if t_pat_e else "Nenhum",
+                "Testes_Femoropatelar": t_pat_comb,
+                # Objetivo Funcional (PSFS + SANE)
+                "Objetivo_Paciente": check_vazio(obj_paciente),
+                "PSFS_Baseline": psfs_baseline,
+                "SANE_Baseline_Pct": sane_baseline,
+                "Distancia_Objetivo_Pct": 100 - sane_baseline,
+                # Força e Dinamometria + Chaves LSI para ia_clinica.py
                 "Forca_Geral_Dir": f"Ext:{fg_ext_d} Flex:{fg_flex_d} Abd:{fg_abd_d} Add:{fg_add_d}",
                 "Forca_Geral_Esq": f"Ext:{fg_ext_e} Flex:{fg_flex_e} Abd:{fg_abd_e} Add:{fg_add_e}",
                 "Dinamometria_Dir": f"Ext:{din_ext_d} Flex:{din_flex_d} Abd:{din_abd_d} Add:{din_add_d}",
                 "Dinamometria_Esq": f"Ext:{din_ext_e} Flex:{din_flex_e} Abd:{din_abd_e} Add:{din_add_e}",
+                "Dinamometria_Lesado": din_lesado,
+                "Dinamometria_Saudavel": din_saudavel,
                 "ADM_Joelho_Flexao": f"Dir:{adm_flex_d} Esq:{adm_flex_e}",
                 "ADM_Joelho_Extensao": f"Dir:{adm_ext_d} Esq:{adm_ext_e}",
                 "Lunge_Test": f"Dir:{lunge_d} Esq:{lunge_e}",
-                "Flexibilidade": ", ".join(flexibilidade) if flexibilidade else "Normal",
+                "Flexibilidade_Dir": ", ".join(flexibilidade_d) if flexibilidade_d else "Normal",
+                "Flexibilidade_Esq": ", ".join(flexibilidade_e) if flexibilidade_e else "Normal",
+                "Flexibilidade": flex_comb,
                 "CM_Globais": f"Marcha:{cm_marcha} | Corrida:{cm_corrida} | Salto:{cm_salto} | Agach_Bi:{cm_agach_bi}",
                 "CM_Membro_Dir": f"Agach:{cm_agach_uni_d} | StepDown:{cm_step_down_d} | StepUp:{cm_step_up_d} | Afundo:{cm_afundo_d} | Eq:{cm_eq_uni_d}",
                 "CM_Membro_Esq": f"Agach:{cm_agach_uni_e} | StepDown:{cm_step_down_e} | StepUp:{cm_step_up_e} | Afundo:{cm_afundo_e} | Eq:{cm_eq_uni_e}",
                 "Exames_Apresentados": ", ".join(tipos_exames) if tipos_exames else "Nenhum",
                 "Testes_Alvo": testes_alvo,
                 "LEFS_Pct": pct_lefs,
+                "LEFS_Pts_80": pts_lefs_80,
                 "Interpretacao_LEFS": interp_lefs,
                 "VISA_P_Pts": score_visap,
                 "Interpretacao_VISA_P": interp_visap,
@@ -803,10 +1015,10 @@ def render():
                     if modo_edicao:
                         db.collection("Avaliacao_Inicial").document(st.session_state.doc_id_avaliacao).update(dados_avaliacao)
                         invalidar_cache("Avaliacao_Inicial")
-                        st.success("🔄 Avaliação Inicial atualizada com sucesso!")
+                        toast("Avaliação Inicial atualizada com sucesso!", "success")
                     else:
                         db.collection("Avaliacao_Inicial").add(dados_avaliacao)
                         invalidar_cache("Avaliacao_Inicial")
-                        st.success("✅ Nova Avaliação Inicial salva com sucesso!")
+                        toast("Nova Avaliação Inicial salva com sucesso!", "success")
                 except Exception as e:
-                    st.error(f"❌ Erro ao comunicar com a base de dados: {e}")
+                    toast(f"Erro ao comunicar com a base de dados: {e}", "error")
