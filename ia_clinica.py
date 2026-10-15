@@ -12,16 +12,18 @@ Princípios inegociáveis:
 - Retorno em dict estruturado, nunca texto livre.
 
 Estrutura:
-    - CONSTANTES CLÍNICAS: MCID, thresholds LSI, definições de bandeiras.
-    - analisar_estagnacao(historico, score)     → detecta estagnação por MCID
-    - calcular_lsi(lado_lesado, lado_saudavel)  → LSI + classificação de risco
-    - analisar_bandeiras(avaliacao)             → red/yellow/blue flags
-    - analisar_paciente(paciente_nome)          → orquestra tudo (função pública)
-    - renderizar_insights(insights, cores)      → renderiza no Streamlit
+    - CONSTANTES CLÍNICAS: MCID, thresholds LSI, GROC, PASS, PSFS/SANE e bandeiras.
+    - analisar_estagnacao(historico, score)           → detecta estagnação por MCID
+    - calcular_lsi(lado_lesado, lado_saudavel, fonte) → LSI + classificação de risco
+    - analisar_percepcao_metas(avaliacao, df_evo)     → GROC, PASS, SANE e PSFS
+    - analisar_bandeiras(avaliacao)                   → red/yellow/blue/black flags
+    - analisar_paciente(paciente_nome)                → orquestra tudo (função pública)
+    - renderizar_insights(insights, cores)            → renderiza no Streamlit
 """
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from config import titulo, secao
 from firebase_client import conn
 
 
@@ -39,27 +41,42 @@ MCID = {
     "LEFS": {
         "valor": 9.0,
         "unidade": "pontos",
-        "referencia": "Binkley 1999"
+        "referencia": "Binkley 1999 (Physical Therapy)"
     },
     "KOOS": {
         "valor": 8.0,   # limite inferior conservador (8-10 pts por subescala)
         "unidade": "pontos por subescala",
-        "referencia": "Roos 2003"
+        "referencia": "Roos 2003 (Health Qual Life Outcomes)"
     },
     "VISA_P": {
         "valor": 13.0,
         "unidade": "pontos",
-        "referencia": "Hernandez-Sanchez 2014"
+        "referencia": "Hernandez-Sanchez 2014 (BJSM)"
     },
     "Lysholm": {
         "valor": 10.0,
         "unidade": "pontos",
-        "referencia": "Briggs 2009"
+        "referencia": "Briggs 2009 (AJSM)"
     },
     "IKDC": {
         "valor": 9.0,
         "unidade": "pontos",
-        "referencia": "Irrgang 2006"
+        "referencia": "Irrgang 2006 (AJSM)"
+    },
+    "PSFS": {
+        "valor": 2.0,
+        "unidade": "pontos (0-10)",
+        "referencia": "Stratford 1995 / Hefford 2012 (JOSPT)"
+    },
+    "GROC": {
+        "valor": 3.0,
+        "unidade": "pontos (-5 a +5)",
+        "referencia": "Kamper 2009 (JOSPT)"
+    },
+    "SANE": {
+        "valor": 15.0,
+        "unidade": "% de capacidade",
+        "referencia": "Shelbourne 2009 / Winterstein 2013"
     }
 }
 
@@ -75,13 +92,6 @@ LSI_REF = "Grindem 2016 (doi:10.1136/bjsports-2016-096031)"
 # ============================================================
 # NORMALIZAÇÃO DE DIAGNÓSTICO (preparação p/ gráficos contextuais)
 # ============================================================
-# Detecta o fenótipo clínico a partir do texto livre digitado pelo fisio.
-# Cada fenótipo define quais métricas devem ser plotadas no painel:
-#   - Tendinopatia: dor + carga excêntrica (não ADM!)
-#   - Pós-LCA: dor + flexão + extensão + LSI
-#   - Condromalácia: dor + dor em funcionais (agachamento, escada)
-#   - Meniscopatia: dor + ADM + bloqueio articular
-#   - Artrose: dor + rigidez matinal + WOMAC
 FENOTIPOS = {
     "pos_lca": {
         "label": "Pós-LCA (Reconstrução do Ligamento Cruzado Anterior)",
@@ -106,7 +116,7 @@ FENOTIPOS = {
     },
     "condromalacia": {
         "label": "Condromalácia / Síndrome Patelofemoral",
-        "keywords": ["condromalacia", "condromalácia", "patelofemoral", "condropatia", "sfp"],
+        "keywords": ["condromalacia", "condromalácia", "patelofemoral", "condropatia", "sfp", "femoropatelar"],
         "metricas_relevantes": ["Dor", "Testes_Funcionais"],
         "prom_principal": "KOOS",
         "tempo_esperado_semanas": 12,
@@ -138,14 +148,6 @@ FENOTIPOS = {
 def normalizar_diagnostico(texto_diagnostico: str) -> dict:
     """
     Detecta o fenótipo clínico a partir do texto livre de diagnóstico.
-
-    Args:
-        texto_diagnostico: texto digitado pelo fisio no cadastro
-                           (ex: "Pós-op LCA", "condromalácia", "VISA-P baixo")
-
-    Returns:
-        dict com {fenotipo, label, metricas_relevantes, prom_principal, tempo_esperado_semanas}
-        Se não reconhecer, retorna fenotipo "generico" com métricas padrão.
     """
     if not texto_diagnostico:
         return {
@@ -182,29 +184,63 @@ def normalizar_diagnostico(texto_diagnostico: str) -> dict:
 BANDEIRAS = {
     "vermelha": {
         "cor": "🔴",
-        "descricao": "Sinal de patologia grave (fratura, tumor, infecção)",
-        "acao": "Encaminhar/reencaminhar avaliação médica",
+        "descricao": "Sinal de patologia grave (fratura, tumor, infecção, TVP)",
+        "acao": "Encaminhar/reencaminhar imediatamente para avaliação médica",
         "referencia": "Greenhalgh 2006 (Red flags in musculoskeletal medicine)"
     },
     "amarela": {
         "cor": "🟡",
-        "descricao": "Fator psicossocial (medo, catastrofização)",
-        "acao": "Considerar aplicação da Tampa Scale (TSK-11)",
-        "referencia": "Nicholas 2011 (early identification of psychosocial risk)"
+        "descricao": "Fator psicossocial / cognitivo-emocional (medo, catastrofização)",
+        "acao": "Aplicar educação em dor, exposição graduada e considerar Tampa Scale (TSK-11)",
+        "referencia": "Nicholas 2011 (Early identification of psychosocial risk)"
     },
     "azul": {
         "cor": "🔵",
-        "descricao": "Barreiras do ambiente de trabalho",
-        "acao": "Abordar contexto ocupacional no plano",
-        "referencia": "Main 2010 (Blue and Black flags)"
+        "descricao": "Barreiras ocupacionais / demandas biomecânicas do trabalho",
+        "acao": "Adaptar volume de carga à rotina laboral e planejar retorno gradual",
+        "referencia": "Main 2010 (Blue and Black flags in occupational rehabilitation)"
     },
     "negra": {
         "cor": "⚫",
-        "descricao": "Barreiras sistêmicas (seguros, processos)",
-        "acao": "Considerar impacto sistêmico na recuperação",
-        "referencia": "Main 2010"
+        "descricao": "Barreiras sistêmicas, previdenciárias ou médico-legais (INSS, litígio)",
+        "acao": "Documentar evolução objetiva rigorosa (LSI, ADM, PROMs) e alinhar expectativas",
+        "referencia": "Main 2010 (Contextual and systemic obstacles to recovery)"
     }
 }
+
+
+# ============================================================
+# HELPERS INTERNOS DE EXTRAÇÃO SEGURA (RETROCOMPATIBILIDADE)
+# ============================================================
+def _extrair_valor_prefixo(texto_bruto, prefixo: str = "Ext") -> float:
+    """
+    Extrai um float de strings formatadas como 'Ext:35.0 Flex:20.0 Abd:15.0 Add:15.0'.
+    Retorna 0.0 se não encontrar.
+    """
+    if texto_bruto is None or pd.isna(texto_bruto):
+        return 0.0
+    if isinstance(texto_bruto, (int, float)):
+        return float(texto_bruto)
+    try:
+        partes = str(texto_bruto).replace("|", " ").split()
+        for p in partes:
+            if p.startswith(prefixo + ":"):
+                return float(p.split(":")[1].replace(",", "."))
+    except (ValueError, TypeError, IndexError):
+        pass
+    return 0.0
+
+
+def _normalizar_lista_flags(valor_bruto) -> list:
+    """Converte string separada por vírgulas ou lista em lista limpa de strings."""
+    if valor_bruto is None or (isinstance(valor_bruto, float) and pd.isna(valor_bruto)):
+        return []
+    if isinstance(valor_bruto, list):
+        itens = [str(x).strip() for x in valor_bruto if x is not None]
+    else:
+        itens = [x.strip() for x in str(valor_bruto).split(",")]
+    termos_vazios = {"não", "nao", "nenhum", "nenhuma", "", "n/a", "normal", "sem dor", "none"}
+    return [i for i in itens if i and i.lower() not in termos_vazios]
 
 
 # ============================================================
@@ -214,13 +250,6 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
     """
     Detecta estagnação clínica: se as últimas N sessões não apresentaram
     delta ≥ MCID, considera-se que o paciente parou de evoluir.
-
-    Args:
-        historico: lista cronológica dos valores do score (ex: [7, 6, 5, 5, 5])
-        score: nome do score ("Dor", "LEFS", "KOOS", "VISA_P", "Lysholm", "IKDC")
-
-    Returns:
-        dict com {status, delta, mcid, sessoes_analisadas, racional, referencia}
     """
     if score not in MCID:
         return {"status": "indefinido", "racional": f"Score {score} não catalogado"}
@@ -242,10 +271,8 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
 
     # Para dor: melhora = redução; para funcionais: melhora = aumento
     if score == "Dor":
-        delta = max(janela) - min(janela)      # amplitude simples
         melhora = janela[0] - janela[-1]       # positivo = dor caindo
     else:
-        delta = max(janela) - min(janela)
         melhora = janela[-1] - janela[0]       # positivo = função subindo
 
     if abs(melhora) < mcid_valor:
@@ -253,19 +280,19 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
         racional = (
             f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões: variação de {melhora:+.1f} "
             f"< MCID ({mcid_valor} {MCID[score]['unidade']}). "
-            f"Sem melhora clinicamente significativa. Considere revisar o plano."
+            f"Sem melhora clinicamente significativa. Considere revisar o plano e progressão de carga."
         )
     elif melhora >= mcid_valor:
         status = "melhora"
         racional = (
             f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões: melhora de {melhora:+.1f} "
-            f"≥ MCID ({mcid_valor}). Evolução clinicamente significativa."
+            f"≥ MCID ({mcid_valor} {MCID[score]['unidade']}). Evolução clinicamente significativa."
         )
     else:
         status = "piora"
         racional = (
-            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões: piora de {melhora:+.1f}. "
-            f"Investigar causa (adesão, sobrecarga, novo trauma)."
+            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões: piora de {melhora:+.1f} "
+            f"({MCID[score]['unidade']}). Investigar causa (adesão, sobrecarga mecânica ou novo trauma)."
         )
 
     return {
@@ -282,49 +309,40 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
 # ============================================================
 # FUNÇÃO 2: Cálculo de LSI (Limb Symmetry Index)
 # ============================================================
-def calcular_lsi(lado_lesado: float, lado_saudavel: float) -> dict:
+def calcular_lsi(lado_lesado: float, lado_saudavel: float, fonte: str = "Dinamometria Extensão (kgf)") -> dict:
     """
     Calcula o Limb Symmetry Index e classifica o risco de re-lesão.
-
     LSI = (lado_lesado / lado_saudavel) * 100
-
-    Thresholds da literatura (Grindem 2016):
-        ≥90% = apto para alta funcional
-        85-89% = zona de atenção
-        <85% = risco 2-4x aumentado de re-lesão
-
-    Args:
-        lado_lesado: valor do teste no lado lesado (força, distância, etc.)
-        lado_saudavel: valor do teste no lado contralateral saudável
-
-    Returns:
-        dict com {valor, classificacao, cor, acao, referencia}
     """
-    if not lado_saudavel or lado_saudavel <= 0:
+    if lado_saudavel is None or lado_saudavel <= 0 or lado_lesado is None or lado_lesado < 0:
         return {
             "valor": None,
             "classificacao": "indefinido",
-            "racional": "Dados do lado saudável insuficientes para calcular LSI.",
+            "fonte": fonte,
+            "racional": "Dados bilaterais insuficientes para calcular LSI.",
             "referencia": LSI_REF
         }
 
-    lsi = (lado_lesado / lado_saudavel) * 100
+    lsi = (lado_lesado / lado_saudavel) * 100.0
 
     if lsi >= LSI_ALTA_FUNCIONAL:
         classificacao = "alta_funcional"
         cor = "🟢"
-        acao = "Simetria adequada. Critério de alta funcional atingido."
+        acao = f"Simetria adequada ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f}). Critério de alta funcional atingido."
     elif lsi >= LSI_ATENCAO:
         classificacao = "atencao"
         cor = "🟡"
-        acao = "Zona de atenção. Progredir carga com cautela antes da alta."
+        acao = f"Zona de atenção ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f}). Progredir carga unilateral com cautela antes da alta."
     else:
         classificacao = "risco"
         cor = "🔴"
-        acao = f"LSI < {LSI_ATENCAO}%. Risco de re-lesão 2-4x aumentado. NÃO liberar para alta."
+        acao = f"LSI < {LSI_ATENCAO}% ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f}). Risco de re-lesão 2-4x aumentado. NÃO liberar para alta."
 
     return {
         "valor": round(lsi, 1),
+        "lado_lesado": round(lado_lesado, 1),
+        "lado_saudavel": round(lado_saudavel, 1),
+        "fonte": fonte,
         "classificacao": classificacao,
         "cor": cor,
         "acao": acao,
@@ -333,70 +351,178 @@ def calcular_lsi(lado_lesado: float, lado_saudavel: float) -> dict:
 
 
 # ============================================================
-# FUNÇÃO 3: Análise de Bandeiras
+# FUNÇÃO 3: Análise de Percepção do Paciente & Metas (GROC, PASS, SANE, PSFS)
+# ============================================================
+def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
+    """
+    Analisa o alinhamento entre a meta funcional inicial do paciente (PSFS/SANE)
+    e a percepção longitudinal nas sessões de check-in (GROC, PASS e evolução do SANE).
+
+    Referências:
+        - PSFS: Stratford 1995 / Hefford 2012 (MCID = 2.0 pts)
+        - GROC: Kamper 2009 (JOSPT — corte clínico ≥ +3 pts)
+        - PASS: Tubach 2005 (Arthritis Rheum — Estado de Sintoma Aceitável)
+        - SANE: Shelbourne 2009 (AJSM — Single Assessment Numeric Evaluation)
+    """
+    objetivo = str(avaliacao.get("Objetivo_Paciente", "Não especificado") or "Não especificado")
+    if objetivo == "Não relatado":
+        objetivo = "Não especificado"
+
+    try:
+        psfs_base = int(float(avaliacao.get("PSFS_Baseline", 3) or 3))
+    except (ValueError, TypeError):
+        psfs_base = 3
+
+    try:
+        sane_base = float(avaliacao.get("SANE_Baseline_Pct", 30.0) or 30.0)
+    except (ValueError, TypeError):
+        sane_base = 30.0
+
+    sane_atual = sane_base
+    groc_score = None
+    groc_label = "Não registrado"
+    pass_atingido = None
+    pass_label = "Não registrado"
+
+    if not df_evo.empty:
+        ultima_sessao = df_evo.iloc[-1]
+        if "SANE_Pct" in df_evo.columns and pd.notna(ultima_sessao.get("SANE_Pct")):
+            try:
+                sane_atual = float(ultima_sessao.get("SANE_Pct"))
+            except (ValueError, TypeError):
+                sane_atual = sane_base
+
+        if "GROC_Score" in df_evo.columns and pd.notna(ultima_sessao.get("GROC_Score")):
+            try:
+                groc_score = int(float(ultima_sessao.get("GROC_Score")))
+            except (ValueError, TypeError):
+                groc_score = None
+
+        if "GROC_Label" in df_evo.columns and pd.notna(ultima_sessao.get("GROC_Label")):
+            groc_label = str(ultima_sessao.get("GROC_Label"))
+
+        if "PASS_Atingido" in df_evo.columns and pd.notna(ultima_sessao.get("PASS_Atingido")):
+            val_pass = ultima_sessao.get("PASS_Atingido")
+            if isinstance(val_pass, bool):
+                pass_atingido = val_pass
+            else:
+                pass_atingido = str(val_pass).strip().lower() in ["true", "1", "sim", "yes"]
+
+        if "PASS_Satisfacao" in df_evo.columns and pd.notna(ultima_sessao.get("PASS_Satisfacao")):
+            pass_label = str(ultima_sessao.get("PASS_Satisfacao"))
+            if pass_atingido is None:
+                pass_atingido = pass_label.startswith("👍") or "sim" in pass_label.lower()
+
+    distancia_meta = max(0.0, 100.0 - sane_atual)
+    ganho_sane = sane_atual - sane_base
+
+    # Regra de Decisão PBE para Status Subjetivo & Alinhamento de Expectativa
+    if pass_atingido is True and (groc_score is not None and groc_score >= 3) and sane_atual >= 85:
+        status = "meta_atingida"
+        cor = "🟢"
+        parecer = (
+            f"Paciente atingiu Estado de Sintoma Aceitável (PASS = Sim), mudança global clinicamente "
+            f"significativa (GROC {groc_score:+d} ≥ +3) e está a apenas {distancia_meta:.0f}% do seu objetivo final."
+        )
+    elif groc_score is not None and groc_score < 0:
+        status = "alerta_insatisfacao"
+        cor = "🔴"
+        parecer = (
+            f"Percepção de piora clínica relatada no GROC ({groc_score:+d} pts). "
+            f"Reavaliar carga recente, expectativas e barreiras psicossociais."
+        )
+    elif pass_atingido is False and ganho_sane >= 15.0:
+        status = "evoluindo_insatisfeito"
+        cor = "🟡"
+        parecer = (
+            f"Ganho funcional relevante de +{ganho_sane:.0f}% no SANE (faltam {distancia_meta:.0f}% para a meta), "
+            f"porém paciente ainda reporta PASS negativo (insatisfeito com o estado atual). Manter progressão."
+        )
+    else:
+        status = "em_construcao"
+        cor = "🔵"
+        parecer = (
+            f"Capacidade atual percebida (SANE) em {sane_atual:.0f}% (Δ {ganho_sane:+.0f}% vs Marco Zero). "
+            f"Faltam {distancia_meta:.0f}% para atingir plenamente o objetivo funcional."
+        )
+
+    return {
+        "objetivo": objetivo,
+        "psfs_baseline": psfs_base,
+        "sane_baseline": round(sane_base, 1),
+        "sane_atual": round(sane_atual, 1),
+        "ganho_sane": round(ganho_sane, 1),
+        "distancia_meta": round(distancia_meta, 1),
+        "groc_score": groc_score,
+        "groc_label": groc_label,
+        "pass_atingido": pass_atingido,
+        "pass_label": pass_label,
+        "status": status,
+        "cor": cor,
+        "parecer": parecer,
+        "referencia": "Kamper 2009 (GROC) | Tubach 2005 (PASS) | Shelbourne 2009 (SANE) | Stratford 1995 (PSFS)"
+    }
+
+
+# ============================================================
+# FUNÇÃO 4: Análise de Bandeiras (Compatível com Chaves Antigas e Novas)
 # ============================================================
 def analisar_bandeiras(avaliacao: dict) -> list:
     """
-    Analisa a avaliação inicial e detecta bandeiras clínicas ativas.
-
-    Args:
-        avaliacao: dict com dados da Avaliacao_Inicial (do Firestore)
-
-    Returns:
-        lista de dicts, cada um representando uma bandeira ativa.
+    Analisa a avaliação inicial e detecta bandeiras clínicas ativas
+    (Vermelhas, Amarelas, Azuis e Negras).
     """
     bandeiras_ativas = []
 
-    # --- Bandeiras Vermelhas ---
-    red_flags = avaliacao.get("Red_Flags", []) or avaliacao.get("Bandeiras_Vermelhas", [])
-    if isinstance(red_flags, str):
-        red_flags = [red_flags]
+    # --- 1. Bandeiras Vermelhas ---
+    red_flags = _normalizar_lista_flags(
+        avaliacao.get("Red_Flags") or avaliacao.get("Bandeiras_Vermelhas")
+    )
+    for flag in red_flags:
+        bandeiras_ativas.append({
+            "tipo": "vermelha",
+            "cor": BANDEIRAS["vermelha"]["cor"],
+            "gatilho": flag,
+            "descricao": BANDEIRAS["vermelha"]["descricao"],
+            "acao": BANDEIRAS["vermelha"]["acao"],
+            "referencia": BANDEIRAS["vermelha"]["referencia"]
+        })
 
-    for flag in (red_flags or []):
-        if flag and str(flag).strip().lower() not in ["não", "nao", "nenhum", "", "n/a"]:
-            bandeiras_ativas.append({
-                "tipo": "vermelha",
-                "cor": BANDEIRAS["vermelha"]["cor"],
-                "gatilho": flag,
-                "descricao": BANDEIRAS["vermelha"]["descricao"],
-                "acao": BANDEIRAS["vermelha"]["acao"],
-                "referencia": BANDEIRAS["vermelha"]["referencia"]
-            })
+    # --- 2. Bandeiras Amarelas (Yellow_Flags ou Yellow_Cog) ---
+    yellow_flags = _normalizar_lista_flags(
+        avaliacao.get("Yellow_Flags") or avaliacao.get("Yellow_Cog") or avaliacao.get("Bandeiras_Amarelas")
+    )
+    for flag in yellow_flags:
+        bandeiras_ativas.append({
+            "tipo": "amarela",
+            "cor": BANDEIRAS["amarela"]["cor"],
+            "gatilho": flag,
+            "descricao": BANDEIRAS["amarela"]["descricao"],
+            "acao": BANDEIRAS["amarela"]["acao"],
+            "referencia": BANDEIRAS["amarela"]["referencia"]
+        })
 
-    # --- Bandeiras Amarelas (psicossociais) ---
-    yellow_flags = avaliacao.get("Yellow_Flags", []) or avaliacao.get("Bandeiras_Amarelas", [])
-    if isinstance(yellow_flags, str):
-        yellow_flags = [yellow_flags]
+    # --- 3. Bandeiras Azuis e Negras (Blue_Flags ou Fatores_Sociais) ---
+    blue_black_raw = _normalizar_lista_flags(
+        avaliacao.get("Blue_Flags") or avaliacao.get("Fatores_Sociais") or avaliacao.get("Bandeiras_Azuis")
+    )
+    termos_black_flag = ["inss", "litígio", "litigio", "processo", "judicial", "seguro", "afastado"]
 
-    for flag in (yellow_flags or []):
-        if flag and str(flag).strip().lower() not in ["não", "nao", "nenhum", "", "n/a"]:
-            bandeiras_ativas.append({
-                "tipo": "amarela",
-                "cor": BANDEIRAS["amarela"]["cor"],
-                "gatilho": flag,
-                "descricao": BANDEIRAS["amarela"]["descricao"],
-                "acao": BANDEIRAS["amarela"]["acao"],
-                "referencia": BANDEIRAS["amarela"]["referencia"]
-            })
+    for flag in blue_black_raw:
+        eh_negra = any(termo in flag.lower() for termo in termos_black_flag)
+        tipo_chave = "negra" if eh_negra else "azul"
+        bandeiras_ativas.append({
+            "tipo": tipo_chave,
+            "cor": BANDEIRAS[tipo_chave]["cor"],
+            "gatilho": flag,
+            "descricao": BANDEIRAS[tipo_chave]["descricao"],
+            "acao": BANDEIRAS[tipo_chave]["acao"],
+            "referencia": BANDEIRAS[tipo_chave]["referencia"]
+        })
 
-    # --- Bandeiras Azuis (trabalho) ---
-    blue_flags = avaliacao.get("Blue_Flags", []) or avaliacao.get("Bandeiras_Azuis", [])
-    if isinstance(blue_flags, str):
-        blue_flags = [blue_flags]
-
-    for flag in (blue_flags or []):
-        if flag and str(flag).strip().lower() not in ["não", "nao", "nenhum", "", "n/a"]:
-            bandeiras_ativas.append({
-                "tipo": "azul",
-                "cor": BANDEIRAS["azul"]["cor"],
-                "gatilho": flag,
-                "descricao": BANDEIRAS["azul"]["descricao"],
-                "acao": BANDEIRAS["azul"]["acao"],
-                "referencia": BANDEIRAS["azul"]["referencia"]
-            })
-
-    # --- Dor noturna (regra clínica automática) ---
+    # --- 4. Dor noturna / Distúrbio severo do sono (regra clínica automática) ---
     dor_noturna = str(avaliacao.get("Dor_Noturna", "")).strip().lower()
+    sono_aval = str(avaliacao.get("Sono", "")).strip().lower()
     if dor_noturna in ["sim", "s", "presente", "true", "yes"]:
         bandeiras_ativas.append({
             "tipo": "vermelha",
@@ -406,32 +532,26 @@ def analisar_bandeiras(avaliacao: dict) -> list:
             "acao": "Considerar reavaliação médica",
             "referencia": "Greenhalgh 2006"
         })
+    elif "acorda com dor" in sono_aval or "insônia" in sono_aval:
+        bandeiras_ativas.append({
+            "tipo": "amarela",
+            "cor": BANDEIRAS["amarela"]["cor"],
+            "gatilho": f"Alteração do Sono ({avaliacao.get('Sono')})",
+            "descricao": "Privação de sono amplifica a sensibilização central e reduz modulação descendente da dor",
+            "acao": "Higiene do sono e controle de carga inflamatória noturna",
+            "referencia": "Finan 2013 (Sleep disturbance and pain — J Pain)"
+        })
 
     return bandeiras_ativas
 
 
 # ============================================================
-# FUNÇÃO 4 (ORQUESTRADORA): analisar_paciente
+# FUNÇÃO 5 (ORQUESTRADORA): analisar_paciente
 # ============================================================
 def analisar_paciente(paciente_nome: str) -> dict:
     """
     Função pública principal: recebe o nome do paciente, busca todos os dados
-    no Firestore e retorna um dashboard clínico completo.
-
-    Args:
-        paciente_nome: nome do paciente (string, chave usada nas coleções)
-
-    Returns:
-        dict com estrutura:
-        {
-            "paciente": str,
-            "gerado_em": str (ISO),
-            "estagnacao": {...},        # análise de estagnação por Dor
-            "estagnacao_funcional": {...},  # se houver LEFS/KOOS
-            "lsi": {...},               # LSI atual se calculável
-            "bandeiras": [...],         # lista de bandeiras ativas
-            "sessoes_registradas": int
-        }
+    no Firestore e retorna um dashboard clínico completo e auditável.
     """
     resultado = {
         "paciente": paciente_nome,
@@ -440,6 +560,7 @@ def analisar_paciente(paciente_nome: str) -> dict:
         "estagnacao": None,
         "estagnacao_funcional": None,
         "lsi": None,
+        "percepcao_metas": None,
         "bandeiras": [],
         "sessoes_registradas": 0
     }
@@ -451,6 +572,8 @@ def analisar_paciente(paciente_nome: str) -> dict:
         if not registro.empty:
             dx_texto = registro.iloc[-1].get("Diagnostico_Clinico", "")
             resultado["fenotipo"] = normalizar_diagnostico(dx_texto)
+        else:
+            resultado["fenotipo"] = normalizar_diagnostico("")
     except Exception:
         resultado["fenotipo"] = normalizar_diagnostico("")
 
@@ -461,9 +584,8 @@ def analisar_paciente(paciente_nome: str) -> dict:
         df_evo = pd.DataFrame()
 
     if not df_evo.empty:
-        # Ordena por data
         if "Data" in df_evo.columns:
-            df_evo["_Data_dt"] = pd.to_datetime(df_evo["Data"], errors="coerce")
+            df_evo["_Data_dt"] = pd.to_datetime(df_evo["Data"], format="mixed", errors="coerce")
             df_evo = df_evo.sort_values("_Data_dt")
 
         resultado["sessoes_registradas"] = len(df_evo)
@@ -480,32 +602,61 @@ def analisar_paciente(paciente_nome: str) -> dict:
     except Exception:
         df_aval = pd.DataFrame()
 
+    ultima_aval = {}
     if not df_aval.empty:
-        # Pega a avaliação mais recente
         if "Data_Avaliacao" in df_aval.columns:
-            df_aval["_Data_dt"] = pd.to_datetime(df_aval["Data_Avaliacao"], errors="coerce")
+            df_aval["_Data_dt"] = pd.to_datetime(df_aval["Data_Avaliacao"], format="mixed", dayfirst=True, errors="coerce")
             df_aval = df_aval.sort_values("_Data_dt")
         ultima_aval = df_aval.iloc[-1].to_dict()
 
         # --- Bandeiras ---
         resultado["bandeiras"] = analisar_bandeiras(ultima_aval)
 
-        # --- LSI (se houver dinamometria bilateral) ---
+        # --- LSI (Compatível com campos diretos novos OU strings legadas Dinamometria_Dir/Esq) ---
         lado_lesado = ultima_aval.get("Forca_Lesado") or ultima_aval.get("Dinamometria_Lesado")
         lado_saudavel = ultima_aval.get("Forca_Saudavel") or ultima_aval.get("Dinamometria_Saudavel")
-        try:
-            if lado_lesado is not None and lado_saudavel is not None:
-                resultado["lsi"] = calcular_lsi(float(lado_lesado), float(lado_saudavel))
-        except (ValueError, TypeError):
-            pass
+        fonte_lsi = "Dinamometria Extensão (kgf)"
 
-        # --- Estagnação Funcional (LEFS, KOOS se coletados no check-in) ---
-        for score_func in ["LEFS", "KOOS"]:
-            if score_func in df_evo.columns:
+        try:
+            val_les = float(lado_lesado) if lado_lesado is not None else 0.0
+            val_sau = float(lado_saudavel) if lado_saudavel is not None else 0.0
+        except (ValueError, TypeError):
+            val_les, val_sau = 0.0, 0.0
+
+        # Fallback automático: extrai de Dinamometria_Dir / Dinamometria_Esq se campos diretos forem 0
+        if val_les <= 0 and val_sau <= 0:
+            ext_d = _extrair_valor_prefixo(ultima_aval.get("Dinamometria_Dir"), "Ext")
+            ext_e = _extrair_valor_prefixo(ultima_aval.get("Dinamometria_Esq"), "Ext")
+            if ext_d > 0 or ext_e > 0:
+                fonte_lsi = "Dinamometria Quadríceps (kgf)"
+            else:
+                ext_d = _extrair_valor_prefixo(ultima_aval.get("Forca_Geral_Dir"), "Ext")
+                ext_e = _extrair_valor_prefixo(ultima_aval.get("Forca_Geral_Esq"), "Ext")
+                fonte_lsi = "Força Manual Quadríceps (Oxford 0-5)"
+
+            lado_ref = str(ultima_aval.get("Lado_Acometido", "")).lower()
+            if "direito" in lado_ref or "dir > esq" in lado_ref:
+                val_les, val_sau = ext_d, ext_e
+            elif "esquerdo" in lado_ref or "esq > dir" in lado_ref:
+                val_les, val_sau = ext_e, ext_d
+            else:
+                val_les, val_sau = min(ext_d, ext_e), max(ext_d, ext_e)
+
+        if val_sau > 0:
+            resultado["lsi"] = calcular_lsi(val_les, val_sau, fonte=fonte_lsi)
+
+        # --- Estagnação Funcional (SANE, LEFS ou KOOS se coletados no check-in) ---
+        for score_func in ["SANE_Pct", "LEFS", "KOOS"]:
+            if not df_evo.empty and score_func in df_evo.columns:
                 hist = pd.to_numeric(df_evo[score_func], errors="coerce").dropna().tolist()
-                if hist:
-                    resultado["estagnacao_funcional"] = analisar_estagnacao(hist, score_func)
-                    break     # usa o primeiro disponível
+                if len(hist) >= SESSOES_MINIMAS_ESTAGNACAO:
+                    chave_mcid = "SANE" if score_func == "SANE_Pct" else score_func
+                    resultado["estagnacao_funcional"] = analisar_estagnacao(hist, chave_mcid)
+                    break
+
+    # --- 3. PERCEPÇÃO DE EVOLUÇÃO & METAS (PSFS, SANE, GROC, PASS) ---
+    if ultima_aval or not df_evo.empty:
+        resultado["percepcao_metas"] = analisar_percepcao_metas(ultima_aval, df_evo)
 
     return resultado
 
@@ -515,26 +666,17 @@ def analisar_paciente(paciente_nome: str) -> dict:
 # ============================================================
 def renderizar_insights(insights: dict, cores: dict):
     """
-    Renderiza o dashboard de IA Clínica dentro de uma aba do painel.
-
-    Args:
-        insights: resultado de analisar_paciente()
-        cores: dict CORES_GENUA (para manter identidade visual)
+    Renderiza o dashboard de IA Clínica dentro da aba de Inteligência Clínica do Painel.
     """
     st.markdown(f"""
         <div style='background: linear-gradient(135deg, {cores['primaria']} 0%, {cores['secundaria']} 100%);
                     padding: 20px; border-radius: 16px; color: white; margin-bottom: 20px;'>
             <h3 style='color: white; margin: 0;'>🧠 Insights Clínicos — IA Baseada em Evidência</h3>
             <p style='color: #E0F7FA; margin: 8px 0 0 0; font-size: 0.95rem;'>
-                Análise automatizada de estagnação, simetria e bandeiras clínicas.
-                Todas as regras têm referência científica documentada.
+                Análise determinística de estagnação (MCID), simetria bilateral (LSI), percepção de mudança (GROC/PASS) e bandeiras clínicas.
             </p>
         </div>
     """, unsafe_allow_html=True)
-
-    if insights["sessoes_registradas"] == 0:
-        st.info("ℹ️ Paciente ainda sem sessões de check-in registradas. Os insights aparecerão após os primeiros atendimentos.")
-        return
 
     # ==== FENÓTIPO CLÍNICO ====
     fen = insights.get("fenotipo") or {}
@@ -545,35 +687,80 @@ def renderizar_insights(insights: dict, cores: dict):
             f"<strong style='color: {cores['primaria']};'>🎯 Fenótipo Clínico Identificado:</strong> {fen['label']}<br>"
             f"<small style='color: {cores['texto_suave']};'>Foco de análise: {', '.join(fen['metricas_relevantes'])} "
             f"| PROM principal: {fen['prom_principal']} "
-            f"| Tempo esperado de reabilitação: {fen['tempo_esperado_semanas']} semanas</small>"
+            f"| Janela prognóstica PBE: {fen['tempo_esperado_semanas']} semanas</small>"
             f"</div>",
             unsafe_allow_html=True,
         )
     elif fen.get("fenotipo") == "generico":
-        st.caption(f"ℹ️ Fenótipo não reconhecido pelo algoritmo. Considere padronizar o Diagnóstico Clínico no Cadastro para análise contextual.")
+        st.caption("ℹ️ Fenótipo específico não reconhecido no Cadastro. Padronize o Diagnóstico Clínico para ativar a janela prognóstica.")
 
     # ==== KPIs no topo ====
-    col1, col2, col3 = st.columns(3)
+    pm = insights.get("percepcao_metas") or {}
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("📅 Sessões Registradas", insights["sessoes_registradas"])
     with col2:
         n_bandeiras = len(insights["bandeiras"])
-        st.metric("🚩 Bandeiras Ativas", n_bandeiras, delta=None if n_bandeiras == 0 else "Atenção")
+        st.metric("🚩 Bandeiras Ativas", n_bandeiras, delta=None if n_bandeiras == 0 else "Atenção", delta_color="inverse")
     with col3:
-        if insights["lsi"] and insights["lsi"].get("valor"):
-            st.metric(f"{insights['lsi']['cor']} LSI", f"{insights['lsi']['valor']}%")
+        if insights.get("lsi") and insights["lsi"].get("valor") is not None:
+            st.metric(f"{insights['lsi']['cor']} LSI (Força)", f"{insights['lsi']['valor']}%")
         else:
-            st.metric("📊 LSI", "N/D", help="Sem dinamometria bilateral registrada")
+            st.metric("📊 LSI (Força)", "N/D", help="Preencha a dinamometria ou força bilateral na Avaliação Inicial")
+    with col4:
+        if pm.get("sane_atual") is not None:
+            st.metric(
+                "🎯 Distância da Meta",
+                f"{pm['distancia_meta']:.0f}%",
+                f"SANE Atual: {pm['sane_atual']:.0f}%"
+            )
+        else:
+            st.metric("🎯 Distância da Meta", "N/D")
 
     st.markdown("---")
 
-    # ==== ESTAGNAÇÃO — DOR ====
-    st.markdown(f"<h4 style='color: {cores['primaria']};'>📉 Análise de Estagnação — Dor (EVA)</h4>", unsafe_allow_html=True)
-    est = insights["estagnacao"]
+    # ==== 1. PERCEPÇÃO DO PACIENTE & METAS (GROC, PASS, SANE, PSFS) ====
+    if pm:
+        titulo("🧭 Alinhamento de Expectativa, Satisfação (PASS) & Objetivo (SANE/GROC)")
+        st.markdown(f"**🏆 Objetivo Principal do Paciente:** *{pm.get('objetivo', 'Não informado')}*")
 
-    if est is None or est.get("status") == "insuficiente":
-        n_atual = est["sessoes_analisadas"] if est else 0
-        st.info(f"⏳ Aguardando dados: análise requer ≥ {SESSOES_MINIMAS_ESTAGNACAO} sessões (há {n_atual}).")
+        c_pm1, c_pm2, c_pm3 = st.columns(3)
+        c_pm1.metric(
+            "Capacidade Atual (SANE)",
+            f"{pm['sane_atual']:.0f}%",
+            f"{pm['ganho_sane']:+.0f}% vs Marco Zero ({pm['sane_baseline']:.0f}%)"
+        )
+        c_pm2.metric(
+            "Mudança Global (GROC)",
+            f"{pm['groc_score']:+d} pts" if pm.get("groc_score") is not None else "N/D",
+            pm.get("groc_label", "Sem registro")
+        )
+        c_pm3.metric(
+            "Satisfação Atual (PASS)",
+            "Satisfeito (Sim)" if pm.get("pass_atingido") is True else ("Insatisfeito (Não)" if pm.get("pass_atingido") is False else "N/D"),
+            f"PSFS Inicial: {pm.get('psfs_baseline', '-')}/10"
+        )
+
+        if pm["status"] == "meta_atingida":
+            st.success(f"{pm['cor']} **META FUNCIONAL E SATISFAÇÃO ATINGIDAS** — {pm['parecer']}")
+        elif pm["status"] == "alerta_insatisfacao":
+            st.error(f"{pm['cor']} **ALERTA DE PERCEPÇÃO NEGATIVA** — {pm['parecer']}")
+        elif pm["status"] == "evoluindo_insatisfeito":
+            st.warning(f"{pm['cor']} **EVOLUÇÃO EM CURSO (PASS AINDA NEGATIVO)** — {pm['parecer']}")
+        else:
+            st.info(f"{pm['cor']} **CONSTRUÇÃO FUNCIONAL** — {pm['parecer']}")
+        st.caption(f"📚 Referências: {pm['referencia']}")
+        st.markdown("---")
+
+    # ==== 2. ESTAGNAÇÃO — DOR ====
+    titulo("📉 Análise de Estagnação — Dor (EVA)")
+    est = insights.get("estagnacao")
+
+    if insights["sessoes_registradas"] == 0:
+        st.info("ℹ️ Paciente ainda sem sessões de check-in registradas. Os cálculos longitudinais aparecerão após os primeiros atendimentos.")
+    elif est is None or est.get("status") == "insuficiente":
+        n_atual = est["sessoes_analisadas"] if est else insights["sessoes_registradas"]
+        st.info(f"⏳ Aguardando dados: análise de estagnação requer ≥ {SESSOES_MINIMAS_ESTAGNACAO} sessões (há {n_atual}).")
     elif est["status"] == "estagnacao":
         st.warning(f"🟡 **ESTAGNAÇÃO DETECTADA**\n\n{est['racional']}")
         st.caption(f"📚 Referência: {est['referencia']}")
@@ -584,9 +771,10 @@ def renderizar_insights(insights: dict, cores: dict):
         st.error(f"🔴 **PIORA CLÍNICA**\n\n{est['racional']}")
         st.caption(f"📚 Referência: {est['referencia']}")
 
-    # ==== LSI ====
-    if insights["lsi"] and insights["lsi"].get("valor") is not None:
-        st.markdown(f"<h4 style='color: {cores['primaria']};'>⚖️ Limb Symmetry Index (LSI)</h4>", unsafe_allow_html=True)
+    # ==== 3. LSI ====
+    if insights.get("lsi") and insights["lsi"].get("valor") is not None:
+        st.markdown("---")
+        titulo("⚖️ Limb Symmetry Index (LSI — Força Muscular)")
         lsi_data = insights["lsi"]
 
         if lsi_data["classificacao"] == "alta_funcional":
@@ -598,17 +786,20 @@ def renderizar_insights(insights: dict, cores: dict):
 
         st.caption(f"📚 Referência: {lsi_data['referencia']}")
 
-    # ==== BANDEIRAS ====
-    st.markdown(f"<h4 style='color: {cores['primaria']};'>🚩 Bandeiras Clínicas Ativas</h4>", unsafe_allow_html=True)
+    # ==== 4. BANDEIRAS ====
+    st.markdown("---")
+    titulo("🚩 Bandeiras Clínicas Ativas (Triagem Biopsicossocial)")
 
     if not insights["bandeiras"]:
-        st.success("✅ Nenhuma bandeira clínica ativa. Perfil de baixo risco.")
+        st.success("✅ Nenhuma bandeira clínica ativa detectada. Perfil de baixo risco biopsicossocial.")
     else:
         for b in insights["bandeiras"]:
             if b["tipo"] == "vermelha":
                 st.error(f"{b['cor']} **BANDEIRA VERMELHA** — {b['gatilho']}\n\n_{b['descricao']}_\n\n**Ação:** {b['acao']}")
             elif b["tipo"] == "amarela":
                 st.warning(f"{b['cor']} **BANDEIRA AMARELA** — {b['gatilho']}\n\n_{b['descricao']}_\n\n**Ação:** {b['acao']}")
+            elif b["tipo"] == "negra":
+                st.error(f"{b['cor']} **BANDEIRA NEGRA (SISTÊMICA/LEGAL)** — {b['gatilho']}\n\n_{b['descricao']}_\n\n**Ação:** {b['acao']}")
             else:
                 st.info(f"{b['cor']} **BANDEIRA {b['tipo'].upper()}** — {b['gatilho']}\n\n_{b['descricao']}_\n\n**Ação:** {b['acao']}")
             st.caption(f"📚 Referência: {b['referencia']}")
