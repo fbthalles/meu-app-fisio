@@ -3,7 +3,8 @@ GENUA | Gerador de Laudo Clínico Avançado (HTML Visual Dark Apple-Style + PDF 
 ===================================================================================
 Exporta:
  - gerar_laudo_html(): Laudo interativo moderno em HTML5/CSS3 (Dark Mode + cores vivas)
-   com gráficos em 300 DPI (Base64) e suporte nativo a impressão PDF (Ctrl+P).
+   com gráficos em 300 DPI (Base64), Comparativo Bilateral (Direito x Esquerdo),
+   Metas PBE (PSFS, SANE, GROC, PASS) e suporte nativo a impressão PDF (Ctrl+P / Cmd+P).
  - gerar_laudo(): Gerador em bytes via FPDF2 para retrocompatibilidade.
 
 Dependências: fpdf2, matplotlib, numpy, io, base64, datetime
@@ -68,6 +69,39 @@ def _esc(texto):
     return html.escape(str(texto))
 
 
+def _extrair_par_dir_esq(dados_aval: dict, chave_dir: str, chave_esq: str, chave_legada: str = None):
+    """
+    Retorna a tupla (valor_direito, valor_esquerdo) lendo primeiro as chaves bilaterais
+    novas e fazendo fallback inteligente para strings legadas do tipo 'Dir:X Esq:Y'.
+    """
+    val_d = dados_aval.get(chave_dir)
+    val_e = dados_aval.get(chave_esq)
+
+    if val_d not in (None, "") or val_e not in (None, ""):
+        return (str(val_d) if val_d not in (None, "") else "-", str(val_e) if val_e not in (None, "") else "-")
+
+    if chave_legada and dados_aval.get(chave_legada) not in (None, ""):
+        bruto = str(dados_aval.get(chave_legada)).strip()
+        if "Dir:" in bruto and "Esq:" in bruto:
+            if "|" in bruto:
+                partes = [p.strip() for p in bruto.split("|")]
+                d_str = partes[0].replace("Dir:", "").strip() if len(partes) > 0 else "-"
+                e_str = partes[1].replace("Esq:", "").strip() if len(partes) > 1 else "-"
+                return d_str, e_str
+            else:
+                partes = bruto.split()
+                d_str, e_str = "-", "-"
+                for p in partes:
+                    if p.startswith("Dir:"):
+                        d_str = p.replace("Dir:", "").strip()
+                    elif p.startswith("Esq:"):
+                        e_str = p.replace("Esq:", "").strip()
+                return d_str, e_str
+        return bruto, bruto
+
+    return "-", "-"
+
+
 def _fig_to_bytes(fig, dpi=300, facecolor='white'):
     """Converte figura Matplotlib em buffer BytesIO PNG a 300 DPI."""
     buf = io.BytesIO()
@@ -122,7 +156,7 @@ def _normalizar_entradas(dados_aval, historico):
 # ============================================================
 def _gerar_grafico_dor_b64(hist, dor_inicial):
     """Gera gráfico de evolução da dor com estética Dark Mode e linha MCID."""
-    datas = [str(ev.get('Data', ''))[:5] for ev in hist]
+    datas = [str(ev.get('Data', ''))[:10] for ev in hist]
     dores = [_safe_float(ev.get('Dor', 0)) for ev in hist]
     x_idx = np.arange(len(datas))
 
@@ -168,7 +202,7 @@ def _gerar_grafico_dor_b64(hist, dor_inicial):
 
 def _gerar_grafico_correlacao_b64(hist):
     """Gera gráfico cruzado Dor vs Função e retorna (base64_str, dict_testes_evolucao)."""
-    datas = [str(ev.get('Data', ''))[:5] for ev in hist]
+    datas = [str(ev.get('Data', ''))[:10] for ev in hist]
     dores = [_safe_float(ev.get('Dor', 0)) for ev in hist]
     x_idx = np.arange(len(datas))
 
@@ -260,8 +294,22 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
 
     dx_texto = dados_aval.get('Diagnostico_Clinico', 'Não informado')
     idade = dados_aval.get('Idade', '-')
+    lado_acom = dados_aval.get('Lado_Acometido', 'Não especificado')
     fen_label = fenotipo.get('label', 'Musculoesquelético Geral') if isinstance(fenotipo, dict) else 'Musculoesquelético Geral'
     tempo_esp = fenotipo.get('tempo_esperado_semanas', '-') if isinstance(fenotipo, dict) else '-'
+
+    # Extração de Objetivo Funcional (PSFS + SANE + GROC + PASS)
+    obj_paciente = dados_aval.get('Objetivo_Paciente', 'Retorno à função sem dor')
+    psfs_base = int(_safe_float(dados_aval.get('PSFS_Baseline', 3), 3.0))
+    sane_base = _safe_float(dados_aval.get('SANE_Baseline_Pct', 30.0), 30.0)
+    sane_atual = _safe_float(hist[-1].get('SANE_Pct', sane_base), sane_base) if hist else sane_base
+    dist_meta_atual = max(0.0, 100.0 - sane_atual)
+    ganho_sane = sane_atual - sane_base
+
+    groc_atual_str = hist[-1].get('GROC_Label', 'Não registrado') if hist else 'Não registrado'
+    groc_score_val = hist[-1].get('GROC_Score', None) if hist else None
+    pass_atual_str = hist[-1].get('PASS_Satisfacao', 'Em evolução') if hist else 'Em evolução'
+    pass_atingido = bool(hist[-1].get('PASS_Atingido', False)) if hist else False
 
     # Semáforo KPI Dor
     if delta_dor >= 2:
@@ -280,6 +328,14 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         cor_flex_hex, badge_flex = "#FF4D6D", f"Variação de {delta_flex:.0f}° de ADM"
     else:
         cor_flex_hex, badge_flex = "#00E5FF", "Amplitude mantida"
+
+    # Semáforo KPI Meta / SANE
+    if sane_atual >= 85:
+        cor_meta_hex, badge_meta = "#10B981", f"Faltam {dist_meta_atual:.0f}% (Δ {ganho_sane:+.0f}% vs Marco Zero)"
+    elif sane_atual >= 50:
+        cor_meta_hex, badge_meta = "#00E5FF", f"Faltam {dist_meta_atual:.0f}% (Δ {ganho_sane:+.0f}% vs Marco Zero)"
+    else:
+        cor_meta_hex, badge_meta = "#F59E0B", f"Faltam {dist_meta_atual:.0f}% (Inicial: {sane_base:.0f}%)"
 
     periodo_str = f"{str(hist[0].get('Data', '-'))[:10]} até {str(hist[-1].get('Data', '-'))[:10]}" if hist else "Sem check-ins"
 
@@ -353,6 +409,54 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             </div>
             """
 
+    # Card PBE: Objetivo Funcional (PSFS / SANE) & Satisfação do Paciente (GROC / PASS)
+    cor_pass_badge = "#10B981" if pass_atingido else "#F59E0B"
+    txt_pass_curto = "SATISFEITO (PASS POSITIVO)" if pass_atingido else "EM EVOLUÇÃO (PASS NEGATIVO)"
+    pct_sane_clamp = max(0.0, min(100.0, sane_atual))
+
+    html_metas_pbe = f"""
+    <div class="card">
+        <div class="section-tag">DESFECHOS CENTRADOS NO PACIENTE (PBE)</div>
+        <h3>Objetivo Funcional (PSFS/SANE), Mudança Global (GROC) & Satisfação (PASS)</h3>
+        <div class="alert-box" style="border-left-color: {cor_meta_hex}; margin-bottom: 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <span style="font-size:11px; color:#94A3B8; text-transform:uppercase; font-weight:700;">Objetivo Principal do Paciente (Marco Zero)</span>
+                    <div style="font-size:16px; font-weight:800; color:#FFFFFF; margin-top:2px;">🎯 {_esc(obj_paciente)}</div>
+                </div>
+                <span class="badge-pill" style="background:{cor_pass_badge}22; color:{cor_pass_badge}; border:1px solid {cor_pass_badge};">
+                    {txt_pass_curto}
+                </span>
+            </div>
+            <div class="progress-track" style="margin:12px 0 8px 0; height:10px;">
+                <div class="progress-fill" style="width:{pct_sane_clamp:.1f}%; background:{cor_meta_hex};"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#CBD5E1; flex-wrap:wrap; gap:8px;">
+                <span><strong>Marco Zero (SANE Inicial):</strong> {sane_base:.0f}% (PSFS: {psfs_base}/10)</span>
+                <span><strong>Progresso Atual (SANE):</strong> <strong style="color:{cor_meta_hex};">{sane_atual:.0f}%</strong> ({ganho_sane:+.0f}%)</span>
+                <span><strong>Distância Restante da Meta:</strong> {dist_meta_atual:.0f}%</span>
+            </div>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; font-size:12.5px;">
+            <div class="meta-box">
+                <span class="meta-label">Percepção Global de Mudança (GROC)</span>
+                <span class="meta-value" style="color:#00E5FF;">{_esc(groc_atual_str)}</span>
+                <small style="display:block; color:#94A3B8; margin-top:2px;">MCID ≥ +3 pts (Kamper et al., JOSPT 2009)</small>
+            </div>
+            <div class="meta-box">
+                <span class="meta-label">Estado de Sintoma Aceitável (PASS)</span>
+                <span class="meta-value" style="color:{cor_pass_badge};">{_esc(pass_atual_str)}</span>
+                <small style="display:block; color:#94A3B8; margin-top:2px;">Referência: Tubach et al., 2005</small>
+            </div>
+            <div class="meta-box">
+                <span class="meta-label">Escala Funcional Específica (PSFS)</span>
+                <span class="meta-value">{psfs_base}/10 pts (Baseline)</span>
+                <small style="display:block; color:#94A3B8; margin-top:2px;">MCID: 2,0 pts (Stratford et al., 1995)</small>
+            </div>
+        </div>
+    </div>
+    """
+
     # Construção dos Cards de PROMs
     proms_config = [
         ("LEFS", "Funcionalidade Geral MMII", dados_aval.get("LEFS_Pct", 0), "%", "MCID: 9 pts (Binkley 1999)", dados_aval.get("Interpretacao_LEFS", "-")),
@@ -389,7 +493,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     if not proms_cards_html:
         proms_cards_html = "<p style='color:#94A3B8; font-size:13px;'>Nenhum questionário PROM (> 0) registrado na avaliação inicial.</p>"
 
-    # Seção de Insights da IA Clínica (Estagnação + LSI + Bandeiras)
+    # Seção de Insights da IA Clínica (LSI + Percepção + Estagnação + Bandeiras)
     insights_html = ""
     if isinstance(insights, dict) and insights:
         blocos_ia = ""
@@ -445,6 +549,8 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                     c_b = "#FF4D6D"
                 elif 'AMAREL' in tipo_b or 'YELLOW' in tipo_b:
                     c_b = "#F59E0B"
+                elif 'NEGR' in tipo_b or 'BLACK' in tipo_b:
+                    c_b = "#94A3B8"
                 else:
                     c_b = "#00E5FF"
                 blocos_ia += f"""
@@ -470,9 +576,55 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
         """
 
-    # Tabela das Últimas 5 Sessões
+    # Tabela Comparativa Bilateral do Exame Físico & Funcional (Direito x Esquerdo)
+    der_d, der_e = _extrair_par_dir_esq(dados_aval, "Derrame_Dir", "Derrame_Esq", "Derrame")
+    ali_d, ali_e = _extrair_par_dir_esq(dados_aval, "Alinhamento_Dir", "Alinhamento_Esq", "Alinhamento")
+    trof_d, trof_e = _extrair_par_dir_esq(dados_aval, "Trofismo_Dir", "Trofismo_Esq", "Trofismo")
+    per_d_cm = dados_aval.get("Perimetria_Dir_cm")
+    per_e_cm = dados_aval.get("Perimetria_Esq_cm")
+    if per_d_cm or per_e_cm:
+        per_d_str = f"{per_d_cm} cm" if per_d_cm else "-"
+        per_e_str = f"{per_e_cm} cm" if per_e_cm else "-"
+    else:
+        per_d_str, per_e_str = _extrair_par_dir_esq(dados_aval, "Perimetria_Dir_cm", "Perimetria_Esq_cm", "Perimetria")
+
+    palp_d, palp_e = _extrair_par_dir_esq(dados_aval, "Palpacao_Dir", "Palpacao_Esq", "Palpacao")
+    din_d, din_e = _extrair_par_dir_esq(dados_aval, "Dinamometria_Dir", "Dinamometria_Esq")
+    oxf_d, oxf_e = _extrair_par_dir_esq(dados_aval, "Forca_Geral_Dir", "Forca_Geral_Esq")
+    adm_fl_d, adm_fl_e = _extrair_par_dir_esq(dados_aval, "ADM_Flex_Dir", "ADM_Flex_Esq", "ADM_Joelho_Flexao")
+    adm_ex_d, adm_ex_e = _extrair_par_dir_esq(dados_aval, "ADM_Ext_Dir", "ADM_Ext_Esq", "ADM_Joelho_Extensao")
+    lng_d, lng_e = _extrair_par_dir_esq(dados_aval, "Lunge_Dir", "Lunge_Esq", "Lunge_Test")
+    tlig_d, tlig_e = _extrair_par_dir_esq(dados_aval, "Testes_Ligamentares_Dir", "Testes_Ligamentares_Esq", "Testes_Ligamentares")
+    tmen_d, tmen_e = _extrair_par_dir_esq(dados_aval, "Testes_Meniscais_Dir", "Testes_Meniscais_Esq", "Testes_Meniscais")
+    tpat_d, tpat_e = _extrair_par_dir_esq(dados_aval, "Testes_Femoropatelar_Dir", "Testes_Femoropatelar_Esq", "Testes_Femoropatelar")
+
+    pares_bilaterais = [
+        ("Derrame Articular (Tecla/Onda)", der_d, der_e),
+        ("Alinhamento Estático", ali_d, ali_e),
+        ("Trofismo Muscular", trof_d, trof_e),
+        ("Perimetria de Coxa (10 cm supra)", per_d_str, per_e_str),
+        ("Palpação Dolorosa", palp_d, palp_e),
+        ("Força Manual (Oxford 0-5)", oxf_d, oxf_e),
+        ("Dinamometria Isométrica (kgf)", din_d, din_e),
+        ("ADM Flexão de Joelho (°)", adm_fl_d, adm_fl_e),
+        ("ADM Extensão Terminal (°)", adm_ex_d, adm_ex_e),
+        ("Lunge Test — Dorsiflexão (cm)", lng_d, lng_e),
+        ("Testes Ligamentares (+)", tlig_d, tlig_e),
+        ("Testes Meniscais (+)", tmen_d, tmen_e),
+        ("Testes Femoropatelares / Tendão (+)", tpat_d, tpat_e),
+    ]
+
+    linhas_bilaterais_html = "".join([
+        f"<tr><td><strong>{_esc(param)}</strong></td><td style='color:#00E5FF;'>{_esc(vd)}</td><td style='color:#10B981;'>{_esc(ve)}</td></tr>"
+        for param, vd, ve in pares_bilaterais
+    ])
+
+    # Tabela das Últimas 5 Sessões (Incluindo SANE, GROC e PASS)
     linhas_sessoes = ""
     for ev in hist[-5:]:
+        sane_ev = f"{_safe_float(ev.get('SANE_Pct'), 0):.0f}%" if ev.get('SANE_Pct') is not None else "-"
+        groc_ev = f"{int(_safe_float(ev.get('GROC_Score'), 0)):+d}" if ev.get('GROC_Score') is not None else "-"
+        pass_ev = "Sim 👍" if ev.get('PASS_Atingido') is True else ("Não" if ev.get('PASS_Atingido') is False else "-")
         linhas_sessoes += f"""
         <tr>
             <td><strong>{_esc(str(ev.get('Data', '-'))[:10])}</strong></td>
@@ -480,20 +632,23 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             <td>{_esc(ev.get('Flexao', '-'))}°</td>
             <td>{_esc(ev.get('Extensao', '-'))}</td>
             <td>{_esc(ev.get('Inchaço', ev.get('Inchaco', '-')))}</td>
-            <td>{_esc(ev.get('Sono', '-'))}</td>
+            <td style="color:#10B981; font-weight:700;">{_esc(sane_ev)}</td>
+            <td>{_esc(groc_ev)}</td>
+            <td>{_esc(pass_ev)}</td>
         </tr>
         """
     if not linhas_sessoes:
-        linhas_sessoes = "<tr><td colspan='6' style='text-align:center; color:#94A3B8;'>Nenhuma sessão de check-in registrada.</td></tr>"
+        linhas_sessoes = "<tr><td colspan='8' style='text-align:center; color:#94A3B8;'>Nenhuma sessão de check-in registrada.</td></tr>"
 
-    # Dados da Avaliação Inicial
+    # Dados Gerais da Anamnese & Exames
     campos_aval = [
         ("Queixa Principal (QP)", dados_aval.get("QP", "-")),
-        ("Classificação da Dor", dados_aval.get("Class_Dor", "-")),
-        ("Derrame Articular", dados_aval.get("Derrame", "-")),
+        ("Lado Acometido Principal", lado_acom),
+        ("Classificação / Origem da Dor", f"{dados_aval.get('Class_Dor', '-')} ({dados_aval.get('Origem_Dor', '-')})"),
+        ("Padrão de Marcha Global", dados_aval.get("Marcha", "-")),
         ("Comorbidades", dados_aval.get("Comorbidades", "-")),
-        ("Alinhamento / Biomecânica", dados_aval.get("Alinhamento", "-")),
         ("Exames Apresentados", dados_aval.get("Exames_Apresentados", "-")),
+        ("Laudo / Achados de Imagem", dados_aval.get("Laudo_Exames", "-")),
     ]
     aval_items_html = "".join([
         f"<div class='kv-row'><span class='kv-label'>{_esc(k)}</span><span class='kv-val'>{_esc(v)}</span></div>"
@@ -538,7 +693,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         line-height: 1.5;
     }}
     .container {{
-        max-width: 1020px;
+        max-width: 1040px;
         margin: 0 auto;
     }}
     .top-bar {{
@@ -585,15 +740,15 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     }}
     .hero-title {{
         margin: 4px 0 0 0;
-        font-size: 26px;
+        font-size: 25px;
         font-weight: 800;
         letter-spacing: -0.5px;
         color: #FFFFFF;
     }}
     .patient-meta {{
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 14px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
     }}
     .meta-box {{
         background: rgba(15, 23, 42, 0.55);
@@ -602,27 +757,27 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         border-radius: 12px;
     }}
     .meta-label {{
-        font-size: 11px;
+        font-size: 10.5px;
         color: var(--text-muted);
         text-transform: uppercase;
         display: block;
     }}
     .meta-value {{
-        font-size: 14.5px;
+        font-size: 14px;
         font-weight: 700;
         color: #FFFFFF;
     }}
     .kpi-grid {{
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
         margin-bottom: 22px;
     }}
     .kpi-card {{
         background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: 16px;
-        padding: 20px;
+        padding: 18px;
         position: relative;
         overflow: hidden;
     }}
@@ -634,19 +789,19 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         height: 4px;
     }}
     .kpi-label {{
-        font-size: 11px;
+        font-size: 10.5px;
         font-weight: 700;
         letter-spacing: 0.8px;
         color: var(--text-muted);
         text-transform: uppercase;
     }}
     .kpi-val {{
-        font-size: 30px;
+        font-size: 26px;
         font-weight: 800;
         margin: 8px 0 6px 0;
     }}
     .kpi-sub {{
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 600;
         color: #CBD5E1;
     }}
@@ -752,20 +907,20 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     .modern-table {{
         width: 100%;
         border-collapse: collapse;
-        font-size: 13px;
+        font-size: 12.5px;
     }}
     .modern-table th {{
         text-align: left;
-        padding: 11px 12px;
+        padding: 10px 12px;
         background: #0A2540;
         color: var(--cyan);
-        font-size: 11.5px;
+        font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.6px;
         border-bottom: 2px solid var(--cyan);
     }}
     .modern-table td {{
-        padding: 10px 12px;
+        padding: 9px 12px;
         border-bottom: 1px solid var(--border);
         color: #E2E8F0;
     }}
@@ -774,12 +929,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         justify-content: space-between;
         padding: 9px 0;
         border-bottom: 1px solid rgba(255,255,255,0.07);
-        font-size: 13px;
+        font-size: 12.5px;
+        gap: 12px;
     }}
     .kv-label {{
         color: var(--cyan);
         font-weight: 600;
-        min-width: 190px;
+        min-width: 180px;
     }}
     .kv-val {{
         color: #F8FAFC;
@@ -805,7 +961,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         .card, .hero-card, .kpi-card {{ break-inside: avoid; }}
     }}
     @media (max-width: 768px) {{
-        .kpi-grid {{ grid-template-columns: 1fr; }}
+        .kpi-grid {{ grid-template-columns: 1fr 1fr; }}
         .grid-2 {{ grid-template-columns: 1fr; }}
     }}
 </style>
@@ -834,8 +990,8 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                 <span class="meta-value">{_esc(paciente_nome)}</span>
             </div>
             <div class="meta-box">
-                <span class="meta-label">Idade</span>
-                <span class="meta-value">{_esc(idade)} anos</span>
+                <span class="meta-label">Idade / Lado Acometido</span>
+                <span class="meta-value">{_esc(idade)} anos • {_esc(lado_acom)}</span>
             </div>
             <div class="meta-box">
                 <span class="meta-label">Diagnóstico Clínico</span>
@@ -862,6 +1018,12 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             <div class="kpi-sub">{_esc(badge_flex)} (Inicial: {flex_inicial:.0f}°)</div>
         </div>
         <div class="kpi-card">
+            <div class="kpi-bar" style="background:{cor_meta_hex};"></div>
+            <div class="kpi-label">Progresso da Meta (SANE)</div>
+            <div class="kpi-val" style="color:{cor_meta_hex};">{sane_atual:.0f}%</div>
+            <div class="kpi-sub">{_esc(badge_meta)}</div>
+        </div>
+        <div class="kpi-card">
             <div class="kpi-bar" style="background:var(--indigo);"></div>
             <div class="kpi-label">Volume de Reabilitação</div>
             <div class="kpi-val" style="color:var(--indigo);">{n_sessoes} sessões</div>
@@ -869,9 +1031,27 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
     </div>
 
+    {html_metas_pbe}
     {html_graficos}
     {insights_html}
     {html_tabela_func}
+
+    <div class="card">
+        <div class="section-tag">AVALIAÇÃO FÍSICA E FUNCIONAL BILATERAL (MARCO ZERO)</div>
+        <h3>Comparativo Lado a Lado: Membro Direito × Membro Esquerdo</h3>
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Parâmetro Clínico / Biomecânico</th>
+                    <th>🦵 Membro Direito</th>
+                    <th>🦵 Membro Esquerdo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {linhas_bilaterais_html}
+            </tbody>
+        </table>
+    </div>
 
     <div class="grid-2">
         <div class="card">
@@ -880,8 +1060,8 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             {proms_cards_html}
         </div>
         <div class="card">
-            <div class="section-tag">LINHA DE BASE</div>
-            <h3>Síntese da Avaliação Inicial</h3>
+            <div class="section-tag">CONTEXTO CLÍNICO</div>
+            <h3>Síntese da Anamnese & Exames</h3>
             {aval_items_html}
         </div>
     </div>
@@ -897,7 +1077,9 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                     <th>Flexão</th>
                     <th>Extensão</th>
                     <th>Edema / Inchaço</th>
-                    <th>Qualidade do Sono</th>
+                    <th>Meta (SANE)</th>
+                    <th>GROC</th>
+                    <th>Satisfação (PASS)</th>
                 </tr>
             </thead>
             <tbody>{linhas_sessoes}</tbody>
@@ -905,10 +1087,10 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     </div>
 
     <div class="signature-box">
-        <p style="max-width:720px; margin:0 auto;">
+        <p style="max-width:760px; margin:0 auto;">
             Relatório analítico processado pela plataforma <strong>GENUA Inteligência Clínica</strong>.
-            Os pontos de corte de significância clínica (MCID e LSI) obedecem a diretrizes científicas internacionais revisadas por pares
-            (Salaffi 2004; Grindem 2016; Binkley 1999; Roos 2003). A conduta final é prerrogativa exclusiva do fisioterapeuta responsável.
+            Os pontos de corte de significância clínica (MCID, LSI, GROC, PASS e PSFS/SANE) obedecem a diretrizes científicas internacionais revisadas por pares
+            (Salaffi 2004; Grindem 2016; Kamper 2009; Tubach 2005; Shelbourne 2009; Stratford 1995). A conduta final é prerrogativa exclusiva do fisioterapeuta responsável.
         </p>
         <div class="sig-line"></div>
         <div style="color:#FFFFFF; font-weight:700; font-size:14px;">Fisioterapeuta Responsável</div>
@@ -964,7 +1146,11 @@ def gerar_laudo(paciente_nome, dados_aval=None, historico=None, insights=None, f
     pdf.set_font('Arial', 'B', 10)
     pdf.set_text_color(*PRETO_TEXTO)
     dx = dados_aval.get('Diagnostico_Clinico', '-')
-    pdf.cell(0, 6, f'Diagnostico: {_limpar_texto(dx)} | Sessoes: {len(hist)}', 0, 1, 'L')
+    lado = dados_aval.get('Lado_Acometido', '-')
+    obj = dados_aval.get('Objetivo_Paciente', '-')
+    pdf.cell(0, 6, f'Diagnostico: {_limpar_texto(dx)} | Lado: {_limpar_texto(lado)} | Sessoes: {len(hist)}', 0, 1, 'L')
+    pdf.set_font('Arial', '', 9)
+    pdf.cell(0, 6, f'Objetivo Funcional (PSFS): {_limpar_texto(obj)}', 0, 1, 'L')
 
     try:
         saida = pdf.output(dest='S')
