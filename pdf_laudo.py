@@ -1,17 +1,20 @@
 """
-GENUA | Gerador de Laudo Clínico Avançado (HTML Visual Dark Apple-Style + PDF FPDF)
-===================================================================================
+GENUA | Gerador de Laudo Clínico Executivo (Clean Light GENUA + Interativo Editável)
+====================================================================================
 Exporta:
- - gerar_laudo_html(): Laudo interativo moderno em HTML5/CSS3 (Dark Mode + cores vivas)
-   com gráficos em 300 DPI (Base64), Comparativo Bilateral (Direito x Esquerdo),
-   Metas PBE (PSFS, SANE, GROC, PASS) e suporte nativo a impressão PDF (Ctrl+P / Cmd+P).
+ - gerar_laudo_html(): Laudo executivo Clean Light nas cores oficiais GENUA (#103E55 / #2E8B9A)
+   com Resumo Executivo Semafórico, Gráficos Clean em 300 DPI, Velocímetro SVG de ADM com
+   evolução por sessões, Filtro Estrito de PROM preenchido, Cards de Força Bilateral (D x E)
+   e Conclusões Automáticas PBE 100% Editáveis ao clique (contenteditable) antes de imprimir.
  - gerar_laudo(): Gerador em bytes via FPDF2 para retrocompatibilidade.
 
-Dependências: fpdf2, matplotlib, numpy, io, base64, datetime
+Dependências: fpdf2, matplotlib, numpy, io, os, base64, datetime
 """
 import io
+import os
 import base64
 import html
+import math
 from datetime import datetime
 import matplotlib
 matplotlib.use('Agg')
@@ -21,32 +24,33 @@ from fpdf import FPDF
 
 
 # ============================================================
-# PALETA DE CORES GENUA + CORES VIVAS
+# PALETA DE CORES OFICIAL GENUA (CLEAN LIGHT CLINICAL DESIGN)
 # ============================================================
 AZUL_PROFUNDO = (10, 37, 64)
-AZUL_GENUA = (16, 62, 85)
-TEAL_GENUA = (57, 142, 155)
+AZUL_GENUA = (16, 62, 85)       # #103E55 (Primária GENUA)
+TEAL_GENUA = (46, 139, 154)     # #2E8B9A (Secundária GENUA)
 TEAL_VIVO = (0, 180, 197)
-CINZA_GELO = (244, 247, 249)
-VERDE_VIVO = (16, 185, 129)
-VERMELHO_VIVO = (239, 68, 68)
-AMBAR_VIVO = (245, 158, 11)
+CINZA_GELO = (245, 245, 247)
+VERDE_VIVO = (22, 163, 74)      # #16A34A
+VERMELHO_VIVO = (220, 38, 38)   # #DC2626
+AMBAR_VIVO = (217, 119, 6)      # #D97706
 INDIGO_VIVO = (99, 102, 241)
-PRETO_TEXTO = (15, 23, 42)
-CINZA_TEXTO = (71, 85, 105)
-CINZA_BORDA = (203, 213, 225)
+PRETO_TEXTO = (29, 29, 31)
+CINZA_TEXTO = (100, 116, 139)
+CINZA_BORDA = (226, 232, 240)
 BRANCO = (255, 255, 255)
 
 
 # ============================================================
-# HELPERS DE SEGURANÇA E CONVERSÃO
+# HELPERS DE SEGURANÇA, CONVERSÃO E PARSERS
 # ============================================================
 def _safe_float(valor, padrao=0.0):
     """Converte qualquer entrada para float de forma segura."""
     if valor is None or valor == "" or valor == "-":
         return padrao
     try:
-        return float(str(valor).replace(",", ".").replace("%", "").strip())
+        s = str(valor).replace(",", ".").replace("%", "").replace("°", "").replace("cm", "").strip()
+        return float(s)
     except (ValueError, TypeError):
         return padrao
 
@@ -64,75 +68,77 @@ def _limpar_texto(texto):
 
 def _esc(texto):
     """Escapa strings para renderização segura em HTML."""
-    if texto is None or texto == "":
-        return "-"
+    if texto is None or str(texto).strip() == "":
+        return "—"
     return html.escape(str(texto))
 
 
-def _extrair_par_dir_esq(dados_aval: dict, chave_dir: str, chave_esq: str, chave_legada: str = None):
+def _carregar_logo_b64():
+    """Tenta carregar a logo oficial da Genua em Base64 para o cabeçalho do PDF."""
+    caminhos = ["logo_genua_novo_v2.png", "logo_genua.png"]
+    for c in caminhos:
+        if os.path.exists(c):
+            try:
+                with open(c, "rb") as f:
+                    return base64.b64encode(f.read()).decode("utf-8")
+            except Exception:
+                pass
+    return None
+
+
+def _extrair_chave_str(texto_bruto, prefixo: str, default: float = 0.0) -> float:
+    """Extrai float de strings como 'Ext:35.0 Flex:20.0' ou 'Dir:125.0 Esq:135.0'."""
+    if texto_bruto is None or texto_bruto == "":
+        return default
+    if isinstance(texto_bruto, (int, float)):
+        return float(texto_bruto)
+    try:
+        partes = str(texto_bruto).replace("|", " ").split()
+        for p in partes:
+            if p.lower().startswith(prefixo.lower() + ":"):
+                val_str = p.split(":", 1)[1].replace("cm", "").replace("°", "").replace(",", ".").strip()
+                return float(val_str)
+    except Exception:
+        pass
+    return default
+
+
+def _extrair_def_extensao_graus(val_ext) -> float:
+    """Converte string ou número de extensão ('Completa (0°)', 'Déficit de -5°', etc.) em graus numéricos."""
+    if val_ext is None or val_ext == "":
+        return 0.0
+    if isinstance(val_ext, (int, float)):
+        return abs(float(val_ext))
+    s = str(val_ext).lower()
+    if "10" in s:
+        return 10.0
+    if "5" in s:
+        return 5.0
+    if "completa" in s or "0" in s:
+        return 0.0
+    return abs(_safe_float(s, 0.0))
+
+
+def _mapa_func_dor_equivalente(resultado_texto):
     """
-    Retorna a tupla (valor_direito, valor_esquerdo) lendo primeiro as chaves bilaterais
-    novas e fazendo fallback inteligente para strings legadas do tipo 'Dir:X Esq:Y'.
+    Mapeia a resposta qualitativa do teste funcional para escala de dificuldade/dor (0 a 10),
+    onde 0 = Sem dor/Normal e 10 = Incapaz (padrão visual de queda da curva de dor nos testes).
     """
-    val_d = dados_aval.get(chave_dir)
-    val_e = dados_aval.get(chave_esq)
-
-    if val_d not in (None, "") or val_e not in (None, ""):
-        return (str(val_d) if val_d not in (None, "") else "-", str(val_e) if val_e not in (None, "") else "-")
-
-    if chave_legada and dados_aval.get(chave_legada) not in (None, ""):
-        bruto = str(dados_aval.get(chave_legada)).strip()
-        if "Dir:" in bruto and "Esq:" in bruto:
-            if "|" in bruto:
-                partes = [p.strip() for p in bruto.split("|")]
-                d_str = partes[0].replace("Dir:", "").strip() if len(partes) > 0 else "-"
-                e_str = partes[1].replace("Esq:", "").strip() if len(partes) > 1 else "-"
-                return d_str, e_str
-            else:
-                partes = bruto.split()
-                d_str, e_str = "-", "-"
-                for p in partes:
-                    if p.startswith("Dir:"):
-                        d_str = p.replace("Dir:", "").strip()
-                    elif p.startswith("Esq:"):
-                        e_str = p.replace("Esq:", "").strip()
-                return d_str, e_str
-        return bruto, bruto
-
-    return "-", "-"
-
-
-def _fig_to_bytes(fig, dpi=300, facecolor='white'):
-    """Converte figura Matplotlib em buffer BytesIO PNG a 300 DPI."""
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight', facecolor=facecolor)
-    buf.seek(0)
-    plt.close(fig)
-    return buf
-
-
-def _fig_to_base64(fig, dpi=300, facecolor='#111827'):
-    """Converte figura Matplotlib em string Base64 para embutir no HTML."""
-    buf = _fig_to_bytes(fig, dpi=dpi, facecolor=facecolor)
-    return base64.b64encode(buf.getvalue()).decode('utf-8')
-
-
-def _mapa_func_score(resultado_texto):
-    """Mapeia string qualitativa do teste funcional para escore numérico (0 a 10)."""
     if not resultado_texto:
         return None
+    s = str(resultado_texto).strip()
     mapa = {
-        "Sem Dor (0)": 10, "Sem Dor": 10,
-        "Dor Leve (1 - 3)": 7, "Dor Leve": 7,
-        "Dor Moderada (4 - 7)": 4, "Dor Moderada": 4,
-        "Dor Grave (8 - 10)": 1, "Dor Grave": 1,
-        "Incapaz (Não realiza)": 0, "Incapaz (Nao realiza)": 0, "Incapaz": 0,
+        "Sem Dor (0)": 0.0, "Sem Dor": 0.0,
+        "Dor Leve (1 - 3)": 2.0, "Dor Leve": 2.0,
+        "Dor Moderada (4 - 7)": 5.5, "Dor Moderada": 5.5,
+        "Dor Grave (8 - 10)": 8.5, "Dor Grave": 8.5,
+        "Incapaz (Não realiza)": 10.0, "Incapaz (Nao realiza)": 10.0, "Incapaz": 10.0,
     }
-    return mapa.get(str(resultado_texto).strip())
+    return mapa.get(s)
 
 
 def _normalizar_entradas(dados_aval, historico):
-    """Garante que dados_aval seja dict e historico seja list[dict] ordenada."""
+    """Garante que dados_aval seja dict e historico seja list[dict] ordenada por data."""
     if hasattr(dados_aval, 'to_dict'):
         records = dados_aval.to_dict('records')
         dados_aval = records[-1] if records else {}
@@ -151,533 +157,803 @@ def _normalizar_entradas(dados_aval, historico):
     return dados_aval, hist_ord
 
 
+def _fig_to_base64(fig, dpi=300, facecolor='#FFFFFF'):
+    """Converte figura Matplotlib em string Base64 PNG a 300 DPI."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight', facecolor=facecolor)
+    buf.seek(0)
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
+
+def _selecionar_marcos_sessoes(hist: list) -> list:
+    """
+    Seleciona até 4 marcos temporais limpos para os gráficos e cards de evolução
+    (ex: Aval., R1, R2, Atual) para manter o laudo limpo mesmo com 20+ sessões.
+    """
+    n = len(hist)
+    if n == 0:
+        return []
+    if n == 1:
+        return [("Aval.", hist[0])]
+    if n == 2:
+        return [("Aval.", hist[0]), ("Atual", hist[-1])]
+    if n == 3:
+        return [("Aval.", hist[0]), ("R1", hist[1]), ("R2 (Atual)", hist[2])]
+    # Para 4 ou mais sessões: início, terço médio, dois terços e última
+    idx1 = max(1, n // 3)
+    idx2 = max(idx1 + 1, (2 * n) // 3)
+    if idx2 >= n - 1:
+        return [("Aval.", hist[0]), ("R1", hist[n // 2]), ("R2 (Atual)", hist[-1])]
+    return [
+        ("Aval.", hist[0]),
+        ("R1", hist[idx1]),
+        ("R2", hist[idx2]),
+        ("Atual", hist[-1]),
+    ]
+
+
 # ============================================================
-# GERADOR DE GRÁFICOS DARK/NEON PARA O LAUDO HTML
+# GERADORES DE GRÁFICOS CLEAN LIGHT GENUA (300 DPI)
 # ============================================================
-def _gerar_grafico_dor_b64(hist, dor_inicial):
-    """Gera gráfico de evolução da dor com estética Dark Mode e linha MCID."""
-    datas = [str(ev.get('Data', ''))[:10] for ev in hist]
-    dores = [_safe_float(ev.get('Dor', 0)) for ev in hist]
-    x_idx = np.arange(len(datas))
+def _gerar_grafico_dor_clean_b64(hist):
+    """Gera gráfico Clean Light de evolução da dor (EVA) com suporte unilateral ou bilateral."""
+    marcos = _selecionar_marcos_sessoes(hist)
+    labels = [m[0] for m in marcos]
+    evs = [m[1] for m in marcos]
+    x_idx = np.arange(len(labels))
 
-    fig, ax = plt.subplots(figsize=(8.5, 3.4))
-    bg_color = '#111827'
-    fig.patch.set_facecolor(bg_color)
-    ax.set_facecolor('#1E293B')
+    fig, ax = plt.subplots(figsize=(8.8, 2.7))
+    fig.patch.set_facecolor('#FFFFFF')
+    ax.set_facecolor('#FFFFFF')
 
-    if dor_inicial >= 2:
-        meta_mcid = max(0.0, dor_inicial - 2.0)
-        ax.axhspan(0, meta_mcid, color='#10B981', alpha=0.14, label='Zona MCID atingida (-2 pts | Salaffi 2004)')
-        ax.axhline(y=meta_mcid, color='#10B981', linestyle='--', linewidth=2, alpha=0.95)
+    tem_bilateral = any(bool(e.get('Registro_Bilateral')) for e in evs)
 
-    ax.fill_between(x_idx, dores, color='#00E5FF', alpha=0.22)
-    ax.plot(x_idx, dores, color='#00E5FF', linewidth=3.2, marker='o', markersize=8,
-            markerfacecolor='#0B0F19', markeredgecolor='#00E5FF', markeredgewidth=2.5,
-            label='Dor (EVA 0-10)', zorder=4)
-
-    for i, v in enumerate(dores):
-        ax.annotate(f'{v:.0f}', (x_idx[i], v), textcoords="offset points",
-                    xytext=(0, 9), ha='center', fontsize=8.5, fontweight='bold', color='#F8FAFC')
+    if tem_bilateral:
+        dores_d = [_safe_float(e.get('Dor_Dir', e.get('Dor', 0))) for e in evs]
+        dores_e = [_safe_float(e.get('Dor_Esq', e.get('Dor', 0))) for e in evs]
+        ax.plot(x_idx, dores_d, color='#103E55', lw=2.6, marker='o', markersize=7, label='EVA Joelho D', zorder=4)
+        ax.plot(x_idx, dores_e, color='#16A34A', lw=2.6, marker='o', markersize=7, label='EVA Joelho E', zorder=4)
+        for i in range(len(x_idx)):
+            ax.annotate(f"{dores_d[i]:.1f}".replace(".", ","), (x_idx[i], dores_d[i]),
+                        textcoords="offset points", xytext=(-10, -14), ha='center',
+                        fontsize=8.5, fontweight='bold', color='#103E55')
+            ax.annotate(f"{dores_e[i]:.1f}".replace(".", ","), (x_idx[i], dores_e[i]),
+                        textcoords="offset points", xytext=(10, 8), ha='center',
+                        fontsize=8.5, fontweight='bold', color='#16A34A')
+    else:
+        dores = [_safe_float(e.get('Dor', 0)) for e in evs]
+        ax.fill_between(x_idx, dores, color='#2E8B9A', alpha=0.08)
+        ax.plot(x_idx, dores, color='#103E55', lw=2.8, marker='o', markersize=7.5,
+                markerfacecolor='#FFFFFF', markeredgecolor='#103E55', markeredgewidth=2.2,
+                label='Dor (EVA 0–10)', zorder=4)
+        for i, v in enumerate(dores):
+            ax.annotate(f"{v:.1f}".replace(".", ","), (x_idx[i], v),
+                        textcoords="offset points", xytext=(0, 9), ha='center',
+                        fontsize=9, fontweight='bold', color='#103E55')
 
     ax.set_xticks(x_idx)
-    ax.set_xticklabels(datas, rotation=25, ha='right', fontsize=8.5, color='#CBD5E1')
-    ax.set_yticks(range(0, 11, 2))
-    ax.set_yticklabels(range(0, 11, 2), fontsize=8.5, color='#CBD5E1')
-    ax.set_ylabel('EVA (0 a 10)', fontweight='bold', fontsize=9.5, color='#00E5FF')
-    ax.set_ylim(-0.6, 11.2)
-    ax.grid(True, axis='y', linestyle=':', color='#334155', alpha=0.8)
+    ax.set_xticklabels(labels, fontsize=9.5, fontweight='bold', color='#475569')
+    ax.set_yticks([0, 5, 10])
+    ax.set_yticklabels(['0', '5', '10'], fontsize=9, color='#64748B')
+    ax.set_ylim(-0.8, 11.2)
+    ax.set_xlim(-0.25, max(1, len(labels) - 1) + 0.25)
+    ax.grid(True, axis='y', linestyle='-', color='#E2E8F0', linewidth=0.9)
+    ax.grid(False, axis='x')
 
-    for spine in ['top', 'right']:
+    for spine in ['top', 'right', 'left']:
         ax.spines[spine].set_visible(False)
-    for spine in ['left', 'bottom']:
-        ax.spines[spine].set_color('#334155')
-
-    leg = ax.legend(loc='upper right', fontsize=8, frameon=True, facecolor='#0B0F19', edgecolor='#334155')
-    for text in leg.get_texts():
-        text.set_color('#F8FAFC')
+    ax.spines['bottom'].set_color('#CBD5E1')
+    ax.tick_params(axis='both', length=0)
 
     fig.tight_layout()
-    return _fig_to_base64(fig, dpi=300, facecolor=bg_color)
+    return _fig_to_base64(fig, dpi=300, facecolor='#FFFFFF')
 
 
-def _gerar_grafico_correlacao_b64(hist):
-    """Gera gráfico cruzado Dor vs Função e retorna (base64_str, dict_testes_evolucao)."""
-    datas = [str(ev.get('Data', ''))[:10] for ev in hist]
-    dores = [_safe_float(ev.get('Dor', 0)) for ev in hist]
-    x_idx = np.arange(len(datas))
-
-    func_scores = []
-    testes_evolucao = {}
-    for ev in hist:
-        testes = ev.get('Testes_Funcionais', {})
-        if isinstance(testes, dict) and testes:
-            scores = []
-            for nome, resultado in testes.items():
-                s = _mapa_func_score(resultado)
-                if s is not None:
-                    scores.append(s)
-                if nome not in testes_evolucao:
-                    testes_evolucao[nome] = []
-                testes_evolucao[nome].append(resultado)
-            func_scores.append(sum(scores) / len(scores) if scores else None)
-        else:
-            func_scores.append(None)
-
-    fig, ax1 = plt.subplots(figsize=(8.5, 3.4))
-    bg_color = '#111827'
-    fig.patch.set_facecolor(bg_color)
-    ax1.set_facecolor('#1E293B')
-
-    ax1.plot(x_idx, dores, color='#FF4D6D', marker='o', markersize=7.5,
-             markerfacecolor='#0B0F19', markeredgecolor='#FF4D6D', markeredgewidth=2,
-             lw=3, label='Dor (EVA 0-10)', zorder=3)
-    ax1.fill_between(x_idx, dores, color='#FF4D6D', alpha=0.14)
-    ax1.set_ylabel('Dor (EVA 0-10)', color='#FF4D6D', fontweight='bold', fontsize=9.5)
-    ax1.set_ylim(-0.6, 11.2)
-    ax1.set_xticks(x_idx)
-    ax1.set_xticklabels(datas, rotation=25, ha='right', fontsize=8.5, color='#CBD5E1')
-    ax1.tick_params(axis='y', colors='#FF4D6D', labelsize=8.5)
-    ax1.grid(True, axis='y', linestyle=':', color='#334155', alpha=0.8)
-
-    ax2 = ax1.twinx()
-    func_clean = [v if v is not None else np.nan for v in func_scores]
-    func_arr = np.array(func_clean, dtype=float)
-    mask = ~np.isnan(func_arr)
-
-    if mask.sum() >= 2:
-        func_interp = np.interp(range(len(func_arr)), np.where(mask)[0], func_arr[mask])
-        ax2.plot(x_idx, func_interp, color='#10B981', marker='s', markersize=7.5,
-                 markerfacecolor='#0B0F19', markeredgecolor='#10B981', markeredgewidth=2,
-                 lw=3, linestyle='-', label='Capacidade Funcional (0-10)', zorder=4)
-        ax2.fill_between(x_idx, func_interp, color='#10B981', alpha=0.14)
-
-    ax2.set_ylabel('Score Funcional (0-10)', color='#10B981', fontweight='bold', fontsize=9.5)
-    ax2.set_ylim(-0.6, 11.2)
-    ax2.tick_params(axis='y', colors='#10B981', labelsize=8.5)
-
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    leg = ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper center',
-                     bbox_to_anchor=(0.5, 1.15), ncol=2, fontsize=8.5,
-                     frameon=True, facecolor='#0B0F19', edgecolor='#334155')
-    for text in leg.get_texts():
-        text.set_color('#F8FAFC')
-
-    ax1.spines['top'].set_visible(False)
-    ax2.spines['top'].set_visible(False)
-    ax1.spines['bottom'].set_color('#334155')
-    ax1.spines['left'].set_color('#FF4D6D')
-    ax2.spines['right'].set_color('#10B981')
-
-    fig.tight_layout()
-    return _fig_to_base64(fig, dpi=300, facecolor=bg_color), testes_evolucao
-
-
-# ============================================================
-# FUNÇÃO 1: gerar_laudo_html() — CHAMADA PELO PAINEL ANALÍTICO
-# ============================================================
-def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=None, fenotipo=None, *args, **kwargs):
+def _gerar_grafico_testes_clean_b64(hist):
     """
-    Gera o Laudo Clínico Visual em HTML5/CSS3 (Dark Apple-Style + Cores Vivas)
-    pronto para pré-visualização no Streamlit e exportação para PDF via navegador.
+    Gera gráfico Clean Light de evolução dos Testes Funcionais Específicos
+    e retorna (b64_img, lista_conclusoes_testes, qtd_testes_melhoraram, total_testes).
     """
-    dados_aval, hist = _normalizar_entradas(dados_aval, historico)
-    n_sessoes = len(hist)
+    marcos = _selecionar_marcos_sessoes(hist)
+    labels = [m[0] for m in marcos]
+    evs = [m[1] for m in marcos]
+    x_idx = np.arange(len(labels))
 
-    dor_inicial = _safe_float(hist[0].get('Dor', 0)) if hist else 0.0
-    dor_atual = _safe_float(hist[-1].get('Dor', 0)) if hist else 0.0
-    delta_dor = dor_inicial - dor_atual
+    # Coleta todos os testes presentes
+    nomes_testes = []
+    for e in hist:
+        tf = e.get('Testes_Funcionais', {})
+        if isinstance(tf, dict):
+            for k in tf.keys():
+                if k not in nomes_testes:
+                    nomes_testes.append(k)
 
-    flex_inicial = _safe_float(hist[0].get('Flexao', 0)) if hist else 0.0
-    flex_atual = _safe_float(hist[-1].get('Flexao', 0)) if hist else 0.0
-    delta_flex = flex_atual - flex_inicial
+    cores_linhas = ['#103E55', '#16A34A', '#D97706', '#2E8B9A', '#6366F1']
+    fig, ax = plt.subplots(figsize=(8.8, 2.8))
+    fig.patch.set_facecolor('#FFFFFF')
+    ax.set_facecolor('#FFFFFF')
 
-    dx_texto = dados_aval.get('Diagnostico_Clinico', 'Não informado')
-    idade = dados_aval.get('Idade', '-')
-    lado_acom = dados_aval.get('Lado_Acometido', 'Não especificado')
-    fen_label = fenotipo.get('label', 'Musculoesquelético Geral') if isinstance(fenotipo, dict) else 'Musculoesquelético Geral'
-    tempo_esp = fenotipo.get('tempo_esperado_semanas', '-') if isinstance(fenotipo, dict) else '-'
+    conclusoes_testes = []
+    melhoraram = 0
 
-    # Extração de Objetivo Funcional (PSFS + SANE + GROC + PASS)
-    obj_paciente = dados_aval.get('Objetivo_Paciente', 'Retorno à função sem dor')
-    psfs_base = int(_safe_float(dados_aval.get('PSFS_Baseline', 3), 3.0))
-    sane_base = _safe_float(dados_aval.get('SANE_Baseline_Pct', 30.0), 30.0)
-    sane_atual = _safe_float(hist[-1].get('SANE_Pct', sane_base), sane_base) if hist else sane_base
-    dist_meta_atual = max(0.0, 100.0 - sane_atual)
-    ganho_sane = sane_atual - sane_base
+    for idx_t, t_nome in enumerate(nomes_testes[:4]):
+        cor_t = cores_linhas[idx_t % len(cores_linhas)]
+        valores_y = []
+        textos_raw = []
+        for e in evs:
+            tf = e.get('Testes_Funcionais', {})
+            resp = tf.get(t_nome) if isinstance(tf, dict) else None
+            sc_dor = _mapa_func_dor_equivalente(resp)
+            valores_y.append(sc_dor if sc_dor is not None else np.nan)
+            textos_raw.append(resp)
 
-    groc_atual_str = hist[-1].get('GROC_Label', 'Não registrado') if hist else 'Não registrado'
-    groc_score_val = hist[-1].get('GROC_Score', None) if hist else None
-    pass_atual_str = hist[-1].get('PASS_Satisfacao', 'Em evolução') if hist else 'Em evolução'
-    pass_atingido = bool(hist[-1].get('PASS_Atingido', False)) if hist else False
+        arr_y = np.array(valores_y, dtype=float)
+        mask = ~np.isnan(arr_y)
+        if mask.sum() >= 1:
+            ax.plot(x_idx[mask], arr_y[mask], color=cor_t, lw=2.5, marker='o', markersize=7, label=t_nome, zorder=3 + idx_t)
+            for xi, yi in zip(x_idx[mask], arr_y[mask]):
+                ax.annotate(f"{yi:.1f}".replace(".", ","), (xi, yi),
+                            textcoords="offset points", xytext=(0, 8), ha='center',
+                            fontsize=8.5, fontweight='bold', color=cor_t)
 
-    # Semáforo KPI Dor
-    if delta_dor >= 2:
-        cor_dor_hex, badge_dor = "#10B981", f"Redução de {delta_dor:.0f} pts (MCID Atingido)"
-    elif delta_dor > 0:
-        cor_dor_hex, badge_dor = "#00E5FF", f"Redução de {delta_dor:.0f} pt(s) na EVA"
-    elif delta_dor < 0:
-        cor_dor_hex, badge_dor = "#FF4D6D", f"Aumento de {abs(delta_dor):.0f} pt(s) na EVA"
-    else:
-        cor_dor_hex, badge_dor = "#F59E0B", "Estável no período"
+            v_ini = arr_y[mask][0]
+            v_fim = arr_y[mask][-1]
+            r_ini_str = textos_raw[int(np.where(mask)[0][0])] or "—"
+            r_fim_str = textos_raw[int(np.where(mask)[0][-1])] or "—"
 
-    # Semáforo KPI Flexão
-    if delta_flex > 0:
-        cor_flex_hex, badge_flex = "#10B981", f"Ganho de +{delta_flex:.0f}° de ADM"
-    elif delta_flex < 0:
-        cor_flex_hex, badge_flex = "#FF4D6D", f"Variação de {delta_flex:.0f}° de ADM"
-    else:
-        cor_flex_hex, badge_flex = "#00E5FF", "Amplitude mantida"
-
-    # Semáforo KPI Meta / SANE
-    if sane_atual >= 85:
-        cor_meta_hex, badge_meta = "#10B981", f"Faltam {dist_meta_atual:.0f}% (Δ {ganho_sane:+.0f}% vs Marco Zero)"
-    elif sane_atual >= 50:
-        cor_meta_hex, badge_meta = "#00E5FF", f"Faltam {dist_meta_atual:.0f}% (Δ {ganho_sane:+.0f}% vs Marco Zero)"
-    else:
-        cor_meta_hex, badge_meta = "#F59E0B", f"Faltam {dist_meta_atual:.0f}% (Inicial: {sane_base:.0f}%)"
-
-    periodo_str = f"{str(hist[0].get('Data', '-'))[:10]} até {str(hist[-1].get('Data', '-'))[:10]}" if hist else "Sem check-ins"
-
-    # Gráficos Base64
-    html_graficos = ""
-    html_tabela_func = ""
-    if n_sessoes >= 2:
-        b64_dor = _gerar_grafico_dor_b64(hist, dor_inicial)
-        b64_corr, testes_evolucao = _gerar_grafico_correlacao_b64(hist)
-
-        if delta_dor >= 2:
-            interp_dor = f"Redução clinicamente significativa de {delta_dor:.0f} pontos na EVA, superando o limiar MCID de 2 pontos (Salaffi et al., 2004)."
-        elif delta_dor > 0:
-            interp_dor = f"Redução de {delta_dor:.0f} ponto(s) na EVA, em evolução porém abaixo do limiar MCID de 2 pontos (Salaffi et al., 2004)."
-        elif delta_dor == 0:
-            interp_dor = "Quadro álgico estável no período avaliado. Recomenda-se revisar progressão de carga e controle de volume."
-        else:
-            interp_dor = f"Aumento de {abs(delta_dor):.0f} ponto(s) na EVA. Investigar sobrecarga mecânica recente, adesão ou sinais de alerta."
-
-        html_graficos = f"""
-        <div class="grid-2">
-            <div class="card">
-                <div class="section-tag">CURVA ANALGÉSICA PBE</div>
-                <h3>Evolução da Dor (EVA) & Meta MCID</h3>
-                <img class="chart-img" src="data:image/png;base64,{b64_dor}" alt="Evolução da Dor" />
-                <div class="insight-pill" style="border-left-color: {cor_dor_hex};">
-                    <strong>Análise Clínica:</strong> {_esc(interp_dor)}
-                </div>
-            </div>
-            <div class="card">
-                <div class="section-tag">BIOMECÂNICA & FUNÇÃO</div>
-                <h3>Correlação Dinâmica: Dor × Capacidade Funcional</h3>
-                <img class="chart-img" src="data:image/png;base64,{b64_corr}" alt="Correlação Dor vs Função" />
-                <div class="insight-pill" style="border-left-color: #10B981;">
-                    <strong>Leitura Clínica:</strong> Cruzamento de curvas (queda da dor em coral e ascensão funcional em verde) confirma adaptação tecidual positiva.
-                </div>
-            </div>
-        </div>
-        """
-
-        if testes_evolucao:
-            linhas_func = ""
-            for nome_t, res_list in testes_evolucao.items():
-                prim = res_list[0] if res_list else "-"
-                ult = res_list[-1] if res_list else "-"
-                sp, su = _mapa_func_score(prim), _mapa_func_score(ult)
-                if sp is not None and su is not None:
-                    d_f = su - sp
-                    cor_d = "#10B981" if d_f > 0 else ("#FF4D6D" if d_f < 0 else "#94A3B8")
-                    txt_d = f"{d_f:+.0f} pts" if d_f != 0 else "Mantido"
+            if v_fim < v_ini:
+                melhoraram += 1
+                pct_red = ((v_ini - v_fim) / max(1.0, v_ini)) * 100.0
+                conclusoes_testes.append((
+                    "verde",
+                    f"Melhora clínica significativa de {pct_red:.0f}% na tolerância ao teste {t_nome} ({r_ini_str} → {r_fim_str}, escore álgico {v_ini:.1f} → {v_fim:.1f})."
+                ))
+            elif v_fim == v_ini:
+                if v_fim == 0:
+                    melhoraram += 1
+                    conclusoes_testes.append((
+                        "verde",
+                        f"Teste {t_nome} realizado com capacidade plena e sem dor ({r_fim_str}) ao longo do período."
+                    ))
                 else:
-                    cor_d, txt_d = "#94A3B8", "-"
-                linhas_func += f"""
-                <tr>
-                    <td><strong>{_esc(nome_t)}</strong></td>
-                    <td>{_esc(prim)}</td>
-                    <td>{_esc(ult)}</td>
-                    <td style="color:{cor_d}; font-weight:700;">{txt_d}</td>
-                </tr>
-                """
-            html_tabela_func = f"""
-            <div class="card">
-                <div class="section-tag">TESTES ESPECÍFICOS</div>
-                <h3>Evolução Analítica por Teste Funcional</h3>
-                <table class="modern-table">
-                    <thead>
-                        <tr><th>Teste Funcional</th><th>Status Inicial</th><th>Status Atual</th><th>Ganho Funcional</th></tr>
-                    </thead>
-                    <tbody>{linhas_func}</tbody>
-                </table>
-            </div>
-            """
+                    conclusoes_testes.append((
+                        "neutro",
+                        f"Teste {t_nome} sem mudança clínica relevante no período ({v_ini:.1f} → {v_fim:.1f} · {r_fim_str})."
+                    ))
+            else:
+                conclusoes_testes.append((
+                    "laranja",
+                    f"Aumento de sensibilidade mecânica no teste {t_nome} ({v_ini:.1f} → {v_fim:.1f} · {r_fim_str}). Ajustar controle excêntrico."
+                ))
 
-    # Card PBE: Objetivo Funcional (PSFS / SANE) & Satisfação do Paciente (GROC / PASS)
-    cor_pass_badge = "#10B981" if pass_atingido else "#F59E0B"
-    txt_pass_curto = "SATISFEITO (PASS POSITIVO)" if pass_atingido else "EM EVOLUÇÃO (PASS NEGATIVO)"
-    pct_sane_clamp = max(0.0, min(100.0, sane_atual))
+    ax.set_xticks(x_idx)
+    ax.set_xticklabels(labels, fontsize=9.5, fontweight='bold', color='#475569')
+    ax.set_yticks([0, 5, 10])
+    ax.set_yticklabels(['0', '5', '10'], fontsize=9, color='#64748B')
+    ax.set_ylim(-0.8, 11.2)
+    ax.set_xlim(-0.25, max(1, len(labels) - 1) + 0.25)
+    ax.grid(True, axis='y', linestyle='-', color='#E2E8F0', linewidth=0.9)
+    ax.grid(False, axis='x')
 
-    html_metas_pbe = f"""
-    <div class="card">
-        <div class="section-tag">DESFECHOS CENTRADOS NO PACIENTE (PBE)</div>
-        <h3>Objetivo Funcional (PSFS/SANE), Mudança Global (GROC) & Satisfação (PASS)</h3>
-        <div class="alert-box" style="border-left-color: {cor_meta_hex}; margin-bottom: 14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                <div>
-                    <span style="font-size:11px; color:#94A3B8; text-transform:uppercase; font-weight:700;">Objetivo Principal do Paciente (Marco Zero)</span>
-                    <div style="font-size:16px; font-weight:800; color:#FFFFFF; margin-top:2px;">🎯 {_esc(obj_paciente)}</div>
-                </div>
-                <span class="badge-pill" style="background:{cor_pass_badge}22; color:{cor_pass_badge}; border:1px solid {cor_pass_badge};">
-                    {txt_pass_curto}
-                </span>
-            </div>
-            <div class="progress-track" style="margin:12px 0 8px 0; height:10px;">
-                <div class="progress-fill" style="width:{pct_sane_clamp:.1f}%; background:{cor_meta_hex};"></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; color:#CBD5E1; flex-wrap:wrap; gap:8px;">
-                <span><strong>Marco Zero (SANE Inicial):</strong> {sane_base:.0f}% (PSFS: {psfs_base}/10)</span>
-                <span><strong>Progresso Atual (SANE):</strong> <strong style="color:{cor_meta_hex};">{sane_atual:.0f}%</strong> ({ganho_sane:+.0f}%)</span>
-                <span><strong>Distância Restante da Meta:</strong> {dist_meta_atual:.0f}%</span>
-            </div>
-        </div>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; font-size:12.5px;">
-            <div class="meta-box">
-                <span class="meta-label">Percepção Global de Mudança (GROC)</span>
-                <span class="meta-value" style="color:#00E5FF;">{_esc(groc_atual_str)}</span>
-                <small style="display:block; color:#94A3B8; margin-top:2px;">MCID ≥ +3 pts (Kamper et al., JOSPT 2009)</small>
-            </div>
-            <div class="meta-box">
-                <span class="meta-label">Estado de Sintoma Aceitável (PASS)</span>
-                <span class="meta-value" style="color:{cor_pass_badge};">{_esc(pass_atual_str)}</span>
-                <small style="display:block; color:#94A3B8; margin-top:2px;">Referência: Tubach et al., 2005</small>
-            </div>
-            <div class="meta-box">
-                <span class="meta-label">Escala Funcional Específica (PSFS)</span>
-                <span class="meta-value">{psfs_base}/10 pts (Baseline)</span>
-                <small style="display:block; color:#94A3B8; margin-top:2px;">MCID: 2,0 pts (Stratford et al., 1995)</small>
-            </div>
-        </div>
+    for spine in ['top', 'right', 'left']:
+        ax.spines[spine].set_visible(False)
+    ax.spines['bottom'].set_color('#CBD5E1')
+    ax.tick_params(axis='both', length=0)
+
+    fig.tight_layout()
+    return _fig_to_base64(fig, dpi=300, facecolor='#FFFFFF'), conclusoes_testes, melhoraram, max(1, len(nomes_testes[:4]))
+
+
+def _gerar_grafico_sane_clean_b64(hist, sane_base: float):
+    """Gera mini-gráfico Clean Light da evolução do Objetivo do Paciente (SANE %)."""
+    marcos = _selecionar_marcos_sessoes(hist)
+    labels = [m[0] for m in marcos] if marcos else ["Aval."]
+    valores = [_safe_float(m[1].get('SANE_Pct'), sane_base) for m in marcos] if marcos else [sane_base]
+    if len(valores) >= 1:
+        valores[0] = sane_base
+    x_idx = np.arange(len(labels))
+
+    fig, ax = plt.subplots(figsize=(5.2, 2.1))
+    fig.patch.set_facecolor('#FFFFFF')
+    ax.set_facecolor('#FFFFFF')
+
+    ax.fill_between(x_idx, valores, color='#2E8B9A', alpha=0.12)
+    ax.plot(x_idx, valores, color='#103E55', lw=2.4, marker='o', markersize=6.5, zorder=4)
+    for i, v in enumerate(valores):
+        ax.annotate(f"{v:.0f}%", (x_idx[i], v), textcoords="offset points",
+                    xytext=(0, 7), ha='center', fontsize=8, fontweight='bold', color='#103E55')
+
+    ax.set_xticks(x_idx)
+    ax.set_xticklabels(labels, fontsize=8.5, fontweight='bold', color='#475569')
+    ax.set_yticks([0, 50, 100])
+    ax.set_yticklabels(['0%', '50%', '100%'], fontsize=8, color='#64748B')
+    ax.set_ylim(-5, 115)
+    ax.set_xlim(-0.25, max(1, len(labels) - 1) + 0.25)
+    ax.grid(True, axis='y', linestyle='-', color='#E2E8F0', linewidth=0.8)
+    ax.grid(False, axis='x')
+    for s in ['top', 'right', 'left']:
+        ax.spines[s].set_visible(False)
+    ax.spines['bottom'].set_color('#CBD5E1')
+    ax.tick_params(axis='both', length=0)
+
+    fig.tight_layout()
+    return _fig_to_base64(fig, dpi=300, facecolor='#FFFFFF')
+
+
+# ============================================================
+# COMPONENTES VISUAIS SVG (GAUGE DE FLEXÃO + DONUT DE EXTENSÃO)
+# ============================================================
+def _construir_svg_gauge_flexao(flex_atual: float, flex_ref: float = 135.0) -> str:
+    """
+    Constrói o Velocímetro Semicircular (Gauge SVG) da Flexão de Joelho
+    idêntico à referência visual (Imagem 4), usando as cores da GENUA.
+    """
+    pct = max(0.0, min(1.0, flex_atual / flex_ref)) if flex_ref > 0 else 0.0
+    pct_exib = round((flex_atual / flex_ref) * 100.0) if flex_ref > 0 else 0
+
+    raio = 80.0
+    perimetro = math.pi * raio  # ~251.33
+    dash_offset = perimetro * (1.0 - pct)
+
+    # Posição do marcador circular ao longo do arco de (20, 100) até (180, 100)
+    ang = pct * math.pi
+    cx_dot = 100.0 - raio * math.cos(ang)
+    cy_dot = 100.0 - raio * math.sin(ang)
+
+    cor_arco = "#16A34A" if flex_atual >= 125 else ("#2E8B9A" if flex_atual >= 105 else ("#D97706" if flex_atual >= 80 else "#DC2626"))
+
+    return f"""
+    <div style="text-align:center; padding: 6px 0 2px 0;">
+        <svg viewBox="0 0 200 122" style="width:100%; max-width:250px; height:auto; overflow:visible;">
+            <!-- Trilha de fundo do velocímetro -->
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#E2E8F0" stroke-width="14" stroke-linecap="round"/>
+            <!-- Arco preenchido proporcional à ADM -->
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="{cor_arco}" stroke-width="14" stroke-linecap="round"
+                  stroke-dasharray="{perimetro:.2f}" stroke-dashoffset="{dash_offset:.2f}"/>
+            <!-- Ponto indicador na ponta do arco -->
+            <circle cx="{cx_dot:.2f}" cy="{cy_dot:.2f}" r="7.5" fill="{cor_arco}" stroke="#FFFFFF" stroke-width="2.5"/>
+            <!-- Valor central em destaque -->
+            <text x="100" y="78" text-anchor="middle" font-size="30" font-weight="800" fill="#103E55" font-family="Inter, sans-serif">{flex_atual:.0f}°</text>
+            <text x="100" y="96" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2E8B9A" font-family="Inter, sans-serif">{pct_exib}% da referência</text>
+            <!-- Rótulos de 0° e 135° -->
+            <text x="20" y="118" text-anchor="middle" font-size="10.5" font-weight="800" fill="#475569" font-family="Inter, sans-serif">0°</text>
+            <text x="180" y="114" text-anchor="middle" font-size="10.5" font-weight="800" fill="#103E55" font-family="Inter, sans-serif">{flex_ref:.0f}°</text>
+            <text x="180" y="124" text-anchor="middle" font-size="7.5" font-weight="700" fill="#2E8B9A" font-family="Inter, sans-serif">REFERÊNCIA</text>
+        </svg>
     </div>
     """
 
-    # Construção dos Cards de PROMs
-    proms_config = [
-        ("LEFS", "Funcionalidade Geral MMII", dados_aval.get("LEFS_Pct", 0), "%", "MCID: 9 pts (Binkley 1999)", dados_aval.get("Interpretacao_LEFS", "-")),
-        ("VISA-P", "Tendinopatia Patelar", dados_aval.get("VISA_P_Pts", 0), "pts", "MCID: 13 pts (Hernandez 2014)", dados_aval.get("Interpretacao_VISA_P", "-")),
-        ("Lysholm", "Ligamentar / Meniscal", dados_aval.get("Lysholm_Pts", 0), "pts", "MCID: 10 pts (Briggs 2009)", dados_aval.get("Interpretacao_Lysholm", "-")),
-        ("WOMAC", "Osteoartrite", dados_aval.get("WOMAC_Pct", 0), "%", "MCID: ~12% (Angst 2001)", dados_aval.get("Interpretacao_WOMAC", "-")),
-        ("KOOS", "Score Global de Joelho", dados_aval.get("KOOS_Pct", 0), "%", "MCID: 8-10 pts (Roos 2003)", "-"),
-        ("IKDC", "Avaliação Subjetiva Joelho", dados_aval.get("IKDC_Pct", 0), "%", "MCID: 9 pts (Irrgang 2006)", "-"),
-    ]
-    proms_cards_html = ""
-    for p_nome, p_ind, p_val, p_un, p_mcid, p_interp in proms_config:
-        val_f = _safe_float(p_val, 0.0)
-        if val_f > 0:
-            pct_bar = max(0.0, min(100.0, val_f))
-            cor_bar = "#10B981" if pct_bar >= 75 else ("#F59E0B" if pct_bar >= 50 else "#FF4D6D")
-            proms_cards_html += f"""
-            <div class="prom-item">
-                <div class="prom-header">
+
+def _construir_svg_donut_extensao(def_ext_atual: float) -> str:
+    """Constrói o anel circular (Donut SVG) de Extensão Terminal de Joelho (Meta 0°)."""
+    cor_anel = "#16A34A" if def_ext_atual == 0 else ("#D97706" if def_ext_atual <= 5 else "#DC2626")
+    txt_sub = "Completa (0°)" if def_ext_atual == 0 else f"Déficit de {def_ext_atual:.0f}°"
+    return f"""
+    <svg viewBox="0 0 110 110" style="width:105px; height:105px; flex-shrink:0;">
+        <circle cx="55" cy="55" r="44" fill="none" stroke="#E2E8F0" stroke-width="9"/>
+        <circle cx="55" cy="55" r="44" fill="none" stroke="{cor_anel}" stroke-width="9"
+                stroke-dasharray="276.46" stroke-dashoffset="{0 if def_ext_atual == 0 else 75}"/>
+        <text x="55" y="54" text-anchor="middle" font-size="22" font-weight="800" fill="#103E55" font-family="Inter, sans-serif">{def_ext_atual:.0f}°</text>
+        <text x="55" y="70" text-anchor="middle" font-size="8.5" font-weight="700" fill="{cor_anel}" font-family="Inter, sans-serif">{txt_sub}</text>
+    </svg>
+    """
+
+
+def _box_conclusao_editavel(cor_status: str, texto_conclusao: str) -> str:
+    """
+    Renderiza a pílula/box de Conclusão com borda semafórica e atributo contenteditable="true"
+    para que o fisioterapeuta possa editar o texto diretamente no laudo com 1 clique.
+    """
+    mapa_cores = {
+        "verde":   {"borda": "#16A34A", "bg": "#F0FDF4", "dot": "#16A34A"},
+        "amarelo": {"borda": "#EAB308", "bg": "#FEFCE8", "dot": "#EAB308"},
+        "laranja": {"borda": "#F97316", "bg": "#FFF7ED", "dot": "#F97316"},
+        "vermelho": {"borda": "#DC2626", "bg": "#FEF2F2", "dot": "#DC2626"},
+        "neutro":  {"borda": "#94A3B8", "bg": "#F8FAFC", "dot": "#64748B"},
+    }
+    c = mapa_cores.get(cor_status, mapa_cores["verde"])
+    return f"""
+    <div class="conclusion-box" style="border-left-color: {c['borda']}; background: {c['bg']};">
+        <div class="conclusion-content" contenteditable="true" spellcheck="false">
+            <span class="status-dot" style="background: {c['dot']};"></span>
+            <strong>Conclusão:</strong> {_esc(texto_conclusao)}
+        </div>
+        <span class="edit-badge no-print" title="Clique no texto ao lado para editar livremente">EDITAR</span>
+    </div>
+    """
+
+
+# ============================================================
+# FUNÇÃO PRINCIPAL: gerar_laudo_html() — CLEAN LIGHT GENUA
+# ============================================================
+def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=None, fenotipo=None, *args, **kwargs):
+    """
+    Gera o Laudo de Evolução Clínica no padrão Clean Light GENUA,
+    limpo, visual e 100% interativo/editável para médico e paciente.
+    """
+    dados_aval, hist = _normalizar_entradas(dados_aval, historico)
+    n_sessoes = len(hist)
+    marcos = _selecionar_marcos_sessoes(hist)
+
+    # --- 1. METADADOS DO CABEÇALHO (1ª ABA DO PDF) ---
+    dx_texto = dados_aval.get('Diagnostico_Clinico') or dados_aval.get('Diagnostico_Cadastro') or 'Não informado'
+    idade = dados_aval.get('Idade') or dados_aval.get('Idade_Cadastro') or '—'
+    ocupacao = dados_aval.get('Ocupacao_Esporte') or dados_aval.get('Ocupacao') or 'Fisioterapia Esportiva'
+    lado_acom = dados_aval.get('Lado_Acometido', 'Joelho')
+    medico_ind = dados_aval.get('Medico_Indicador') or '—'
+    data_emissao = datetime.now().strftime("%d/%m/%Y")
+
+    if n_sessoes >= 2:
+        d_ini = str(hist[0].get('Data', ''))[:10]
+        d_fim = str(hist[-1].get('Data', ''))[:10]
+        try:
+            d_ini = datetime.strptime(d_ini, "%Y-%m-%d").strftime("%d/%m/%Y")
+            d_fim = datetime.strptime(d_fim, "%Y-%m-%Y") if False else datetime.strptime(d_fim, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            pass
+        periodo_avaliado = f"{d_ini} a {d_fim} ({n_sessoes} sessões)"
+    elif n_sessoes == 1:
+        periodo_avaliado = f"Avaliação Inicial ({str(hist[0].get('Data', ''))[:10]})"
+    else:
+        periodo_avaliado = dados_aval.get("Data_Avaliacao", data_emissao)
+
+    # --- 2. CÁLCULOS E CONCLUSÃO DE DOR (EVA) ---
+    dor_inicial = _safe_float(hist[0].get('Dor', 0)) if hist else 0.0
+    dor_atual = _safe_float(hist[-1].get('Dor', 0)) if hist else 0.0
+    delta_dor = dor_inicial - dor_atual
+    pct_dor = ((delta_dor / dor_inicial) * 100.0) if dor_inicial > 0 else 0.0
+
+    if delta_dor > 0:
+        cor_kpi_dor = "#16A34A" if (delta_dor >= 2 or dor_atual <= 2) else "#D97706"
+        icone_kpi_dor = "↓"
+        txt_kpi_dor = f"↓ {pct_dor:.0f}%" if dor_inicial > 0 else f"↓ {delta_dor:.0f} pts"
+        sub_kpi_dor = f"({dor_inicial:.1f} → {dor_atual:.1f})".replace(".", ",")
+        status_conc_dor = "verde" if (delta_dor >= 2 or dor_atual <= 2) else "amarelo"
+        conc_dor_txt = (
+            f"Redução clinicamente significativa da dor em {pct_dor:.0f}% ({dor_inicial:.1f} → {dor_atual:.1f} na escala EVA), "
+            f"indicando excelente modulação inflamatória/álgica e aumento da tolerância à carga mecânica."
+        ).replace(".", ",")
+    elif delta_dor == 0:
+        cor_kpi_dor = "#16A34A" if dor_atual <= 2 else "#D97706"
+        icone_kpi_dor = "="
+        txt_kpi_dor = "Estável"
+        sub_kpi_dor = f"({dor_inicial:.1f} → {dor_atual:.1f})".replace(".", ",")
+        status_conc_dor = "verde" if dor_atual <= 2 else "amarelo"
+        conc_dor_txt = (
+            f"Quadro álgico mantido em nível controlado ({dor_atual:.1f}/10 na EVA) durante a progressão de demanda funcional."
+            if dor_atual <= 2 else
+            f"Estabilidade álgica ({dor_inicial:.1f} → {dor_atual:.1f} na EVA). Mantido controle de carga conforme irritabilidade tecidual."
+        ).replace(".", ",")
+    else:
+        cor_kpi_dor = "#DC2626"
+        icone_kpi_dor = "↑"
+        txt_kpi_dor = f"+{abs(delta_dor):.0f} pts"
+        sub_kpi_dor = f"({dor_inicial:.1f} → {dor_atual:.1f})".replace(".", ",")
+        status_conc_dor = "laranja"
+        conc_dor_txt = (
+            f"Oscilação reativa da dor ({dor_inicial:.1f} → {dor_atual:.1f} na EVA). Ajustado volume mecânico para respeitar a janela de reatividade de 24h."
+        ).replace(".", ",")
+
+    # --- 3. CÁLCULOS E CONCLUSÃO DE ADM (FLEXÃO E EXTENSÃO AO LONGO DAS SESSÕES) ---
+    # Resgata Flexão Inicial da Avaliação Inicial (do lado acometido) ou da 1ª sessão
+    adm_fl_d_av = _extrair_chave_str(dados_aval.get("ADM_Joelho_Flexao", ""), "Dir", 0.0)
+    adm_fl_e_av = _extrair_chave_str(dados_aval.get("ADM_Joelho_Flexao", ""), "Esq", 0.0)
+    lado_str_low = str(lado_acom).lower()
+    adm_base_aval = adm_fl_e_av if "esquerdo" in lado_str_low else adm_fl_d_av
+
+    flex_inicial = _safe_float(hist[0].get('Flexao', 0)) if hist else adm_base_aval
+    if flex_inicial <= 0 and adm_base_aval > 0:
+        flex_inicial = adm_base_aval
+    flex_atual = _safe_float(hist[-1].get('Flexao', flex_inicial)) if hist else flex_inicial
+    ganho_flex = flex_atual - flex_inicial
+
+    # Significado clínico biomecânico conforme a faixa de flexão atingida
+    if flex_atual >= 125:
+        significado_flex = "liberando a cinemática necessária para agachamento profundo, corrida e gestos esportivos sem restrição articular"
+    elif flex_atual >= 110:
+        significado_flex = "atingindo o arco biomecânico necessário para descer escadas de forma recíproca, pedalar e agachar até a paralela sem compensações"
+    elif flex_atual >= 95:
+        significado_flex = "permitindo sentar e levantar com conforto e realizar marcha no plano sem compensação em rotação de quadril"
+    else:
+        significado_flex = "em fase de ganho progressivo de mobilidade articular para restabelecer as atividades de vida diária"
+
+    if ganho_flex > 0:
+        cor_kpi_adm = "#16A34A"
+        icone_kpi_adm = "↑"
+        txt_kpi_adm = f"+{ganho_flex:.0f}° ganho"
+        sub_kpi_adm = f"({flex_inicial:.0f}° → {flex_atual:.0f}°)"
+        status_conc_flex = "verde"
+        conc_flex_txt = (
+            f"Ganho de +{ganho_flex:.0f}° na flexão de joelho ao longo das sessões ({flex_inicial:.0f}° → {flex_atual:.0f}°), "
+            f"{significado_flex}."
+        )
+    elif flex_atual >= 125:
+        cor_kpi_adm = "#16A34A"
+        icone_kpi_adm = "✓"
+        txt_kpi_adm = f"{flex_atual:.0f}° plena"
+        sub_kpi_adm = "amplitude funcional"
+        status_conc_flex = "verde"
+        conc_flex_txt = (
+            f"Amplitude de flexão de joelho preservada em nível de excelência ({flex_atual:.0f}° / ref. 135°), "
+            f"{significado_flex}."
+        )
+    else:
+        cor_kpi_adm = "#D97706"
+        icone_kpi_adm = "="
+        txt_kpi_adm = f"{flex_atual:.0f}° atual"
+        sub_kpi_adm = f"(Meta: 135°)"
+        status_conc_flex = "amarelo"
+        conc_flex_txt = (
+            f"Flexão de joelho em {flex_atual:.0f}° (referência clínica: 135°), {significado_flex}."
+        )
+
+    # Extensão Terminal ao longo das sessões
+    ext_ini_deg = _extrair_def_extensao_graus(hist[0].get('Extensao', '0')) if hist else 0.0
+    ext_atu_deg = _extrair_def_extensao_graus(hist[-1].get('Extensao', '0')) if hist else 0.0
+    if ext_atu_deg == 0:
+        status_conc_ext = "verde"
+        conc_ext_txt = (
+            f"Extensão terminal completa atingida ({ext_ini_deg:.0f}° → 0°), eliminando o mecanismo de inibição artrogênica "
+            f"do quadríceps e garantindo destravamento eficiente na fase de apoio da marcha."
+        )
+    else:
+        status_conc_ext = "amarelo" if ext_atu_deg <= 5 else "laranja"
+        conc_ext_txt = (
+            f"Extensão de Joelho ({ext_ini_deg:.0f}° → {ext_atu_deg:.0f}°) · déficit residual de {ext_atu_deg:.0f}°. "
+            f"Priorizada mobilização em extensão terminal para otimizar o recrutamento do quadríceps."
+        )
+
+    # Mini-cards de evolução de ADM por sessão (Avaliação -> Reav 1 -> Reav 2)
+    cards_sessoes_flex_html = ""
+    cards_sessoes_ext_html = ""
+    if marcos:
+        for lbl_m, ev_m in marcos[:3]:
+            lbl_exib = "Avaliação" if lbl_m == "Aval." else lbl_m.replace("R1", "Reav 1").replace("R2", "Reav 2")
+            fl_m = _safe_float(ev_m.get('Flexao', flex_atual))
+            ex_m = _extrair_def_extensao_graus(ev_m.get('Extensao', 0))
+            cards_sessoes_flex_html += f"""
+            <div class="stage-pill">
+                <span class="stage-lbl">{_esc(lbl_exib)}</span>
+                <span class="stage-val">{fl_m:.0f}°</span>
+            </div>
+            """
+            cards_sessoes_ext_html += f"""
+            <div class="stage-pill">
+                <span class="stage-lbl">{_esc(lbl_exib)}</span>
+                <span class="stage-val">{ex_m:.0f}°</span>
+            </div>
+            """
+
+    # --- 4. GRÁFICOS DE DOR E TESTES FUNCIONAIS ---
+    b64_dor = _gerar_grafico_dor_clean_b64(hist) if n_sessoes >= 1 else ""
+    b64_testes, conclusoes_testes, qtd_melhorou, total_testes = _gerar_grafico_testes_clean_b64(hist) if n_sessoes >= 1 else ("", [], 0, 1)
+
+    cor_kpi_func = "#16A34A" if qtd_melhorou >= max(1, total_testes // 2) else "#D97706"
+    txt_kpi_func = f"{qtd_melhorou}/{total_testes} testes"
+    sub_kpi_func = "em evolução positiva"
+
+    boxes_conclusao_testes_html = "".join([
+        _box_conclusao_editavel(cor_st, txt_c) for cor_st, txt_c in conclusoes_testes
+    ])
+    if not boxes_conclusao_testes_html:
+        boxes_conclusao_testes_html = _box_conclusao_editavel(
+            "verde", "Boa tolerância mecânica nos testes funcionais monitorados em consultório."
+        )
+
+    # --- 5. FILTRO ESTRITO DE QUESTIONÁRIO (EXIBE SOMENTE O QUE FOI RESPONDIDO) ---
+    catalogo_proms = {
+        "LEFS": {
+            "sub": "Escala Funcional da Extremidade Inferior",
+            "val": _safe_float(dados_aval.get("LEFS_Pts_80") or (float(dados_aval.get("LEFS_Pct", 0) or 0) * 0.8), 0.0),
+            "pct": _safe_float(dados_aval.get("LEFS_Pct", 0), 0.0),
+            "melhor_ref": "80,0 pts (100%)",
+            "pior_ref": "0,0 pts",
+            "un": "pts",
+            "interp": dados_aval.get("Interpretacao_LEFS", "Boa capacidade funcional"),
+            "default_falso": 0.0,
+        },
+        "VISA-P": {
+            "sub": "Tendinopatia Patelar (Jumper's Knee)",
+            "val": _safe_float(dados_aval.get("VISA_P_Pts", 0), 0.0),
+            "pct": _safe_float(dados_aval.get("VISA_P_Pts", 0), 0.0),
+            "melhor_ref": "100,0 pts",
+            "pior_ref": "0,0 pts",
+            "un": "pts",
+            "interp": dados_aval.get("Interpretacao_VISA_P", "Em evolução"),
+            "default_falso": 50.0,
+        },
+        "Lysholm": {
+            "sub": "Escore Funcional Ligamentar e Meniscal",
+            "val": _safe_float(dados_aval.get("Lysholm_Pts", 0), 0.0),
+            "pct": _safe_float(dados_aval.get("Lysholm_Pts", 0), 0.0),
+            "melhor_ref": "100,0 pts",
+            "pior_ref": "0,0 pts",
+            "un": "pts",
+            "interp": dados_aval.get("Interpretacao_Lysholm", "Em evolução"),
+            "default_falso": 100.0,
+        },
+        "WOMAC": {
+            "sub": "Índice Funcional de Osteoartrite",
+            "val": _safe_float(dados_aval.get("WOMAC_Pct", 0), 0.0),
+            "pct": _safe_float(dados_aval.get("WOMAC_Pct", 0), 0.0),
+            "melhor_ref": "100,0%",
+            "pior_ref": "0,0%",
+            "un": "%",
+            "interp": dados_aval.get("Interpretacao_WOMAC", "Em evolução"),
+            "default_falso": 100.0,
+        },
+        "KOOS": {
+            "sub": "Knee Injury and Osteoarthritis Outcome Score",
+            "val": _safe_float(dados_aval.get("KOOS_Pct", 0), 0.0),
+            "pct": _safe_float(dados_aval.get("KOOS_Pct", 0), 0.0),
+            "melhor_ref": "100,0%",
+            "pior_ref": "0,0%",
+            "un": "%",
+            "interp": "Score Global de Joelho",
+            "default_falso": 100.0,
+        },
+        "IKDC": {
+            "sub": "International Knee Documentation Committee",
+            "val": _safe_float(dados_aval.get("IKDC_Pct", 0), 0.0),
+            "pct": _safe_float(dados_aval.get("IKDC_Pct", 0), 0.0),
+            "melhor_ref": "100,0%",
+            "pior_ref": "0,0%",
+            "un": "%",
+            "interp": "Avaliação Subjetiva de Joelho",
+            "default_falso": 75.0,
+        },
+    }
+
+    # Determina exatamente qual questionário mostrar (prioriza seleção do painel ou detecta o único preenchido real)
+    proms_escolhidos = dados_aval.get("PROMs_Selecionados")
+    if not proms_escolhidos:
+        proms_escolhidos = []
+        for k_p, info_p in catalogo_proms.items():
+            if info_p["val"] > 0 and round(info_p["val"], 1) != info_p["default_falso"]:
+                proms_escolhidos.append(k_p)
+                break
+        if not proms_escolhidos and catalogo_proms["LEFS"]["val"] > 0:
+            proms_escolhidos = ["LEFS"]
+
+    html_secao_prom = ""
+    kpi_prom_nome = "QUESTIONÁRIO"
+    kpi_prom_val = "N/A"
+    kpi_prom_sub = "Não aplicado"
+    cor_kpi_prom = "#2E8B9A"
+
+    if proms_escolhidos:
+        cards_prom_inner = ""
+        for nome_p in proms_escolhidos:
+            if nome_p not in catalogo_proms:
+                continue
+            p_info = catalogo_proms[nome_p]
+            val_exib = f"{p_info['val']:.1f}".replace(".", ",")
+            pct_p = max(0.0, min(100.0, p_info["pct"]))
+            cor_p = "#16A34A" if pct_p >= 70 else ("#D97706" if pct_p >= 45 else "#DC2626")
+            status_p = "verde" if pct_p >= 70 else ("amarelo" if pct_p >= 45 else "laranja")
+
+            if kpi_prom_val == "N/A":
+                kpi_prom_nome = nome_p
+                kpi_prom_val = f"{val_exib} {p_info['un']}"
+                kpi_prom_sub = str(p_info["interp"]).replace("⭐ ", "").replace("🟢 ", "").replace("🟡 ", "").replace("🚨 ", "")
+                cor_kpi_prom = cor_p
+
+            conc_prom_txt = (
+                f"Pontuação de {val_exib} {p_info['un']} no questionário {nome_p} ({p_info['sub']}), "
+                f"compatível com {str(p_info['interp']).replace('⭐ ', '').replace('🟢 ', '').replace('🟡 ', '').replace('🚨 ', '').lower()}."
+            )
+
+            cards_prom_inner += f"""
+            <div class="sub-card">
+                <div class="sub-card-header">
                     <div>
-                        <span class="prom-title">{_esc(p_nome)}</span>
-                        <span class="prom-sub">{_esc(p_ind)}</span>
+                        <span class="sub-card-title">{_esc(nome_p)}</span>
+                        <span class="sub-card-caption"> · {_esc(p_info['sub'])}</span>
                     </div>
-                    <span class="prom-score" style="color:{cor_bar};">{val_f:.1f}{_esc(p_un)}</span>
+                    <span class="sub-card-meta">Evolução funcional · melhor no topo</span>
                 </div>
-                <div class="progress-track">
-                    <div class="progress-fill" style="width:{pct_bar:.1f}%; background:{cor_bar};"></div>
+                <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:16px; align-items:center; margin: 12px 0;">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:#475569; margin-bottom:6px;">
+                            <span>Capacidade Funcional Relatada</span>
+                            <span style="color:{cor_p}; font-size:15px; font-weight:800;">{pct_p:.0f}%</span>
+                        </div>
+                        <div class="bar-track" style="height:14px;">
+                            <div class="bar-fill" style="width:{pct_p:.1f}%; background:{cor_p};"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:10.5px; color:#64748B; margin-top:6px;">
+                            <span>0% (Incapacidade)</span>
+                            <span>100% (Capacidade Máxima)</span>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <div class="stage-pill">
+                            <span class="stage-lbl">MELHOR REF.</span>
+                            <span class="stage-val" style="color:#16A34A; font-size:13px;">{_esc(p_info['melhor_ref'])}</span>
+                        </div>
+                        <div class="stage-pill">
+                            <span class="stage-lbl">PIOR REF.</span>
+                            <span class="stage-val" style="color:#DC2626; font-size:13px;">{_esc(p_info['pior_ref'])}</span>
+                        </div>
+                        <div class="stage-pill" style="grid-column: span 2; background:#F0F9FF; border-color:#BAE6FD;">
+                            <span class="stage-lbl" style="color:#103E55;">PONTUAÇÃO ATUAL ({_esc(nome_p)})</span>
+                            <span class="stage-val" style="color:#103E55; font-size:17px;">{val_exib} {_esc(p_info['un'])}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="prom-footer">
-                    <span>{_esc(p_mcid)}</span>
-                    <span><strong>Classificação:</strong> {_esc(p_interp)}</span>
-                </div>
-            </div>
-            """
-    if not proms_cards_html:
-        proms_cards_html = "<p style='color:#94A3B8; font-size:13px;'>Nenhum questionário PROM (> 0) registrado na avaliação inicial.</p>"
-
-    # Seção de Insights da IA Clínica (LSI + Percepção + Estagnação + Bandeiras)
-    insights_html = ""
-    if isinstance(insights, dict) and insights:
-        blocos_ia = ""
-
-        # LSI Gauge
-        lsi_data = insights.get('lsi')
-        if isinstance(lsi_data, dict) and lsi_data.get('valor') is not None:
-            val_lsi = _safe_float(lsi_data.get('valor'), 0.0)
-            pct_lsi = max(0.0, min(100.0, val_lsi))
-            if val_lsi >= 90:
-                c_lsi, st_lsi = "#10B981", "APTO PARA ALTA / RETORNO AO ESPORTE (≥ 90%)"
-            elif val_lsi >= 85:
-                c_lsi, st_lsi = "#F59E0B", "ATENÇÃO BIOMECÂNICA (85% - 89%)"
-            else:
-                c_lsi, st_lsi = "#FF4D6D", "RISCO ELEVADO DE RE-LESÃO (< 85%)"
-
-            blocos_ia += f"""
-            <div class="alert-box" style="border-left-color:{c_lsi};">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <strong style="color:{c_lsi}; font-size:15px;">LIMB SYMMETRY INDEX (LSI): {val_lsi:.1f}%</strong>
-                    <span class="badge-pill" style="background:{c_lsi}22; color:{c_lsi}; border:1px solid {c_lsi};">{st_lsi}</span>
-                </div>
-                <div class="progress-track" style="margin:10px 0;">
-                    <div class="progress-fill" style="width:{pct_lsi:.1f}%; background:{c_lsi};"></div>
-                </div>
-                <p style="margin:4px 0; font-size:13px; color:#E2E8F0;">{_esc(lsi_data.get('acao', ''))}</p>
-                <small style="color:#94A3B8;">Referência Científica: {_esc(lsi_data.get('referencia', 'Grindem et al., BJSM 2016'))}</small>
+                {_box_conclusao_editavel(status_p, conc_prom_txt)}
             </div>
             """
 
-        # Estagnação / Evolução
-        est = insights.get('estagnacao')
-        if isinstance(est, dict) and est.get('status') not in ('insuficiente', None):
-            st_e = est.get('status')
-            c_e = "#10B981" if st_e == 'melhora' else ("#F59E0B" if st_e == 'estagnacao' else "#FF4D6D")
-            t_e = "EVOLUÇÃO CLÍNICA POSITIVA" if st_e == 'melhora' else ("ESTAGNAÇÃO DETECTADA" if st_e == 'estagnacao' else "ALERTA DE PIORA CLÍNICA")
-            blocos_ia += f"""
-            <div class="alert-box" style="border-left-color:{c_e};">
-                <strong style="color:{c_e}; font-size:14px;">{t_e}</strong>
-                <p style="margin:5px 0; font-size:13px; color:#E2E8F0;">{_esc(est.get('racional', ''))}</p>
-                <small style="color:#94A3B8;">Referência: {_esc(est.get('referencia', 'Salaffi et al., 2004'))}</small>
+        if cards_prom_inner:
+            html_secao_prom = f"""
+            <div class="section-card">
+                <div class="section-title">QUESTIONÁRIO VALIDADO / PROM APLICADO</div>
+                {cards_prom_inner}
             </div>
             """
 
-        # Bandeiras Clínicas
-        bandeiras = insights.get('bandeiras', [])
-        if isinstance(bandeiras, list) and bandeiras:
-            for b in bandeiras:
-                if not isinstance(b, dict):
-                    continue
-                tipo_b = str(b.get('tipo', 'INFO')).upper()
-                if 'VERMELH' in tipo_b or 'RED' in tipo_b:
-                    c_b = "#FF4D6D"
-                elif 'AMAREL' in tipo_b or 'YELLOW' in tipo_b:
-                    c_b = "#F59E0B"
-                elif 'NEGR' in tipo_b or 'BLACK' in tipo_b:
-                    c_b = "#94A3B8"
-                else:
-                    c_b = "#00E5FF"
-                blocos_ia += f"""
-                <div class="alert-box" style="border-left-color:{c_b};">
-                    <strong style="color:{c_b}; font-size:13.5px;">BANDEIRA {_esc(tipo_b)}: {_esc(b.get('gatilho', ''))}</strong>
-                    <p style="margin:4px 0; font-size:13px; color:#E2E8F0;"><strong>Conduta:</strong> {_esc(b.get('acao', ''))}</p>
-                    <small style="color:#94A3B8;">Referência: {_esc(b.get('referencia', ''))}</small>
-                </div>
-                """
+    # --- 6. OBJETIVOS DO PACIENTE (PSFS / SANE / GROC / PASS) ---
+    obj_paciente = dados_aval.get('Objetivo_Paciente', 'Retorno à função e esporte sem dor')
+    psfs_base = int(_safe_float(dados_aval.get('PSFS_Baseline', 3), 3.0))
+    sane_base = _safe_float(dados_aval.get('SANE_Baseline_Pct', 30.0), 30.0)
+    sane_atual = _safe_float(hist[-1].get('SANE_Pct', sane_base), sane_base) if hist else sane_base
+    ganho_sane = sane_atual - sane_base
+    b64_sane = _gerar_grafico_sane_clean_b64(hist, sane_base)
+
+    status_sane = "verde" if (sane_atual >= 80 or ganho_sane >= 15) else "amarelo"
+    conc_sane_txt = (
+        f"Evolução de {ganho_sane:+.0f} pontos percentuais na percepção de capacidade funcional para '{obj_paciente}' "
+        f"desde o início do tratamento ({sane_base:.0f}% → {sane_atual:.0f}% na escala SANE)."
+    )
+
+    # --- 7. FORÇA ISOMÉTRICA / MUSCULAR (DIREITO × ESQUERDO — ESTILO IMAGEM 2) ---
+    din_d_str = dados_aval.get('Dinamometria_Dir', '')
+    din_e_str = dados_aval.get('Dinamometria_Esq', '')
+    oxf_d_str = dados_aval.get('Forca_Geral_Dir', '')
+    oxf_e_str = dados_aval.get('Forca_Geral_Esq', '')
+
+    ext_kg_d = _extrair_chave_str(din_d_str, "Ext", 0.0)
+    ext_kg_e = _extrair_chave_str(din_e_str, "Ext", 0.0)
+    usa_din = (ext_kg_d > 0 or ext_kg_e > 0)
+    un_forca = "kgf" if usa_din else "grau (0-5)"
+    fonte_d = din_d_str if usa_din else oxf_d_str
+    fonte_e = din_e_str if usa_din else oxf_e_str
+
+    grupos_forca = [
+        ("Extensão Joelho (Quadríceps)", "Ext"),
+        ("Flexão Joelho (Isquiotibiais)", "Flex"),
+        ("Abdução Quadril (Glúteo Médio)", "Abd"),
+        ("Adução Quadril (Adutores)", "Add"),
+    ]
+
+    cards_forca_html = ""
+    maior_deficit_pct = 0.0
+    for nome_g, pref_g in grupos_forca:
+        vd = _extrair_chave_str(fonte_d, pref_g, 0.0)
+        ve = _extrair_chave_str(fonte_e, pref_g, 0.0)
+        max_v = max(vd, ve, 0.1)
+
+        if vd == 0 and ve == 0:
+            deficit_pct = 0.0
+            lsi_tec = 100.0
+            lado_def = ""
         else:
-            blocos_ia += """
-            <div class="alert-box" style="border-left-color:#10B981;">
-                <strong style="color:#10B981;">RASTREIO DE BANDEIRAS CLÍNICAS NEGATIVO</strong>
-                <p style="margin:4px 0; font-size:13px; color:#E2E8F0;">Nenhuma Red/Yellow Flag ativa detectada. Paciente seguro para progressão de carga.</p>
-            </div>
-            """
+            lsi_tec = (min(vd, ve) / max_v) * 100.0
+            deficit_pct = max(0.0, 100.0 - lsi_tec)
+            lado_def = "D" if vd < ve else ("E" if ve < vd else "")
 
-        insights_html = f"""
-        <div class="card">
-            <div class="section-tag">MOTOR DE REGRAS DETERMINÍSTICAS (PBE)</div>
-            <h3>Análise de Inteligência Clínica & Simetria Funcional</h3>
-            {blocos_ia}
+        if nome_g.startswith("Extensão"):
+            maior_deficit_pct = deficit_pct
+
+        if deficit_pct <= 10.0:
+            cor_def = "#16A34A"
+            badge_def = "normal / simétrico"
+            st_forca = "verde"
+            conc_f_txt = f"Simetria muscular adequada em {nome_g} (Déficit de {deficit_pct:.0f}% ≤ 10%, LSI técnico de {lsi_tec:.0f}%)."
+        elif deficit_pct <= 20.0:
+            cor_def = "#EAB308"
+            badge_def = "déficit discreto"
+            st_forca = "amarelo"
+            conc_f_txt = f"Déficit discreto de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} (LSI técnico: {lsi_tec:.0f}% · referência clínica ≥ 90%)."
+        elif deficit_pct <= 30.0:
+            cor_def = "#F97316"
+            badge_def = "déficit moderado"
+            st_forca = "laranja"
+            conc_f_txt = f"Déficit moderado de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} (LSI: {lsi_tec:.0f}%). Intensificar fortalecimento unilateral."
+        else:
+            cor_def = "#DC2626"
+            badge_def = "déficit importante"
+            st_forca = "vermelho"
+            conc_f_txt = f"Déficit importante de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} (LSI: {lsi_tec:.0f}%). Prioridade máxima na reabilitação."
+
+        w_d = (vd / max_v) * 100.0 if (vd > 0 or ve > 0) else 0.0
+        w_e = (ve / max_v) * 100.0 if (vd > 0 or ve > 0) else 0.0
+        cor_bar_d = cor_def if vd < ve else "#16A34A"
+        cor_bar_e = cor_def if ve < vd else "#16A34A"
+
+        cards_forca_html += f"""
+        <div class="sub-card" style="margin-bottom:0;">
+            <div class="sub-card-header">
+                <span class="sub-card-title">{_esc(nome_g)}</span>
+                <span class="sub-card-meta">Direito × Esquerdo · Déficit {deficit_pct:.0f}% {lado_def}</span>
+            </div>
+            <div class="ref-banner">
+                <span>Referência clínica PBE</span>
+                <strong>≤ 10% de diferença entre os membros (LSI ≥ 90%)</strong>
+            </div>
+            <div style="display:grid; grid-template-columns: 1.35fr 1fr; gap:14px; align-items:center; margin: 12px 0;">
+                <div>
+                    <div style="font-size:11px; font-weight:800; color:#103E55; margin-bottom:8px;">Avaliação ({_esc(un_forca)})</div>
+                    <div class="force-row">
+                        <span class="force-lbl">Direito</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:{w_d:.1f}%; background:{cor_bar_d};"></div></div>
+                        <span class="force-val">{vd:.1f}</span>
+                    </div>
+                    <div class="force-row">
+                        <span class="force-lbl">Esquerdo</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:{w_e:.1f}%; background:{cor_bar_e};"></div></div>
+                        <span class="force-val">{ve:.1f}</span>
+                    </div>
+                    <div style="font-size:10.5px; color:#64748B; margin-top:6px;">
+                        {deficit_pct:.0f}% {lado_def} · {_esc(badge_def)}
+                    </div>
+                </div>
+                <div class="deficit-box">
+                    <span class="deficit-lbl">DÉFICIT ENTRE OS MEMBROS</span>
+                    <div class="deficit-big" style="color:{cor_def};">{deficit_pct:.0f}% {lado_def}</div>
+                    <span class="deficit-pill" style="background:{cor_def};">{_esc(badge_def)}</span>
+                    <span class="deficit-sub">LSI técnico: {lsi_tec:.0f}% · ref. ≥ 90%</span>
+                </div>
+            </div>
+            {_box_conclusao_editavel(st_forca, conc_f_txt)}
         </div>
         """
 
-    # Tabela Comparativa Bilateral do Exame Físico & Funcional (Direito x Esquerdo)
-    der_d, der_e = _extrair_par_dir_esq(dados_aval, "Derrame_Dir", "Derrame_Esq", "Derrame")
-    ali_d, ali_e = _extrair_par_dir_esq(dados_aval, "Alinhamento_Dir", "Alinhamento_Esq", "Alinhamento")
-    trof_d, trof_e = _extrair_par_dir_esq(dados_aval, "Trofismo_Dir", "Trofismo_Esq", "Trofismo")
-    per_d_cm = dados_aval.get("Perimetria_Dir_cm")
-    per_e_cm = dados_aval.get("Perimetria_Esq_cm")
-    if per_d_cm or per_e_cm:
-        per_d_str = f"{per_d_cm} cm" if per_d_cm else "-"
-        per_e_str = f"{per_e_cm} cm" if per_e_cm else "-"
+    cor_kpi_forca = "#16A34A" if maior_deficit_pct <= 10 else ("#D97706" if maior_deficit_pct <= 20 else "#DC2626")
+    txt_kpi_forca = f"{maior_deficit_pct:.0f}% déficit" if maior_deficit_pct > 0 else "Simétrico"
+    sub_kpi_forca = f"LSI Quad: {100.0 - maior_deficit_pct:.0f}%"
+
+    # --- 8. CONCLUSÃO FINAL E RECOMENDAÇÕES DO FISIOTERAPEUTA ---
+    conclusao_livre = dados_aval.get("Conclusao_Final_Fisio", "")
+    if not conclusao_livre:
+        conclusao_livre = (
+            f"Paciente apresenta evolução clínica e biomecânica consistente no período avaliado, "
+            f"com dor em {dor_atual:.0f}/10 na EVA, flexão de joelho de {flex_atual:.0f}° e capacidade funcional percebida (SANE) em {sane_atual:.0f}%. "
+            f"Recomendamos manutenção da progressão de carga específica e monitoramento dos critérios objetivos de simetria (LSI ≥ 90%)."
+        )
+
+    # Logo no Header
+    logo_b64 = _carregar_logo_b64()
+    if logo_b64:
+        logo_html = f'<img src="data:image/png;base64,{logo_b64}" alt="GENUA" style="max-height:66px; width:auto; border-radius:10px;" />'
     else:
-        per_d_str, per_e_str = _extrair_par_dir_esq(dados_aval, "Perimetria_Dir_cm", "Perimetria_Esq_cm", "Perimetria")
+        logo_html = '<div style="font-size:26px; font-weight:900; letter-spacing:1px; color:#FFFFFF;">GENUA</div><div style="font-size:10px; color:#A5F3FC; letter-spacing:1.2px;">FISIOTERAPIA ESPORTIVA</div>'
 
-    palp_d, palp_e = _extrair_par_dir_esq(dados_aval, "Palpacao_Dir", "Palpacao_Esq", "Palpacao")
-    din_d, din_e = _extrair_par_dir_esq(dados_aval, "Dinamometria_Dir", "Dinamometria_Esq")
-    oxf_d, oxf_e = _extrair_par_dir_esq(dados_aval, "Forca_Geral_Dir", "Forca_Geral_Esq")
-    adm_fl_d, adm_fl_e = _extrair_par_dir_esq(dados_aval, "ADM_Flex_Dir", "ADM_Flex_Esq", "ADM_Joelho_Flexao")
-    adm_ex_d, adm_ex_e = _extrair_par_dir_esq(dados_aval, "ADM_Ext_Dir", "ADM_Ext_Esq", "ADM_Joelho_Extensao")
-    lng_d, lng_e = _extrair_par_dir_esq(dados_aval, "Lunge_Dir", "Lunge_Esq", "Lunge_Test")
-    tlig_d, tlig_e = _extrair_par_dir_esq(dados_aval, "Testes_Ligamentares_Dir", "Testes_Ligamentares_Esq", "Testes_Ligamentares")
-    tmen_d, tmen_e = _extrair_par_dir_esq(dados_aval, "Testes_Meniscais_Dir", "Testes_Meniscais_Esq", "Testes_Meniscais")
-    tpat_d, tpat_e = _extrair_par_dir_esq(dados_aval, "Testes_Femoropatelar_Dir", "Testes_Femoropatelar_Esq", "Testes_Femoropatelar")
+    svg_gauge_flex = _construir_svg_gauge_flexao(flex_atual, 135.0)
+    svg_donut_ext = _construir_svg_donut_extensao(ext_atu_deg)
 
-    pares_bilaterais = [
-        ("Derrame Articular (Tecla/Onda)", der_d, der_e),
-        ("Alinhamento Estático", ali_d, ali_e),
-        ("Trofismo Muscular", trof_d, trof_e),
-        ("Perimetria de Coxa (10 cm supra)", per_d_str, per_e_str),
-        ("Palpação Dolorosa", palp_d, palp_e),
-        ("Força Manual (Oxford 0-5)", oxf_d, oxf_e),
-        ("Dinamometria Isométrica (kgf)", din_d, din_e),
-        ("ADM Flexão de Joelho (°)", adm_fl_d, adm_fl_e),
-        ("ADM Extensão Terminal (°)", adm_ex_d, adm_ex_e),
-        ("Lunge Test — Dorsiflexão (cm)", lng_d, lng_e),
-        ("Testes Ligamentares (+)", tlig_d, tlig_e),
-        ("Testes Meniscais (+)", tmen_d, tmen_e),
-        ("Testes Femoropatelares / Tendão (+)", tpat_d, tpat_e),
-    ]
-
-    linhas_bilaterais_html = "".join([
-        f"<tr><td><strong>{_esc(param)}</strong></td><td style='color:#00E5FF;'>{_esc(vd)}</td><td style='color:#10B981;'>{_esc(ve)}</td></tr>"
-        for param, vd, ve in pares_bilaterais
-    ])
-
-    # Tabela das Últimas 5 Sessões (Incluindo SANE, GROC e PASS)
-    linhas_sessoes = ""
-    for ev in hist[-5:]:
-        sane_ev = f"{_safe_float(ev.get('SANE_Pct'), 0):.0f}%" if ev.get('SANE_Pct') is not None else "-"
-        groc_ev = f"{int(_safe_float(ev.get('GROC_Score'), 0)):+d}" if ev.get('GROC_Score') is not None else "-"
-        pass_ev = "Sim 👍" if ev.get('PASS_Atingido') is True else ("Não" if ev.get('PASS_Atingido') is False else "-")
-        linhas_sessoes += f"""
-        <tr>
-            <td><strong>{_esc(str(ev.get('Data', '-'))[:10])}</strong></td>
-            <td style="color:#00E5FF; font-weight:700;">{_esc(ev.get('Dor', '-'))}/10</td>
-            <td>{_esc(ev.get('Flexao', '-'))}°</td>
-            <td>{_esc(ev.get('Extensao', '-'))}</td>
-            <td>{_esc(ev.get('Inchaço', ev.get('Inchaco', '-')))}</td>
-            <td style="color:#10B981; font-weight:700;">{_esc(sane_ev)}</td>
-            <td>{_esc(groc_ev)}</td>
-            <td>{_esc(pass_ev)}</td>
-        </tr>
-        """
-    if not linhas_sessoes:
-        linhas_sessoes = "<tr><td colspan='8' style='text-align:center; color:#94A3B8;'>Nenhuma sessão de check-in registrada.</td></tr>"
-
-    # Dados Gerais da Anamnese & Exames
-    campos_aval = [
-        ("Queixa Principal (QP)", dados_aval.get("QP", "-")),
-        ("Lado Acometido Principal", lado_acom),
-        ("Classificação / Origem da Dor", f"{dados_aval.get('Class_Dor', '-')} ({dados_aval.get('Origem_Dor', '-')})"),
-        ("Padrão de Marcha Global", dados_aval.get("Marcha", "-")),
-        ("Comorbidades", dados_aval.get("Comorbidades", "-")),
-        ("Exames Apresentados", dados_aval.get("Exames_Apresentados", "-")),
-        ("Laudo / Achados de Imagem", dados_aval.get("Laudo_Exames", "-")),
-    ]
-    aval_items_html = "".join([
-        f"<div class='kv-row'><span class='kv-label'>{_esc(k)}</span><span class='kv-val'>{_esc(v)}</span></div>"
-        for k, v in campos_aval
-    ])
-
-    data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
-
-    # Documento HTML Completo (Dark Apple-Style + Print CSS fiel)
+    # ============================================================
+    # MONTAGEM DO DOCUMENTO HTML5 CLEAN LIGHT GENUA
+    # ============================================================
     html_completo = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Laudo Clínico GENUA - {_esc(paciente_nome)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<title>Relatório de Evolução GENUA - {_esc(paciente_nome)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
     :root {{
-        --bg-main: #0B0F19;
-        --bg-card: #111827;
-        --bg-sub: #1E293B;
-        --border: #334155;
-        --text-main: #F8FAFC;
-        --text-muted: #94A3B8;
-        --cyan: #00E5FF;
-        --emerald: #10B981;
-        --coral: #FF4D6D;
-        --amber: #F59E0B;
-        --indigo: #6366F1;
+        --genua-primary: #103E55;
+        --genua-secondary: #2E8B9A;
+        --bg-page: #F4F6F8;
+        --bg-card: #FFFFFF;
+        --bg-subtle: #F8FAFC;
+        --border-color: #E2E8F0;
+        --text-dark: #1E293B;
+        --text-muted: #64748B;
     }}
     * {{
         box-sizing: border-box;
@@ -686,417 +962,633 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     }}
     body {{
         margin: 0;
-        padding: 24px;
+        padding: 20px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        background-color: var(--bg-main);
-        color: var(--text-main);
-        line-height: 1.5;
+        background-color: var(--bg-page);
+        color: var(--text-dark);
+        line-height: 1.45;
     }}
     .container {{
-        max-width: 1040px;
+        max-width: 980px;
         margin: 0 auto;
     }}
-    .top-bar {{
+    .action-bar {{
         display: flex;
         justify-content: space-between;
         align-items: center;
+        background: #FFFFFF;
+        border: 1px solid var(--border-color);
+        padding: 12px 18px;
+        border-radius: 14px;
         margin-bottom: 18px;
+        box-shadow: 0 2px 8px rgba(16, 62, 85, 0.05);
     }}
     .btn-print {{
-        background: linear-gradient(135deg, #00E5FF 0%, #398E9B 100%);
-        color: #0B0F19;
+        background: linear-gradient(135deg, #103E55 0%, #2E8B9A 100%);
+        color: #FFFFFF;
         border: none;
-        padding: 10px 20px;
-        border-radius: 10px;
+        padding: 10px 22px;
+        border-radius: 99px;
         font-weight: 700;
         font-size: 13px;
         cursor: pointer;
-        box-shadow: 0 4px 15px rgba(0, 229, 255, 0.25);
+        box-shadow: 0 4px 12px rgba(16, 62, 85, 0.2);
     }}
-    .hero-card {{
-        background: linear-gradient(135deg, #0A2540 0%, #103E55 55%, #0F172A 100%);
-        border: 1px solid rgba(0, 229, 255, 0.35);
+    .btn-print:hover {{
+        filter: brightness(1.08);
+    }}
+
+    /* HEADER INSTITUCIONAL GENUA (1ª ABA DO PDF) */
+    .header-banner {{
+        background: linear-gradient(135deg, #0D3246 0%, #103E55 60%, #1B5E7A 100%);
+        color: #FFFFFF;
         border-radius: 18px;
-        padding: 28px;
-        margin-bottom: 22px;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        padding: 24px 28px;
+        margin-bottom: 18px;
+        display: grid;
+        grid-template-columns: 210px 1fr;
+        gap: 24px;
+        align-items: center;
+        box-shadow: 0 8px 24px rgba(16, 62, 85, 0.14);
     }}
-    .hero-top {{
+    .brand-col {{
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 12px;
-        border-bottom: 1px solid rgba(255,255,255,0.12);
-        padding-bottom: 16px;
-        margin-bottom: 16px;
+        flex-direction: column;
+        gap: 8px;
+        border-right: 1px solid rgba(255, 255, 255, 0.15);
+        padding-right: 20px;
     }}
-    .brand-badge {{
+    .logo-box {{
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        padding: 12px;
+        text-align: center;
+    }}
+    .header-pill {{
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        color: #E2E8F0;
         font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 1.5px;
-        color: var(--cyan);
-        text-transform: uppercase;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 99px;
+        text-align: center;
     }}
-    .hero-title {{
-        margin: 4px 0 0 0;
-        font-size: 25px;
+    .meta-grid {{
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px 18px;
+    }}
+    .meta-item {{
+        display: flex;
+        flex-direction: column;
+    }}
+    .meta-lbl {{
+        font-size: 10.5px;
+        color: #94A3B8;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        margin-bottom: 2px;
+    }}
+    .meta-val {{
+        font-size: 13.5px;
         font-weight: 800;
-        letter-spacing: -0.5px;
         color: #FFFFFF;
     }}
-    .patient-meta {{
+
+    /* RESUMO EXECUTIVO (5 PÍLULAS SEMAFÓRICAS) */
+    .section-card {{
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 20px 22px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+    }}
+    .section-title {{
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.8px;
+        color: var(--genua-primary);
+        text-transform: uppercase;
+        margin-bottom: 14px;
+        border-bottom: 1px solid #F1F5F9;
+        padding-bottom: 8px;
+    }}
+    .exec-grid {{
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
     }}
-    .meta-box {{
-        background: rgba(15, 23, 42, 0.55);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 10px 14px;
-        border-radius: 12px;
+    .exec-pill {{
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        padding: 12px 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }}
-    .meta-label {{
-        font-size: 10.5px;
+    .exec-icon {{
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        color: #FFFFFF;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 15px;
+        flex-shrink: 0;
+    }}
+    .exec-info {{
+        overflow: hidden;
+    }}
+    .exec-lbl {{
+        font-size: 9.5px;
+        font-weight: 800;
         color: var(--text-muted);
         text-transform: uppercase;
         display: block;
     }}
-    .meta-value {{
-        font-size: 14px;
-        font-weight: 700;
-        color: #FFFFFF;
-    }}
-    .kpi-grid {{
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 14px;
-        margin-bottom: 22px;
-    }}
-    .kpi-card {{
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 18px;
-        position: relative;
-        overflow: hidden;
-    }}
-    .kpi-bar {{
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-    }}
-    .kpi-label {{
-        font-size: 10.5px;
-        font-weight: 700;
-        letter-spacing: 0.8px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-    }}
-    .kpi-val {{
-        font-size: 26px;
+    .exec-main {{
+        font-size: 13px;
         font-weight: 800;
-        margin: 8px 0 6px 0;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
-    .kpi-sub {{
-        font-size: 11.5px;
+    .exec-sub {{
+        font-size: 10.5px;
         font-weight: 600;
-        color: #CBD5E1;
+        color: var(--text-muted);
+        display: block;
     }}
+
+    /* SUB-CARDS E GRIDS */
     .grid-2 {{
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
-        gap: 18px;
-        margin-bottom: 22px;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
     }}
-    .card {{
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 22px;
-        margin-bottom: 20px;
+    .sub-card {{
+        background: #FFFFFF;
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 12px;
     }}
-    .section-tag {{
-        font-size: 10.5px;
+    .sub-card-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 10px;
+        gap: 8px;
+    }}
+    .sub-card-title {{
+        font-size: 13.5px;
         font-weight: 800;
-        letter-spacing: 1.2px;
-        color: var(--cyan);
-        text-transform: uppercase;
-        margin-bottom: 4px;
+        color: var(--genua-primary);
     }}
-    .card h3 {{
-        margin: 0 0 16px 0;
-        font-size: 17px;
-        font-weight: 700;
-        color: #FFFFFF;
+    .sub-card-caption {{
+        font-size: 11.5px;
+        color: var(--text-muted);
+        font-weight: 500;
+    }}
+    .sub-card-meta {{
+        font-size: 10.5px;
+        color: var(--text-muted);
+        font-weight: 600;
+        text-align: right;
     }}
     .chart-img {{
         width: 100%;
         height: auto;
+        display: block;
+        margin: 4px 0 10px 0;
+    }}
+
+    /* MINI-CARDS DE MARCOS (Avaliação -> Reav 1 -> Reav 2) */
+    .stages-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin: 10px 0;
+    }}
+    .stage-pill {{
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
         border-radius: 10px;
-        margin-bottom: 12px;
+        padding: 8px 10px;
     }}
-    .insight-pill {{
-        background: var(--bg-sub);
-        border-left: 4px solid var(--cyan);
-        padding: 10px 14px;
+    .stage-lbl {{
+        font-size: 10px;
+        color: var(--text-muted);
+        font-weight: 600;
+        display: block;
+    }}
+    .stage-val {{
+        font-size: 14.5px;
+        font-weight: 800;
+        color: var(--text-dark);
+    }}
+    .ref-banner {{
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
         border-radius: 8px;
-        font-size: 12.5px;
-        color: #E2E8F0;
-    }}
-    .prom-item {{
-        background: var(--bg-sub);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 12px;
-        padding: 14px 16px;
-        margin-bottom: 12px;
-    }}
-    .prom-header {{
+        padding: 6px 12px;
         display: flex;
         justify-content: space-between;
-        align-items: baseline;
-        margin-bottom: 8px;
-    }}
-    .prom-title {{
-        font-weight: 800;
-        font-size: 15px;
-        color: #FFFFFF;
-        margin-right: 8px;
-    }}
-    .prom-sub {{
-        font-size: 12px;
+        font-size: 11px;
         color: var(--text-muted);
+        margin-bottom: 10px;
     }}
-    .prom-score {{
-        font-size: 18px;
+    .ref-banner strong {{
+        color: var(--text-dark);
+    }}
+
+    /* FORÇA ISOMÉTRICA (D x E) */
+    .force-row {{
+        display: grid;
+        grid-template-columns: 58px 1fr 38px;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 7px;
+        font-size: 11.5px;
+    }}
+    .force-lbl {{
+        color: var(--text-dark);
+        font-weight: 600;
+    }}
+    .force-val {{
         font-weight: 800;
+        color: var(--text-dark);
+        text-align: right;
     }}
-    .progress-track {{
+    .bar-track {{
         width: 100%;
-        height: 8px;
-        background: #0F172A;
+        height: 9px;
+        background: #E2E8F0;
         border-radius: 99px;
         overflow: hidden;
-        margin-bottom: 8px;
     }}
-    .progress-fill {{
+    .bar-fill {{
         height: 100%;
         border-radius: 99px;
     }}
-    .prom-footer {{
+    .deficit-box {{
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 10px 8px;
+        text-align: center;
         display: flex;
-        justify-content: space-between;
-        font-size: 11.5px;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }}
+    .deficit-lbl {{
+        font-size: 8.5px;
+        font-weight: 800;
         color: var(--text-muted);
+        text-transform: uppercase;
     }}
-    .alert-box {{
-        background: var(--bg-sub);
-        border-left: 4px solid var(--cyan);
-        border-radius: 10px;
-        padding: 14px 16px;
-        margin-bottom: 12px;
+    .deficit-big {{
+        font-size: 24px;
+        font-weight: 900;
+        line-height: 1.1;
     }}
-    .badge-pill {{
-        font-size: 11px;
-        font-weight: 700;
-        padding: 3px 10px;
+    .deficit-pill {{
+        color: #FFFFFF;
+        font-size: 9.5px;
+        font-weight: 800;
+        padding: 2px 10px;
         border-radius: 99px;
     }}
-    .modern-table {{
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12.5px;
+    .deficit-sub {{
+        font-size: 9px;
+        color: var(--text-muted);
+        font-weight: 600;
     }}
-    .modern-table th {{
-        text-align: left;
-        padding: 10px 12px;
-        background: #0A2540;
-        color: var(--cyan);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        border-bottom: 2px solid var(--cyan);
-    }}
-    .modern-table td {{
-        padding: 9px 12px;
-        border-bottom: 1px solid var(--border);
-        color: #E2E8F0;
-    }}
-    .kv-row {{
+
+    /* BOX DE CONCLUSÃO AUTOMÁTICA + EDITÁVEL */
+    .conclusion-box {{
+        border-left: 4px solid #16A34A;
+        background: #F0FDF4;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-top: 10px;
         display: flex;
         justify-content: space-between;
-        padding: 9px 0;
-        border-bottom: 1px solid rgba(255,255,255,0.07);
-        font-size: 12.5px;
-        gap: 12px;
+        align-items: center;
+        gap: 10px;
     }}
-    .kv-label {{
-        color: var(--cyan);
-        font-weight: 600;
-        min-width: 180px;
-    }}
-    .kv-val {{
-        color: #F8FAFC;
-        text-align: right;
-    }}
-    .signature-box {{
-        text-align: center;
-        padding: 28px 20px;
-        margin-top: 24px;
-        border-top: 1px solid var(--border);
-        color: var(--text-muted);
+    .conclusion-content {{
         font-size: 12px;
+        color: #1E293B;
+        line-height: 1.45;
+        flex: 1;
+        outline: none;
+        padding: 2px 4px;
+        border-radius: 6px;
+        transition: background 0.15s;
     }}
-    .sig-line {{
-        width: 280px;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-        margin: 26px auto 10px auto;
+    .conclusion-content:hover, .conclusion-content:focus {{
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 0 0 2px rgba(46, 139, 154, 0.35);
     }}
+    .status-dot {{
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 5px;
+        vertical-align: middle;
+    }}
+    .edit-badge {{
+        font-size: 9.5px;
+        font-weight: 800;
+        color: #94A3B8;
+        letter-spacing: 0.5px;
+        user-select: none;
+        flex-shrink: 0;
+    }}
+
+    /* CONCLUSÃO FINAL E LEGENDA */
+    .final-textarea {{
+        width: 100%;
+        min-height: 76px;
+        border: 1px solid #CBD5E1;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 12.5px;
+        color: var(--text-dark);
+        background: #F8FAFC;
+        outline: none;
+        line-height: 1.5;
+    }}
+    .final-textarea:focus {{
+        background: #FFFFFF;
+        border-color: var(--genua-secondary);
+        box-shadow: 0 0 0 3px rgba(46, 139, 154, 0.15);
+    }}
+    .legend-bar {{
+        background: #FFFFFF;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 12px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--text-dark);
+    }}
+    .legend-item {{
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }}
+    .legend-dot {{
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+    }}
+
     @media print {{
         .no-print {{ display: none !important; }}
-        body {{ padding: 0; background-color: #0B0F19 !important; }}
-        .card, .hero-card, .kpi-card {{ break-inside: avoid; }}
+        body {{ padding: 0; background: #FFFFFF !important; }}
+        .section-card, .sub-card, .header-banner {{ break-inside: avoid; box-shadow: none !important; }}
     }}
     @media (max-width: 768px) {{
-        .kpi-grid {{ grid-template-columns: 1fr 1fr; }}
+        .header-banner {{ grid-template-columns: 1fr; }}
+        .brand-col {{ border-right: none; border-bottom: 1px solid rgba(255,255,255,0.15); padding-right: 0; padding-bottom: 14px; }}
+        .meta-grid {{ grid-template-columns: 1fr 1fr; }}
+        .exec-grid {{ grid-template-columns: 1fr 1fr; }}
         .grid-2 {{ grid-template-columns: 1fr; }}
     }}
 </style>
 </head>
 <body>
 <div class="container">
-    <div class="top-bar no-print">
-        <span style="font-size:12px; color:#94A3B8;">⚡ Visualização Interativa GENUA HealthTech</span>
-        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar como PDF</button>
+
+    <!-- BARRA DE AÇÃO INTERATIVA (OCULTA NA IMPRESSÃO) -->
+    <div class="action-bar no-print">
+        <div style="font-size:12px; color:#475569;">
+            💡 <strong>Laudo Interativo GENUA:</strong> Clique em qualquer caixa de <strong>Conclusão</strong> ou no <strong>Resumo Executivo</strong> abaixo para editar o texto antes de imprimir.
+        </div>
+        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
     </div>
 
-    <div class="hero-card">
-        <div class="hero-top">
-            <div>
-                <div class="brand-badge">GENUA INTELIGÊNCIA CLÍNICA • PRÁTICA BASEADA EM EVIDÊNCIA</div>
-                <h1 class="hero-title">Laudo de Evolução Biomecânica e Funcional</h1>
+    <!-- 1. CABEÇALHO INSTITUCIONAL GENUA (1ª DOBRA) -->
+    <div class="header-banner">
+        <div class="brand-col">
+            <div class="logo-box">
+                {logo_html}
             </div>
-            <div style="text-align:right; font-size:12px; color:#CBD5E1;">
-                <div><strong>Emitido em:</strong> {_esc(data_emissao)}</div>
-                <div style="color:var(--cyan); font-weight:700; margin-top:4px;">Fenótipo: {_esc(fen_label)}</div>
+            <div class="header-pill">Relatório de Evolução Clínica</div>
+            <div class="header-pill" style="color:#A5F3FC; border-color:rgba(165,243,252,0.3);">Genua Evolution Report</div>
+        </div>
+        <div class="meta-grid">
+            <div class="meta-item">
+                <span class="meta-lbl">Paciente</span>
+                <span class="meta-val" contenteditable="true">{_esc(paciente_nome)} ({_esc(idade)} anos)</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-lbl">Diagnóstico Clínico</span>
+                <span class="meta-val" contenteditable="true">{_esc(dx_texto)}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-lbl">Médico / Indicação</span>
+                <span class="meta-val" contenteditable="true">{_esc(medico_ind)}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-lbl">Data do Relatório</span>
+                <span class="meta-val" contenteditable="true">{_esc(data_emissao)}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-lbl">Jornada / Membro</span>
+                <span class="meta-val" contenteditable="true">Joelho ({_esc(lado_acom)})</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-lbl">Esporte / Atividade</span>
+                <span class="meta-val" contenteditable="true">{_esc(ocupacao)}</span>
+            </div>
+            <div class="meta-item" style="grid-column: span 2;">
+                <span class="meta-lbl">Período Avaliado</span>
+                <span class="meta-val" contenteditable="true">{_esc(periodo_avaliado)}</span>
             </div>
         </div>
-        <div class="patient-meta">
-            <div class="meta-box">
-                <span class="meta-label">Paciente</span>
-                <span class="meta-value">{_esc(paciente_nome)}</span>
+    </div>
+
+    <!-- 2. RESUMO EXECUTIVO (5 INDICADORES SEMAFÓRICOS) -->
+    <div class="section-card">
+        <div class="section-title">RESUMO EXECUTIVO</div>
+        <div class="exec-grid">
+            <div class="exec-pill">
+                <div class="exec-icon" style="background:{cor_kpi_dor};">{icone_kpi_dor}</div>
+                <div class="exec-info" contenteditable="true">
+                    <span class="exec-lbl">DOR (EVA)</span>
+                    <span class="exec-main" style="color:{cor_kpi_dor};">{_esc(txt_kpi_dor)}</span>
+                    <span class="exec-sub">{_esc(sub_kpi_dor)}</span>
+                </div>
             </div>
-            <div class="meta-box">
-                <span class="meta-label">Idade / Lado Acometido</span>
-                <span class="meta-value">{_esc(idade)} anos • {_esc(lado_acom)}</span>
+            <div class="exec-pill">
+                <div class="exec-icon" style="background:{cor_kpi_func};">↑</div>
+                <div class="exec-info" contenteditable="true">
+                    <span class="exec-lbl">FUNÇÃO</span>
+                    <span class="exec-main" style="color:{cor_kpi_func};">{_esc(txt_kpi_func)}</span>
+                    <span class="exec-sub">{_esc(sub_kpi_func)}</span>
+                </div>
             </div>
-            <div class="meta-box">
-                <span class="meta-label">Diagnóstico Clínico</span>
-                <span class="meta-value">{_esc(dx_texto)}</span>
+            <div class="exec-pill">
+                <div class="exec-icon" style="background:{cor_kpi_adm};">{icone_kpi_adm}</div>
+                <div class="exec-info" contenteditable="true">
+                    <span class="exec-lbl">ADM JOELHO</span>
+                    <span class="exec-main" style="color:{cor_kpi_adm};">{_esc(txt_kpi_adm)}</span>
+                    <span class="exec-sub">{_esc(sub_kpi_adm)}</span>
+                </div>
             </div>
-            <div class="meta-box">
-                <span class="meta-label">Janela Prognóstica PBE</span>
-                <span class="meta-value" style="color:var(--cyan);">{_esc(tempo_esp)} semanas</span>
+            <div class="exec-pill">
+                <div class="exec-icon" style="background:{cor_kpi_prom};">Q</div>
+                <div class="exec-info" contenteditable="true">
+                    <span class="exec-lbl">{_esc(kpi_prom_nome)}</span>
+                    <span class="exec-main" style="color:#103E55;">{_esc(kpi_prom_val)}</span>
+                    <span class="exec-sub">{_esc(kpi_prom_sub)}</span>
+                </div>
+            </div>
+            <div class="exec-pill">
+                <div class="exec-icon" style="background:{cor_kpi_forca};">=</div>
+                <div class="exec-info" contenteditable="true">
+                    <span class="exec-lbl">FORÇA / SIMETRIA</span>
+                    <span class="exec-main" style="color:{cor_kpi_forca};">{_esc(txt_kpi_forca)}</span>
+                    <span class="exec-sub">{_esc(sub_kpi_forca)}</span>
+                </div>
+            </div>
+        </div>
+        <div class="no-print" style="font-size:10.5px; color:#64748B; margin-top:10px;">
+            Clique nos indicadores do resumo ou nas conclusões abaixo para personalizar o texto antes de exportar/imprimir.
+        </div>
+    </div>
+
+    <!-- 3. EVOLUÇÃO DA DOR (EVA) -->
+    <div class="section-card">
+        <div class="section-title">EVOLUÇÃO DA DOR · EVA (0 A 10)</div>
+        <img class="chart-img" src="data:image/png;base64,{b64_dor}" alt="Evolução da Dor EVA" />
+        {_box_conclusao_editavel(status_conc_dor, conc_dor_txt)}
+    </div>
+
+    <!-- 4. TESTES FUNCIONAIS ESPECÍFICOS -->
+    <div class="section-card">
+        <div class="section-title">TESTES FUNCIONAIS ESPECÍFICOS</div>
+        <img class="chart-img" src="data:image/png;base64,{b64_testes}" alt="Testes Funcionais" />
+        {boxes_conclusao_testes_html}
+    </div>
+
+    <!-- 5. AMPLITUDE DE MOVIMENTO (ADM — VELOCÍMETRO + MARCOS POR SESSÃO + CONCLUSÃO) -->
+    <div class="section-card">
+        <div class="section-title">AMPLITUDE DE MOVIMENTO (ADM) AO LONGO DAS SESSÕES</div>
+        <div class="grid-2">
+            <!-- Flexão de Joelho -->
+            <div class="sub-card" style="margin-bottom:0;">
+                <div class="sub-card-header">
+                    <span class="sub-card-title">Flexão de Joelho</span>
+                    <span class="sub-card-meta">Atual: {flex_atual:.0f}° · Inicial: {flex_inicial:.0f}°</span>
+                </div>
+                {svg_gauge_flex}
+                <div class="stages-grid">
+                    {cards_sessoes_flex_html}
+                </div>
+                <div class="ref-banner">
+                    <span>Referência angular funcional</span>
+                    <strong>135°</strong>
+                </div>
+                {_box_conclusao_editavel(status_conc_flex, conc_flex_txt)}
+            </div>
+
+            <!-- Extensão de Joelho -->
+            <div class="sub-card" style="margin-bottom:0;">
+                <div class="sub-card-header">
+                    <span class="sub-card-title">Extensão de Joelho</span>
+                    <span class="sub-card-meta">Déficit atual: {ext_atu_deg:.0f}°</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:16px; margin: 14px 0;">
+                    {svg_donut_ext}
+                    <div style="flex:1;">
+                        <div class="ref-banner" style="margin-bottom:8px;">
+                            <span>Meta clínica</span>
+                            <strong>0° (Completa)</strong>
+                        </div>
+                        <p style="font-size:11px; color:#64748B; margin:0; line-height:1.45;">
+                            Para a extensão terminal do joelho, a referência de <strong>0°</strong> é tratada como alvo biomecânico absoluto para destravamento articular e ativação plena do quadríceps.
+                        </p>
+                    </div>
+                </div>
+                <div class="stages-grid">
+                    {cards_sessoes_ext_html}
+                </div>
+                <div class="ref-banner">
+                    <span>Referência angular terminal</span>
+                    <strong>0°</strong>
+                </div>
+                {_box_conclusao_editavel(status_conc_ext, conc_ext_txt)}
             </div>
         </div>
     </div>
 
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-bar" style="background:{cor_dor_hex};"></div>
-            <div class="kpi-label">Modulação da Dor (EVA)</div>
-            <div class="kpi-val" style="color:{cor_dor_hex};">{dor_inicial:.0f} → {dor_atual:.0f}</div>
-            <div class="kpi-sub">{_esc(badge_dor)}</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-bar" style="background:{cor_flex_hex};"></div>
-            <div class="kpi-label">Amplitude de Flexão</div>
-            <div class="kpi-val" style="color:{cor_flex_hex};">{flex_atual:.0f}°</div>
-            <div class="kpi-sub">{_esc(badge_flex)} (Inicial: {flex_inicial:.0f}°)</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-bar" style="background:{cor_meta_hex};"></div>
-            <div class="kpi-label">Progresso da Meta (SANE)</div>
-            <div class="kpi-val" style="color:{cor_meta_hex};">{sane_atual:.0f}%</div>
-            <div class="kpi-sub">{_esc(badge_meta)}</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-bar" style="background:var(--indigo);"></div>
-            <div class="kpi-label">Volume de Reabilitação</div>
-            <div class="kpi-val" style="color:var(--indigo);">{n_sessoes} sessões</div>
-            <div class="kpi-sub">{_esc(periodo_str)}</div>
+    <!-- 6. QUESTIONÁRIO / PROM (EXIBE SOMENTE O QUE FOI RESPONDIDO) -->
+    {html_secao_prom}
+
+    <!-- 7. OBJETIVOS DO PACIENTE (PSFS / SANE) -->
+    <div class="section-card">
+        <div class="section-title">OBJETIVOS DO PACIENTE · PSFS / SANE</div>
+        <div class="sub-card" style="margin-bottom:0;">
+            <div class="sub-card-header">
+                <div>
+                    <span class="sub-card-title">🎯 {_esc(obj_paciente)}</span>
+                    <span class="sub-card-caption"> · Escala SANE (0–100%) & PSFS Inicial ({psfs_base}/10)</span>
+                </div>
+                <span class="sub-card-meta">Meta Final: 100% (Alta Subjetiva ≥ 85%)</span>
+            </div>
+            <img class="chart-img" style="max-height:190px; object-fit:contain;" src="data:image/png;base64,{b64_sane}" alt="Evolução do Objetivo" />
+            {_box_conclusao_editavel(status_sane, conc_sane_txt)}
         </div>
     </div>
 
-    {html_metas_pbe}
-    {html_graficos}
-    {insights_html}
-    {html_tabela_func}
-
-    <div class="card">
-        <div class="section-tag">AVALIAÇÃO FÍSICA E FUNCIONAL BILATERAL (MARCO ZERO)</div>
-        <h3>Comparativo Lado a Lado: Membro Direito × Membro Esquerdo</h3>
-        <table class="modern-table">
-            <thead>
-                <tr>
-                    <th>Parâmetro Clínico / Biomecânico</th>
-                    <th>🦵 Membro Direito</th>
-                    <th>🦵 Membro Esquerdo</th>
-                </tr>
-            </thead>
-            <tbody>
-                {linhas_bilaterais_html}
-            </tbody>
-        </table>
-    </div>
-
-    <div class="grid-2">
-        <div class="card">
-            <div class="section-tag">QUESTIONÁRIOS VALIDADOS (PBE)</div>
-            <h3>Métricas Subjetivas & PROMs</h3>
-            {proms_cards_html}
-        </div>
-        <div class="card">
-            <div class="section-tag">CONTEXTO CLÍNICO</div>
-            <h3>Síntese da Anamnese & Exames</h3>
-            {aval_items_html}
+    <!-- 8. FORÇA ISOMÉTRICA · DIREITO × ESQUERDO -->
+    <div class="section-card">
+        <div class="section-title">FORÇA MUSCULAR · DIREITO × ESQUERDO (SIMETRIA / LSI)</div>
+        <div class="grid-2">
+            {cards_forca_html}
         </div>
     </div>
 
-    <div class="card">
-        <div class="section-tag">HISTÓRICO RECENTE</div>
-        <h3>Últimos Check-ins Registrados</h3>
-        <table class="modern-table">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Dor (EVA)</th>
-                    <th>Flexão</th>
-                    <th>Extensão</th>
-                    <th>Edema / Inchaço</th>
-                    <th>Meta (SANE)</th>
-                    <th>GROC</th>
-                    <th>Satisfação (PASS)</th>
-                </tr>
-            </thead>
-            <tbody>{linhas_sessoes}</tbody>
-        </table>
+    <!-- 9. CONCLUSÃO FINAL E RECOMENDAÇÕES -->
+    <div class="section-card">
+        <div class="section-title">CONCLUSÃO FINAL E RECOMENDAÇÕES CLÍNICAS</div>
+        <div class="final-textarea" contenteditable="true" spellcheck="false">
+            {_esc(conclusao_livre)}
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:12px; border-top:1px solid #F1F5F9; font-size:11.5px; color:#64748B;">
+            <div><strong>GENUA Instituto de Fisioterapia Esportiva</strong> · Prática Baseada em Evidência</div>
+            <div contenteditable="true">Fisioterapeuta Responsável · Data: {_esc(data_emissao)}</div>
+        </div>
     </div>
 
-    <div class="signature-box">
-        <p style="max-width:760px; margin:0 auto;">
-            Relatório analítico processado pela plataforma <strong>GENUA Inteligência Clínica</strong>.
-            Os pontos de corte de significância clínica (MCID, LSI, GROC, PASS e PSFS/SANE) obedecem a diretrizes científicas internacionais revisadas por pares
-            (Salaffi 2004; Grindem 2016; Kamper 2009; Tubach 2005; Shelbourne 2009; Stratford 1995). A conduta final é prerrogativa exclusiva do fisioterapeuta responsável.
-        </p>
-        <div class="sig-line"></div>
-        <div style="color:#FFFFFF; font-weight:700; font-size:14px;">Fisioterapeuta Responsável</div>
-        <div style="color:var(--cyan); font-weight:600;">GENUA Instituto de Fisioterapia Esportiva</div>
-        <div style="margin-top:4px;">CREFITO: ________________________ • Data: {datetime.now().strftime("%d/%m/%Y")}</div>
+    <!-- LEGENDA SEMAFÓRICA DE INTERPRETAÇÃO -->
+    <div class="legend-bar">
+        <span style="color:#103E55; font-weight:800;">Legenda de Interpretação</span>
+        <div class="legend-item"><span class="legend-dot" style="background:#16A34A;"></span> Normal / Favorável (Meta atingida)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#EAB308;"></span> Déficit ou melhora discreta</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#F97316;"></span> Déficit moderado / Atenção</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#DC2626;"></span> Déficit importante / Alerta</div>
     </div>
+
 </div>
 </body>
 </html>"""
@@ -1110,9 +1602,9 @@ class LaudoGenua(FPDF):
     """PDF FPDF com identidade visual Genua."""
 
     def header(self):
-        self.set_fill_color(*AZUL_PROFUNDO)
+        self.set_fill_color(*AZUL_GENUA)
         self.rect(0, 0, 140, 4, 'F')
-        self.set_fill_color(*TEAL_VIVO)
+        self.set_fill_color(*TEAL_GENUA)
         self.rect(140, 0, 70, 4, 'F')
         self.set_y(8)
 
@@ -1120,7 +1612,7 @@ class LaudoGenua(FPDF):
         self.set_y(-15)
         self.set_font('Arial', 'I', 7)
         self.set_text_color(*CINZA_TEXTO)
-        self.cell(0, 10, f'GENUA HealthTech - Pagina {self.page_no()}/{{nb}}', 0, 0, 'C')
+        self.cell(0, 10, f'GENUA Fisioterapia Esportiva - Pagina {self.page_no()}/{{nb}}', 0, 0, 'C')
 
 
 def gerar_laudo(paciente_nome, dados_aval=None, historico=None, insights=None, fenotipo=None, *args, **kwargs):
@@ -1131,12 +1623,12 @@ def gerar_laudo(paciente_nome, dados_aval=None, historico=None, insights=None, f
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
 
-    pdf.set_fill_color(*AZUL_PROFUNDO)
+    pdf.set_fill_color(*AZUL_GENUA)
     pdf.rect(10, 10, 190, 22, 'F')
     pdf.set_xy(15, 15)
     pdf.set_font('Arial', 'B', 15)
     pdf.set_text_color(*BRANCO)
-    pdf.cell(0, 6, f'LAUDO CLINICO GENUA - {_limpar_texto(paciente_nome).upper()}', 0, 1, 'L')
+    pdf.cell(0, 6, f'RELATORIO DE EVOLUCAO GENUA - {_limpar_texto(paciente_nome).upper()}', 0, 1, 'L')
     pdf.set_x(15)
     pdf.set_font('Arial', '', 9)
     pdf.set_text_color(*TEAL_VIVO)
@@ -1147,8 +1639,9 @@ def gerar_laudo(paciente_nome, dados_aval=None, historico=None, insights=None, f
     pdf.set_text_color(*PRETO_TEXTO)
     dx = dados_aval.get('Diagnostico_Clinico', '-')
     lado = dados_aval.get('Lado_Acometido', '-')
+    med = dados_aval.get('Medico_Indicador', '-')
     obj = dados_aval.get('Objetivo_Paciente', '-')
-    pdf.cell(0, 6, f'Diagnostico: {_limpar_texto(dx)} | Lado: {_limpar_texto(lado)} | Sessoes: {len(hist)}', 0, 1, 'L')
+    pdf.cell(0, 6, f'Diagnostico: {_limpar_texto(dx)} | Lado: {_limpar_texto(lado)} | Medico: {_limpar_texto(med)}', 0, 1, 'L')
     pdf.set_font('Arial', '', 9)
     pdf.cell(0, 6, f'Objetivo Funcional (PSFS): {_limpar_texto(obj)}', 0, 1, 'L')
 
