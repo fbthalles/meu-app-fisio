@@ -88,6 +88,54 @@ def _calcular_lsi_seguro(val_d: float, val_e: float, lado_acometido: str) -> tup
     return round(lsi, 1), round(lesado, 1), round(saudavel, 1), cor
 
 
+def _detectar_prom_preenchido(av_p: dict, prom_fenotipo: str = "LEFS") -> list:
+    """
+    Detecta de forma inteligente qual questionário foi realmente preenchido na Avaliação Inicial,
+    filtrando os valores 'default' automáticos dos sliders do modulo_avaliacao.py.
+    Retorna lista com 1 questionário principal sugerido.
+    """
+    if not av_p:
+        return []
+
+    lefs_v = float(av_p.get("LEFS_Pct", 0) or 0)
+    visap_v = float(av_p.get("VISA_P_Pts", 0) or 0)
+    lysh_v = float(av_p.get("Lysholm_Pts", 0) or 0)
+    womac_v = float(av_p.get("WOMAC_Pct", 0) or 0)
+    koos_v = float(av_p.get("KOOS_Pct", 0) or 0)
+    ikdc_v = float(av_p.get("IKDC_Pct", 0) or 0)
+
+    candidatos = []
+    # LEFS começa em 0 por padrão; se > 0, foi mexido pelo fisioterapeuta
+    if lefs_v > 0:
+        candidatos.append("LEFS")
+    # VISA-P começa em 50 por padrão nos sliders não tocados
+    if visap_v > 0 and visap_v != 50.0:
+        candidatos.append("VISA-P")
+    # Lysholm começa em 100 por padrão nos selectboxes não tocados
+    if lysh_v > 0 and lysh_v != 100.0:
+        candidatos.append("Lysholm")
+    # WOMAC começa em 100% por padrão
+    if womac_v > 0 and round(womac_v, 1) != 100.0:
+        candidatos.append("WOMAC")
+    # KOOS começa em 100% por padrão
+    if koos_v > 0 and round(koos_v, 1) != 100.0:
+        candidatos.append("KOOS")
+    # IKDC começa em 75% por padrão
+    if ikdc_v > 0 and round(ikdc_v, 1) != 75.0:
+        candidatos.append("IKDC")
+
+    if candidatos:
+        # Prioriza o primeiro detectado ou o que bate com o fenótipo
+        mapa_fen = {"VISA_P": "VISA-P", "Lysholm": "Lysholm", "WOMAC": "WOMAC", "KOOS": "KOOS", "IKDC": "IKDC", "LEFS": "LEFS"}
+        alvo_fen = mapa_fen.get(prom_fenotipo, "LEFS")
+        if alvo_fen in candidatos:
+            return [alvo_fen]
+        return [candidatos[0]]
+
+    # Fallback se todos estiverem nos defaults: se LEFS > 0 usa LEFS, senão lista vazia
+    return ["LEFS"] if lefs_v > 0 else []
+
+
 def render():
     # Lazy import do Matplotlib + Aplicação do Tema Apple Health
     import matplotlib.pyplot as plt
@@ -101,6 +149,7 @@ def render():
     idade_p = "—"
     dx_clinico_base = "Não especificado"
     ocupacao_p = "Não informada"
+    medico_cad = ""
     try:
         df_cad = conn.read("Cadastro")
         if not df_cad.empty and "Nome" in df_cad.columns:
@@ -110,6 +159,7 @@ def render():
                 idade_p = int(float(registro_p.get('Idade', 0))) if pd.notna(registro_p.get('Idade')) else "—"
                 dx_clinico_base = registro_p.get('Diagnostico_Clinico') or registro_p.get('Historia') or 'Não especificado'
                 ocupacao_p = registro_p.get('Ocupacao') or 'Não informada'
+                medico_cad = str(registro_p.get('Medico_Indicador', '') or '')
     except Exception:
         pass
 
@@ -775,13 +825,13 @@ def render():
             fig2.tight_layout()
             st.pyplot(fig2)
 
-        # Card 3: Curva de Aproximação ao Objetivo do Paciente (SANE %)
+        # Card 3: Curva de Aproximação ao Objetivo do Paciente (SANE %) — LEGENDA NO TOPO SEM SOBREPOSIÇÃO
         with st.container(border=True):
             secao(
                 "🏆 Trajetória Rumo ao Objetivo do Paciente (SANE % — Shelbourne et al., 2009)",
                 f"Objetivo: '{av_objetivo}' · MCID do SANE = +15% · Limiar de Alta Subjetiva ≥ 85%."
             )
-            fig_sane, ax_s = plt.subplots(figsize=(10, 3.2), dpi=120)
+            fig_sane, ax_s = plt.subplots(figsize=(10, 3.5), dpi=120)
             sane_serie = df_p['SANE_Pct_Num'].fillna(sane_base_av)
             ax_s.axhline(y=85, color=CORES_GENUA['alerta_sucesso'], linestyle='--', lw=1.6, alpha=0.85, label="Limiar de Alta (85%)")
             ax_s.axhline(y=min(100.0, sane_base_av + 15.0), color=CORES_GENUA['alerta_aviso'], linestyle='-.', lw=1.3, alpha=0.75, label=f"Meta MCID (+15% = {min(100.0, sane_base_av + 15.0):.0f}%)")
@@ -792,11 +842,17 @@ def render():
             )
             ax_s.fill_between(range(len(df_p)), sane_serie, alpha=0.10, color=CORES_GENUA['secundaria'])
             ax_s.set_ylabel("Capacidade Percebida (%)", fontweight='600', color=CORES_GENUA['primaria'])
-            ax_s.set_ylim(-5, 105)
+            ax_s.set_ylim(-5, 108)
             ax_s.spines['top'].set_visible(False)
             ax_s.spines['right'].set_visible(False)
             plt.setp(ax_s.get_xticklabels(), rotation=25, ha='right', fontsize=9)
-            ax_s.legend(loc='lower right', frameon=False, fontsize=8.8)
+            ax_s.legend(
+                loc='upper center',
+                bbox_to_anchor=(0.5, 1.18),
+                ncol=4,
+                frameon=False,
+                fontsize=8.6
+            )
             fig_sane.tight_layout()
             st.pyplot(fig_sane)
 
@@ -868,26 +924,60 @@ def render():
             st.markdown(f"- **Conduta Recomendada (PBE):** {diretriz}")
 
     # ============================================================
-    # 5. CARD DE EXPORTAÇÃO DO LAUDO VISUAL APPLE DARK
+    # 5. CARD DE EXPORTAÇÃO DO LAUDO VISUAL (CLEAN LIGHT GENUA)
     # ============================================================
     with st.container(border=True):
         secao(
-            "📄 Exportação de Laudo Clínico Avançado (Apple Dark Mode)",
-            "Gera um relatório visual completo com KPIs, gráficos em alta resolução, PROMs e referências científicas. Abra o arquivo baixado e pressione Cmd+P (Mac) ou Ctrl+P (Windows) para salvar em PDF."
+            "📄 Exportação de Laudo de Evolução Clínica (Clean Light GENUA)",
+            "Gera o relatório executivo para médico e paciente com Resumo Semafórico, Velocímetro de ADM, Força Bilateral e Conclusões Interativas Editáveis."
         )
 
-        if st.button("⚙️ GERAR LAUDO VISUAL COMPLETO", width='stretch', type="primary"):
-            with st.spinner("🧠 Compilando laudo clínico com gráficos de alta resolução e análise de IA..."):
+        opcoes_prom_laudo = ["LEFS", "VISA-P", "Lysholm", "WOMAC", "KOOS", "IKDC"]
+        default_prom_laudo = _detectar_prom_preenchido(av_p, fen_info.get("prom_principal", "LEFS"))
+
+        c_cfg1, c_cfg2 = st.columns([1.4, 1.6], gap="large")
+        with c_cfg1:
+            medico_laudo = st.text_input(
+                "👨‍⚕️ Médico Assistente / Quem Indicou",
+                value=av_p.get("Medico_Indicador", medico_cad) if tem_av else medico_cad,
+                placeholder="Ex: Dr. Felipe (CRM) / Indicação Clínica",
+                key="input_medico_laudo"
+            )
+        with c_cfg2:
+            prom_selecionado = st.multiselect(
+                "📋 Questionário(s) Aplicado(s) para Exibir no Laudo",
+                options=opcoes_prom_laudo,
+                default=default_prom_laudo,
+                help="Apenas o questionário selecionado aqui aparecerá no PDF (evita exibir questionários não aplicados)."
+            )
+
+        conclusao_livre_fisio = st.text_area(
+            "✍️ Conclusão Final e Recomendações ao Médico / Paciente (Opcional — Também editável direto no Laudo)",
+            value="",
+            placeholder="Digite aqui o parecer final e recomendações de conduta, ou edite diretamente nos boxes interativos do laudo abaixo antes de imprimir...",
+            height=80,
+            key="input_conclusao_livre_laudo"
+        )
+
+        if st.button("⚙️ GERAR LAUDO EXECUTIVO INTERATIVO", width='stretch', type="primary"):
+            with st.spinner("🧠 Compilando laudo clínico Clean Light com conclusões automáticas editáveis..."):
                 try:
                     import streamlit.components.v1 as components
                     from pdf_laudo import gerar_laudo_html
                     from ia_clinica import analisar_paciente as _analisar, normalizar_diagnostico as _normalizar
 
-                    dados_aval = av_p if tem_av else {}
+                    dados_aval = dict(av_p) if tem_av else {}
+                    dados_aval["Medico_Indicador"] = medico_laudo.strip() or "—"
+                    dados_aval["Ocupacao_Esporte"] = ocupacao_p
+                    dados_aval["Idade_Cadastro"] = idade_p
+                    dados_aval["Diagnostico_Cadastro"] = dx_clinico_base
+                    dados_aval["PROMs_Selecionados"] = prom_selecionado
+                    dados_aval["Conclusao_Final_Fisio"] = conclusao_livre_fisio.strip()
+
                     historico = df_p.to_dict("records")
 
                     insights_l = _analisar(st.session_state.paciente)
-                    fenotipo_l = _normalizar(dados_aval.get('Diagnostico_Clinico', '') if dados_aval else texto_fenotipo_busca)
+                    fenotipo_l = _normalizar(dados_aval.get('Diagnostico_Clinico', '') if dados_aval.get('Diagnostico_Clinico') else texto_fenotipo_busca)
 
                     laudo_html = gerar_laudo_html(
                         paciente_nome=st.session_state.paciente,
@@ -898,15 +988,15 @@ def render():
                     )
 
                     st.download_button(
-                        label="📥 BAIXAR LAUDO (HTML / PDF) — Abrir e usar Cmd+P / Ctrl+P",
+                        label="📥 BAIXAR LAUDO (HTML / PDF) — Abrir ou usar o botão 'Imprimir / PDF' abaixo",
                         data=laudo_html.encode('utf-8'),
                         file_name=f"Laudo_GENUA_{st.session_state.paciente.replace(' ', '_')}.html",
                         mime="text/html",
                         type="primary",
                         width='stretch'
                     )
-                    toast("Laudo gerado com sucesso! Confira a pré-visualização abaixo.", "success")
-                    components.html(laudo_html, height=1350, scrolling=True)
+                    toast("Laudo gerado! Clique em qualquer 'Conclusão' dentro da pré-visualização abaixo para editar o texto ao vivo antes de salvar em PDF.", "success")
+                    components.html(laudo_html, height=1450, scrolling=True)
 
                 except Exception as e:
                     toast(f"Erro ao gerar o laudo: {e}", "error")
