@@ -13,6 +13,47 @@ from config import CORES_GENUA, titulo, secao, toast
 from firebase_client import db, invalidar_cache
 
 
+def _parse_data_br(data_str: str) -> datetime:
+    """Converte string de data (DD/MM/YYYY ou YYYY-MM-DD) em datetime seguro para ordenação."""
+    if not data_str:
+        return datetime(2000, 1, 1)
+    s = str(data_str).strip()[:10]
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s, fmt)
+        except Exception:
+            pass
+    return datetime(2000, 1, 1)
+
+
+def _detectar_proms_legados(dados: dict) -> list:
+    """Infere quais questionários foram preenchidos em avaliações salvas antes do campo PROMs_Aplicados."""
+    if not dados:
+        return []
+    if isinstance(dados.get("PROMs_Aplicados"), list):
+        return dados["PROMs_Aplicados"]
+
+    aplicados = []
+    if float(dados.get("LEFS_Pct", 0) or 0) > 0:
+        aplicados.append("LEFS")
+    visap = float(dados.get("VISA_P_Pts", 0) or 0)
+    if visap > 0 and visap != 50.0:
+        aplicados.append("VISA-P")
+    lysh = float(dados.get("Lysholm_Pts", 0) or 0)
+    if lysh > 0 and lysh != 100.0:
+        aplicados.append("Lysholm")
+    womac = float(dados.get("WOMAC_Pct", 0) or 0)
+    if womac > 0 and round(womac, 1) != 100.0:
+        aplicados.append("WOMAC")
+    koos = float(dados.get("KOOS_Pct", 0) or 0)
+    if koos > 0 and round(koos, 1) != 100.0:
+        aplicados.append("KOOS")
+    ikdc = float(dados.get("IKDC_Pct", 0) or 0)
+    if ikdc > 0 and round(ikdc, 1) != 75.0:
+        aplicados.append("IKDC")
+    return aplicados
+
+
 def render():
     # Cabeçalho limpo estilo Apple Health
     st.markdown(f"""
@@ -34,7 +75,7 @@ def render():
             docs = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
             avaliacoes_existentes = [{"id": d.id, "data": d.to_dict()} for d in docs]
             avaliacoes_existentes.sort(
-                key=lambda x: datetime.strptime(x["data"].get("Data_Avaliacao", "01/01/2000"), "%d/%m/%Y"),
+                key=lambda x: _parse_data_br(x["data"].get("Data_Avaliacao", "01/01/2000")),
                 reverse=True
             )
         except Exception:
@@ -99,6 +140,7 @@ def render():
 
     # --- HELPERS DE AUTO-PREENCHIMENTO E RETROCOMPATIBILIDADE ---
     dados = st.session_state.get('dados_antigos') or {}
+    modo_edicao = st.session_state.get("doc_id_avaliacao") is not None
 
     def get_idx(opcoes_lista, chave, fallback_chave=None):
         val = dados.get(chave)
@@ -146,9 +188,9 @@ def render():
         with st.container(border=True):
             secao(
                 "🗣️ Histórico Clínico, Lateralidade e Contexto",
-                "Mapeamento do membro acometido, queixa principal, comportamento mecânico dos sintomas e histórico prévio."
+                "Mapeamento do membro acometido, data da avaliação, queixa principal, comportamento mecânico e histórico prévio."
             )
-            c_qp, c_lado = st.columns([2.2, 1])
+            c_qp, c_lado, c_data_av = st.columns([2.0, 1.1, 0.9])
             with c_qp:
                 qp = st.text_input(
                     "Queixa Principal (QP) *",
@@ -162,6 +204,14 @@ def render():
                     op_lado,
                     index=get_idx(op_lado, "Lado_Acometido"),
                     help="Essencial para o cálculo determinístico do Limb Symmetry Index (LSI) no motor de IA Clínica."
+                )
+            with c_data_av:
+                dt_av_default = _parse_data_br(dados.get("Data_Avaliacao")) if modo_edicao and dados.get("Data_Avaliacao") else datetime.now()
+                data_aval_input = st.date_input(
+                    "📅 Data da Avaliação",
+                    value=dt_av_default,
+                    format="DD/MM/YYYY",
+                    help="Em modo de edição, preserva a data original do Marco Zero."
                 )
 
             hma = st.text_area(
@@ -437,7 +487,6 @@ def render():
                 with c_ge2:
                     temp_e = st.radio("Temperatura (Esq)", op_temp, index=get_idx(op_temp, "Temperatura_Esq", "Temperatura"), key="tmp_e")
 
-            # Cálculo automático de assimetria de perimetria de coxa
             if perimetria_d > 0 and perimetria_e > 0:
                 diff_perim = perimetria_d - perimetria_e
                 if abs(diff_perim) >= 1.5:
@@ -477,13 +526,13 @@ def render():
 
             c_te_d, c_te_e = st.columns(2, gap="large")
             with c_te_d:
-                st.markdown(f"**🦵 Joelho DIREITO (Marcar Positivos)**")
+                st.markdown("**🦵 Joelho DIREITO (Marcar Positivos)**")
                 t_lig_d = st.multiselect("🔗 Ligamentares (Direito)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Dir") or get_list(op_lig, "Testes_Ligamentares"), key="t_lig_d")
                 t_men_d = st.multiselect("🌙 Meniscais (Direito)", op_men, default=get_list(op_men, "Testes_Meniscais_Dir") or get_list(op_men, "Testes_Meniscais"), key="t_men_d")
                 t_pat_d = st.multiselect("🎯 Femoropatelares / Tendíneos (Direito)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Dir") or get_list(op_pat, "Testes_Femoropatelar"), key="t_pat_d")
 
             with c_te_e:
-                st.markdown(f"**🦵 Joelho ESQUERDO (Marcar Positivos)**")
+                st.markdown("**🦵 Joelho ESQUERDO (Marcar Positivos)**")
                 t_lig_e = st.multiselect("🔗 Ligamentares (Esquerdo)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Esq"), key="t_lig_e")
                 t_men_e = st.multiselect("🌙 Meniscais (Esquerdo)", op_men, default=get_list(op_men, "Testes_Meniscais_Esq"), key="t_men_e")
                 t_pat_e = st.multiselect("🎯 Femoropatelares / Tendíneos (Esquerdo)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Esq"), key="t_pat_e")
@@ -516,15 +565,18 @@ def render():
                 pass
             return "3 - Normal"
 
-        # Card 0 (NOVO PBE): Objetivo do Paciente & Distância da Meta (PSFS + SANE)
+        # Card 0: Objetivo do Paciente & Distância da Meta (PSFS + SANE)
         with st.container(border=True):
             secao(
                 "🎯 Objetivo Funcional do Paciente & Distância da Meta (PSFS + SANE — PBE)",
                 "Patient-Specific Functional Scale (Stratford et al., 1995 — MCID: 2,0 pts) & Single Assessment Numeric Evaluation (Shelbourne et al., 2009)."
             )
+            obj_val_antigo = dados.get("Objetivo_Paciente", "")
+            if obj_val_antigo == "Não relatado":
+                obj_val_antigo = ""
             obj_paciente = st.text_input(
                 "🏆 Qual é o principal objetivo que o paciente veio buscar na fisioterapia?",
-                value=dados.get("Objetivo_Paciente", ""),
+                value=obj_val_antigo,
                 placeholder="Ex: Voltar a correr 10 km sem dor, jogar futebol no fim de semana, descer escadas sem travar..."
             )
             c_psfs1, c_psfs2 = st.columns(2, gap="large")
@@ -533,7 +585,7 @@ def render():
                     "📊 Escala Funcional Específica (PSFS: 0 = Incapaz | 10 = Nível Pré-Lesão)",
                     min_value=0, max_value=10,
                     value=int(dados.get("PSFS_Baseline", 3) if dados.get("PSFS_Baseline") is not None else 3),
-                    help="Quão capaz o paciente se sente HOJE de realizar essa atividade específica? (Variacão ≥ 2 pontos = melhora clinicamente relevante)."
+                    help="Quão capaz o paciente se sente HOJE de realizar essa atividade específica? (Variação ≥ 2 pontos = melhora clinicamente relevante)."
                 )
             with c_psfs2:
                 sane_baseline = st.slider(
@@ -553,9 +605,9 @@ def render():
         with st.container(border=True):
             secao(
                 "💪 Força Muscular (Oxford) e Dinamometria Isométrica (kgf)",
-                "O sistema calcula automaticamente o Índice de Simetria (LSI %) ao preencher os valores bilaterais."
+                "O Índice de Simetria (LSI %) nos painéis e no laudo PDF é calculado EXCLUSIVAMENTE a partir da Dinamometria (kgf)."
             )
-            st.caption("1. Força Manual Qualitativa (Escala de Oxford 0 a 5)")
+            st.caption("1. Força Manual Qualitativa (Escala de Oxford 0 a 5 — Prática de Consultório / Triagem)")
             c_fg1, c_fg2, c_fg3, c_fg4 = st.columns(4)
             fg_ext_d = c_fg1.number_input("Extensão (Dir) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Dir", "Ext", 5))
             fg_flex_d = c_fg2.number_input("Flexão (Dir) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Dir", "Flex", 5))
@@ -569,7 +621,7 @@ def render():
             fg_add_e = c_fg8.number_input("Adução (Esq) [0-5]", min_value=0, max_value=5, value=get_val_str("Forca_Geral_Esq", "Add", 5))
 
             st.markdown("<hr style='margin: 16px 0;'>", unsafe_allow_html=True)
-            st.caption("2. Dinamometria Quantitativa (Handheld Dynamometer — kgf)")
+            st.caption("2. Dinamometria Quantitativa (Handheld Dynamometer — kgf) · Alimenta o LSI e o Laudo PDF")
             c_din1, c_din2, c_din3, c_din4 = st.columns(4)
             din_ext_d = c_din1.number_input("Extensão Dir (kg)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Dir", "Ext", 0.0, float))
             din_flex_d = c_din2.number_input("Flexão Dir (kg)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Dir", "Flex", 0.0, float))
@@ -582,7 +634,6 @@ def render():
             din_abd_e = c_din7.number_input("Abdução Esq (kg)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Esq", "Abd", 0.0, float))
             din_add_e = c_din8.number_input("Adução Esq (kg)", min_value=0.0, step=1.0, value=get_val_str("Dinamometria_Esq", "Add", 0.0, float))
 
-            # Análise instantânea de Simetria (LSI %)
             pares_din = [
                 ("Extensão (Quadríceps)", din_ext_d, din_ext_e),
                 ("Flexão (Isquiotibiais)", din_flex_d, din_flex_e),
@@ -611,6 +662,8 @@ def render():
                             delta=f"Δ {diff_kg:.1f}kg ({lado_forte})",
                             delta_color="normal" if lsi_g >= 90 else "inverse"
                         )
+            else:
+                st.caption("ℹ️ Dinamometria em 0.0 kgf — A seção de Força Muscular/LSI ficará oculta no Laudo PDF até que seja medida.")
 
         # Card 2: Mobilidade Articular (Goniometria e Lunge Test)
         with st.container(border=True):
@@ -725,7 +778,6 @@ def render():
                 "Step Down (D)", "Step Down (E)", "Lunge / Afundo", "Salto (Hop Test)", "Corrida", "Marcha"
             ]
             def_alvos = get_list("Testes_Alvo")
-            # Mantém compatibilidade com nomes antigos se já salvos
             for t_antigo in def_alvos:
                 if t_antigo not in lista_testes_disp:
                     lista_testes_disp.append(t_antigo)
@@ -749,20 +801,45 @@ def render():
                 height=140
             )
 
-    # --- ABA 7: QUESTIONÁRIOS (PROMs) ---
+    # --- ABA 7: QUESTIONÁRIOS (PROMs) — COM PERSISTÊNCIA NA EDIÇÃO E FILTRO ANTI-FALSO POSITIVO ---
     with t_quest:
         with st.container(border=True):
             secao(
                 "📋 Questionários de Desfecho Clínico (PROMs)",
-                "Expanda os instrumentos aplicáveis ao fenótipo do paciente para calcular o score funcional."
+                "Selecione quais questionários foram efetivamente aplicados hoje. Apenas os selecionados serão salvos e exibidos no Laudo PDF."
             )
 
+            opcoes_todos_proms = ["LEFS", "VISA-P", "Lysholm", "WOMAC", "KOOS", "IKDC"]
+            default_proms_aplicados = _detectar_proms_legados(dados)
+            proms_aplicados = st.multiselect(
+                "✅ Questionários Aplicados nesta Avaliação:",
+                options=opcoes_todos_proms,
+                default=[p for p in default_proms_aplicados if p in opcoes_todos_proms],
+                help="Questionários não marcados aqui serão salvos como 0 (Não aplicados) para não poluir o prontuário nem o PDF."
+            )
+
+            respostas_salvas = dados.get("Respostas_PROMs") if isinstance(dados.get("Respostas_PROMs"), dict) else {}
+
+            def _idx_prom(lista_op, chave_item, idx_padrao=0):
+                val_salvo = respostas_salvas.get(chave_item)
+                return lista_op.index(val_salvo) if val_salvo in lista_op else idx_padrao
+
+            def _val_prom(chave_item, val_padrao):
+                val_salvo = respostas_salvas.get(chave_item)
+                try:
+                    return int(val_salvo) if val_salvo is not None else val_padrao
+                except Exception:
+                    return val_padrao
+
+            novas_respostas_proms = dict(respostas_salvas)
+
             # 1. LEFS
-            with st.expander("📝 LEFS (Escala Funcional da Extremidade Inferior)"):
+            with st.expander("📝 LEFS (Escala Funcional da Extremidade Inferior)", expanded=("LEFS" in proms_aplicados)):
                 opcoes_lefs = {
                     "Incapaz / Extrema Dificuldade": 0, "Muita Dificuldade": 1,
                     "Dificuldade Moderada": 2, "Um Pouco de Dificuldade": 3, "Nenhuma Dificuldade": 4
                 }
+                lista_k_lefs = list(opcoes_lefs.keys())
                 perguntas_lefs = [
                     "1. Agachar ou ajoelhar", "2. Andar 2 quarteirões", "3. Subir um lance de escadas",
                     "4. Descer um lance de escadas", "5. Ficar em pé por 1 hora", "6. Correr em terreno plano",
@@ -772,118 +849,175 @@ def render():
                 c_l1, c_l2 = st.columns(2)
                 for i, p in enumerate(perguntas_lefs):
                     with (c_l1 if i < 4 else c_l2):
-                        score_lefs += opcoes_lefs[st.selectbox(p, list(opcoes_lefs.keys()), key=f"lefs_{i}")]
+                        esc_l = st.selectbox(p, lista_k_lefs, index=_idx_prom(lista_k_lefs, f"lefs_{i}", 0), key=f"lefs_{i}")
+                        novas_respostas_proms[f"lefs_{i}"] = esc_l
+                        score_lefs += opcoes_lefs[esc_l]
 
-                pct_lefs = (score_lefs / 32) * 100
-                pts_lefs_80 = round((score_lefs / 32) * 80, 1)
-                interp_lefs = (
-                    "🚨 Função Muito Ruim" if pct_lefs < 30 else
-                    "🟡 Função Regular" if pct_lefs < 60 else
-                    "🟢 Função Boa" if pct_lefs < 85 else
+                pct_lefs_calc = (score_lefs / 32) * 100
+                # Se for uma avaliação legada sendo editada que não tinha Respostas_PROMs mas tinha LEFS_Pct salvo e o usuário não mexeu nos 0s:
+                if modo_edicao and not respostas_salvas and score_lefs == 0 and float(dados.get("LEFS_Pct", 0) or 0) > 0:
+                    pct_lefs_calc = float(dados.get("LEFS_Pct", 0))
+
+                pts_lefs_80_calc = round((pct_lefs_calc / 100.0) * 80, 1)
+                interp_lefs_calc = (
+                    "🚨 Função Muito Ruim" if pct_lefs_calc < 30 else
+                    "🟡 Função Regular" if pct_lefs_calc < 60 else
+                    "🟢 Função Boa" if pct_lefs_calc < 85 else
                     "⭐ Função Excelente"
                 )
-                st.info(f"📊 **Resultado LEFS:** {pts_lefs_80}/80 pts equivalentes (**{pct_lefs:.1f}%**) — {interp_lefs} *(MCID: 9 pts | Binkley 1999)*")
+                st.info(f"📊 **Resultado LEFS:** {pts_lefs_80_calc}/80 pts equivalentes (**{pct_lefs_calc:.1f}%**) — {interp_lefs_calc} *(MCID: 9 pts | Binkley 1999)*")
 
             # 2. VISA-P
-            with st.expander("🎯 VISA-P (Tendinopatia Patelar)"):
+            with st.expander("🎯 VISA-P (Tendinopatia Patelar)", expanded=("VISA-P" in proms_aplicados)):
                 st.caption("0 = Dor máxima / Incapaz · 10 = Sem dor / Perfeito (Máximo: 100 pts).")
-                score_visap = 0
+                score_visap_calc = 0
                 c_v1, c_v2 = st.columns(2)
                 with c_v1:
-                    score_visap += st.slider("1. Dor ao ficar sentado", 0, 10, 10, key="vp1")
-                    score_visap += st.slider("2. Dor ao descer escadas", 0, 10, 10, key="vp2")
-                    score_visap += st.slider("3. Dor ao esticar ativamente o joelho", 0, 10, 10, key="vp3")
-                    score_visap += st.slider("4. Dor ao fazer um afundo (lunge)", 0, 10, 10, key="vp4")
+                    vp1 = st.slider("1. Dor ao ficar sentado", 0, 10, _val_prom("vp1", 10), key="vp1")
+                    vp2 = st.slider("2. Dor ao descer escadas", 0, 10, _val_prom("vp2", 10), key="vp2")
+                    vp3 = st.slider("3. Dor ao esticar ativamente o joelho", 0, 10, _val_prom("vp3", 10), key="vp3")
+                    vp4 = st.slider("4. Dor ao fazer um afundo (lunge)", 0, 10, _val_prom("vp4", 10), key="vp4")
                 with c_v2:
-                    score_visap += st.slider("5. Problemas para agachar", 0, 10, 10, key="vp5")
-                    score_visap += st.slider("6. Dor durante/após salto ou esporte", 0, 10, 10, key="vp6")
-                    p7 = st.selectbox("7. Esporte Atual", ["Não consegue (0 pts)", "Modificado/Menos frequente (4 pts)", "Competindo com dor (7 pts)", "Competindo sem dor (10 pts)"], key="vp7")
-                    score_visap += 0 if "0 pts" in p7 else 4 if "4 pts" in p7 else 7 if "7 pts" in p7 else 10
-                    p8 = st.selectbox("8. Tempo de dor no esporte", ["Incapaz (0 pts)", "Para aos 15 min (7 pts)", "Dor após o esporte (15 pts)", "Sem dor (30 pts)"], key="vp8")
-                    score_visap += 0 if "0 pts" in p8 else 7 if "7 pts" in p8 else 15 if "15 pts" in p8 else 30
+                    vp5 = st.slider("5. Problemas para agachar", 0, 10, _val_prom("vp5", 10), key="vp5")
+                    vp6 = st.slider("6. Dor durante/após salto ou esporte", 0, 10, _val_prom("vp6", 10), key="vp6")
+                    op_vp7 = ["Não consegue (0 pts)", "Modificado/Menos frequente (4 pts)", "Competindo com dor (7 pts)", "Competindo sem dor (10 pts)"]
+                    p7 = st.selectbox("7. Esporte Atual", op_vp7, index=_idx_prom(op_vp7, "vp7", 0), key="vp7")
+                    op_vp8 = ["Incapaz (0 pts)", "Para aos 15 min (7 pts)", "Dor após o esporte (15 pts)", "Sem dor (30 pts)"]
+                    p8 = st.selectbox("8. Tempo de dor no esporte", op_vp8, index=_idx_prom(op_vp8, "vp8", 0), key="vp8")
 
-                interp_visap = "🚨 Tendinopatia Severa/Aguda" if score_visap < 50 else "🟡 Fase Reativa" if score_visap < 80 else "🟢 Remodelamento/Alta"
-                st.info(f"📊 **Resultado VISA-P:** **{score_visap}/100 pontos** — {interp_visap} *(MCID: 13 pts | Hernandez-Sanchez 2014)*")
+                for k_vp, v_vp in [("vp1", vp1), ("vp2", vp2), ("vp3", vp3), ("vp4", vp4), ("vp5", vp5), ("vp6", vp6), ("vp7", p7), ("vp8", p8)]:
+                    novas_respostas_proms[k_vp] = v_vp
+
+                score_visap_calc = vp1 + vp2 + vp3 + vp4 + vp5 + vp6
+                score_visap_calc += 0 if "0 pts" in p7 else 4 if "4 pts" in p7 else 7 if "7 pts" in p7 else 10
+                score_visap_calc += 0 if "0 pts" in p8 else 7 if "7 pts" in p8 else 15 if "15 pts" in p8 else 30
+
+                if modo_edicao and not respostas_salvas and score_visap_calc == 60 and float(dados.get("VISA_P_Pts", 0) or 0) not in (0, 50, 60):
+                    score_visap_calc = int(float(dados.get("VISA_P_Pts", 0)))
+
+                interp_visap_calc = "🚨 Tendinopatia Severa/Aguda" if score_visap_calc < 50 else "🟡 Fase Reativa" if score_visap_calc < 80 else "🟢 Remodelamento/Alta"
+                st.info(f"📊 **Resultado VISA-P:** **{score_visap_calc}/100 pontos** — {interp_visap_calc} *(MCID: 13 pts | Hernandez-Sanchez 2014)*")
 
             # 3. LYSHOLM
-            with st.expander("🦵 Escala de Lysholm (Ligamentar e Meniscal)"):
+            with st.expander("🦵 Escala de Lysholm (Ligamentar e Meniscal)", expanded=("Lysholm" in proms_aplicados)):
                 c_ly1, c_ly2 = st.columns(2)
-                score_lysholm = 0
-                with c_ly1:
-                    score_lysholm += int(st.selectbox("Mancar", ["5 - Nenhum", "3 - Leve ou Periódico", "0 - Grave ou Constante"]).split(" -")[0])
-                    score_lysholm += int(st.selectbox("Apoio", ["5 - Nenhum (Não precisa)", "2 - Usa bengala/muleta", "0 - Impossível apoiar"]).split(" -")[0])
-                    score_lysholm += int(st.selectbox("Travamento", ["15 - Nenhum", "10 - Sensação de travamento", "6 - Ocasional", "2 - Frequente", "0 - Articulação travada"]).split(" -")[0])
-                    score_lysholm += int(st.selectbox("Instabilidade", ["25 - Nunca cede", "20 - Raramente", "15 - Frequente no esporte", "10 - Ocasional em AVDs", "5 - Frequente em AVDs", "0 - A cada passo"]).split(" -")[0])
-                with c_ly2:
-                    score_lysholm += int(st.selectbox("Dor", ["25 - Nenhuma", "20 - Inconstante ou Leve", "15 - Durante esporte pesado", "10 - Durante esporte leve", "5 - Após andar 2km", "0 - Constante"]).split(" -")[0])
-                    score_lysholm += int(st.selectbox("Inchaço", ["10 - Nenhum", "6 - Após esforço intenso", "2 - Após AVDs", "0 - Constante"]).split(" -")[0])
-                    score_lysholm += int(st.selectbox("Subir Escadas", ["10 - Sem problemas", "6 - Levemente prejudicado", "2 - Um degrau por vez", "0 - Impossível"]).split(" -")[0])
-                    score_lysholm += int(st.selectbox("Agachamento", ["5 - Sem problemas", "4 - Levemente prejudicado", "2 - Não passa de 90 graus", "0 - Impossível"]).split(" -")[0])
+                op_ly_mancar = ["5 - Nenhum", "3 - Leve ou Periódico", "0 - Grave ou Constante"]
+                op_ly_apoio = ["5 - Nenhum (Não precisa)", "2 - Usa bengala/muleta", "0 - Impossível apoiar"]
+                op_ly_trav = ["15 - Nenhum", "10 - Sensação de travamento", "6 - Ocasional", "2 - Frequente", "0 - Articulação travada"]
+                op_ly_inst = ["25 - Nunca cede", "20 - Raramente", "15 - Frequente no esporte", "10 - Ocasional em AVDs", "5 - Frequente em AVDs", "0 - A cada passo"]
+                op_ly_dor = ["25 - Nenhuma", "20 - Inconstante ou Leve", "15 - Durante esporte pesado", "10 - Durante esporte leve", "5 - Após andar 2km", "0 - Constante"]
+                op_ly_inc = ["10 - Nenhum", "6 - Após esforço intenso", "2 - Após AVDs", "0 - Constante"]
+                op_ly_esc = ["10 - Sem problemas", "6 - Levemente prejudicado", "2 - Um degrau por vez", "0 - Impossível"]
+                op_ly_aga = ["5 - Sem problemas", "4 - Levemente prejudicado", "2 - Não passa de 90 graus", "0 - Impossível"]
 
-                interp_lysholm = "🚨 Ruim (Instabilidade Severa)" if score_lysholm < 65 else "🟡 Regular" if score_lysholm < 84 else "🟢 Bom" if score_lysholm < 95 else "⭐ Excelente"
-                st.info(f"📊 **Resultado Lysholm:** **{score_lysholm}/100 pontos** — {interp_lysholm} *(MCID: 10 pts | Briggs 2009)*")
+                with c_ly1:
+                    ly1 = st.selectbox("Mancar", op_ly_mancar, index=_idx_prom(op_ly_mancar, "ly1", 0), key="ly1")
+                    ly2 = st.selectbox("Apoio", op_ly_apoio, index=_idx_prom(op_ly_apoio, "ly2", 0), key="ly2")
+                    ly3 = st.selectbox("Travamento", op_ly_trav, index=_idx_prom(op_ly_trav, "ly3", 0), key="ly3")
+                    ly4 = st.selectbox("Instabilidade", op_ly_inst, index=_idx_prom(op_ly_inst, "ly4", 0), key="ly4")
+                with c_ly2:
+                    ly5 = st.selectbox("Dor", op_ly_dor, index=_idx_prom(op_ly_dor, "ly5", 0), key="ly5")
+                    ly6 = st.selectbox("Inchaço", op_ly_inc, index=_idx_prom(op_ly_inc, "ly6", 0), key="ly6")
+                    ly7 = st.selectbox("Subir Escadas", op_ly_esc, index=_idx_prom(op_ly_esc, "ly7", 0), key="ly7")
+                    ly8 = st.selectbox("Agachamento", op_ly_aga, index=_idx_prom(op_ly_aga, "ly8", 0), key="ly8")
+
+                lista_ly = [("ly1", ly1), ("ly2", ly2), ("ly3", ly3), ("ly4", ly4), ("ly5", ly5), ("ly6", ly6), ("ly7", ly7), ("ly8", ly8)]
+                score_lysholm_calc = 0
+                for k_ly, v_ly in lista_ly:
+                    novas_respostas_proms[k_ly] = v_ly
+                    score_lysholm_calc += int(v_ly.split(" -")[0])
+
+                if modo_edicao and not respostas_salvas and score_lysholm_calc == 100 and float(dados.get("Lysholm_Pts", 0) or 0) not in (0, 100):
+                    score_lysholm_calc = int(float(dados.get("Lysholm_Pts", 0)))
+
+                interp_lysholm_calc = "🚨 Ruim (Instabilidade Severa)" if score_lysholm_calc < 65 else "🟡 Regular" if score_lysholm_calc < 84 else "🟢 Bom" if score_lysholm_calc < 95 else "⭐ Excelente"
+                st.info(f"📊 **Resultado Lysholm:** **{score_lysholm_calc}/100 pontos** — {interp_lysholm_calc} *(MCID: 10 pts | Briggs 2009)*")
 
             # 4. WOMAC
-            with st.expander("🦴 Índice WOMAC (Osteoartrite)"):
+            with st.expander("🦴 Índice WOMAC (Osteoartrite)", expanded=("WOMAC" in proms_aplicados)):
                 w_op = {"Nenhuma": 0, "Leve": 1, "Moderada": 2, "Intensa": 3, "Muito Intensa": 4}
-                score_womac = 0
+                lista_w_keys = list(w_op.keys())
+                score_womac_bruto = 0
                 c_w1, c_w2, c_w3 = st.columns(3)
                 with c_w1:
                     st.markdown("**Dor (5 itens)**")
                     for p in ["Andar", "Subir escadas", "Deitar (Noturna)", "Sentar/Repouso", "Ficar em pé"]:
-                        score_womac += w_op[st.selectbox(p, list(w_op.keys()), key=f"wd_{p}")]
+                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wd_{p}", 0), key=f"wd_{p}")
+                        novas_respostas_proms[f"wd_{p}"] = esc_w
+                        score_womac_bruto += w_op[esc_w]
                 with c_w2:
                     st.markdown("**Rigidez (2 itens)**")
                     for p in ["Ao acordar", "Durante o dia"]:
-                        score_womac += w_op[st.selectbox(p, list(w_op.keys()), key=f"wr_{p}")]
+                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wr_{p}", 0), key=f"wr_{p}")
+                        novas_respostas_proms[f"wr_{p}"] = esc_w
+                        score_womac_bruto += w_op[esc_w]
                 with c_w3:
                     st.markdown("**Função - AVDs (8 itens)**")
                     for p in ["Descer escadas", "Levantar da cadeira", "Ficar em pé", "Entrar/Sair do carro", "Calçar meias", "Sair da cama", "Banho", "Tarefa doméstica"]:
-                        score_womac += w_op[st.selectbox(p, list(w_op.keys()), key=f"wf_{p}")]
+                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wf_{p}", 0), key=f"wf_{p}")
+                        novas_respostas_proms[f"wf_{p}"] = esc_w
+                        score_womac_bruto += w_op[esc_w]
 
                 max_w = (5 + 2 + 8) * 4
-                pct_womac = 100 - ((score_womac / max_w) * 100)
-                interp_womac = "🚨 Artrose Severa" if pct_womac < 30 else "🟡 Artrose Moderada" if pct_womac < 70 else "🟢 Artrose Leve" if pct_womac < 90 else "⭐ Excelente"
-                st.info(f"📊 **Resultado WOMAC:** **{pct_womac:.1f}%** (Pontos brutos: {score_womac}) — {interp_womac}")
+                pct_womac_calc = 100 - ((score_womac_bruto / max_w) * 100)
+                if modo_edicao and not respostas_salvas and pct_womac_calc == 100.0 and float(dados.get("WOMAC_Pct", 0) or 0) not in (0.0, 100.0):
+                    pct_womac_calc = float(dados.get("WOMAC_Pct", 0))
+
+                interp_womac_calc = "🚨 Artrose Severa" if pct_womac_calc < 30 else "🟡 Artrose Moderada" if pct_womac_calc < 70 else "🟢 Artrose Leve" if pct_womac_calc < 90 else "⭐ Excelente"
+                st.info(f"📊 **Resultado WOMAC:** **{pct_womac_calc:.1f}%** (Pontos brutos: {score_womac_bruto}) — {interp_womac_calc}")
 
             # 5. KOOS
-            with st.expander("🟢 Score KOOS (Lesões Gerais e O.A.)"):
+            with st.expander("🟢 Score KOOS (Lesões Gerais e O.A.)", expanded=("KOOS" in proms_aplicados)):
                 koos_op = {"Extremo / Sempre": 0, "Severo / Frequente": 1, "Moderado": 2, "Leve / Raro": 3, "Nenhum / Nunca": 4}
+                lista_k_op = list(koos_op.keys())
                 c_k1, c_k2 = st.columns(2)
-                score_koos = 0
                 with c_k1:
-                    score_koos += koos_op[st.selectbox("Sintomas e Inchaço (Média)", list(koos_op.keys()), index=4, key="k1")]
-                    score_koos += koos_op[st.selectbox("Nível de Dor (Média)", list(koos_op.keys()), index=4, key="k2")]
-                    score_koos += koos_op[st.selectbox("Atividades Diárias - AVDs (Média)", list(koos_op.keys()), index=4, key="k3")]
+                    k1 = st.selectbox("Sintomas e Inchaço (Média)", lista_k_op, index=_idx_prom(lista_k_op, "k1", 4), key="k1")
+                    k2 = st.selectbox("Nível de Dor (Média)", lista_k_op, index=_idx_prom(lista_k_op, "k2", 4), key="k2")
+                    k3 = st.selectbox("Atividades Diárias - AVDs (Média)", lista_k_op, index=_idx_prom(lista_k_op, "k3", 4), key="k3")
                 with c_k2:
-                    score_koos += koos_op[st.selectbox("Esportes e Recreação (Média)", list(koos_op.keys()), index=4, key="k4")]
-                    score_koos += koos_op[st.selectbox("Qualidade de Vida (Média)", list(koos_op.keys()), index=4, key="k5")]
+                    k4 = st.selectbox("Esportes e Recreação (Média)", lista_k_op, index=_idx_prom(lista_k_op, "k4", 4), key="k4")
+                    k5 = st.selectbox("Qualidade de Vida (Média)", lista_k_op, index=_idx_prom(lista_k_op, "k5", 4), key="k5")
 
-                pct_koos = (score_koos / 20) * 100
-                interp_koos = "🚨 Risco Funcional" if pct_koos < 40 else "🟡 Limitação Moderada" if pct_koos < 80 else "🟢 Alta Performance"
-                st.info(f"📊 **Resultado KOOS:** **{pct_koos:.1f}%** — {interp_koos} *(MCID: 8-10 pts | Roos 2003)*")
+                score_koos_bruto = 0
+                for k_k, v_k in [("k1", k1), ("k2", k2), ("k3", k3), ("k4", k4), ("k5", k5)]:
+                    novas_respostas_proms[k_k] = v_k
+                    score_koos_bruto += koos_op[v_k]
+
+                pct_koos_calc = (score_koos_bruto / 20) * 100
+                if modo_edicao and not respostas_salvas and pct_koos_calc == 100.0 and float(dados.get("KOOS_Pct", 0) or 0) not in (0.0, 100.0):
+                    pct_koos_calc = float(dados.get("KOOS_Pct", 0))
+
+                interp_koos_calc = "🚨 Risco Funcional" if pct_koos_calc < 40 else "🟡 Limitação Moderada" if pct_koos_calc < 80 else "🟢 Alta Performance"
+                st.info(f"📊 **Resultado KOOS:** **{pct_koos_calc:.1f}%** — {interp_koos_calc} *(MCID: 8-10 pts | Roos 2003)*")
 
             # 6. IKDC
-            with st.expander("✚ IKDC Subjetivo"):
+            with st.expander("✚ IKDC Subjetivo", expanded=("IKDC" in proms_aplicados)):
                 c_ik1, c_ik2 = st.columns(2)
+                op_ik_freq = ["Constante (0 pts)", "Diária (2 pts)", "Semanal (4 pts)", "Rara (7 pts)", "Nenhuma (10 pts)"]
                 with c_ik1:
-                    ik_dor = st.slider("Nível da Pior Dor (0=Pior, 10=Nenhuma)", 0, 10, 10, key="ik1")
-                    ik_freq = st.selectbox("Frequência da Dor", ["Constante (0 pts)", "Diária (2 pts)", "Semanal (4 pts)", "Rara (7 pts)", "Nenhuma (10 pts)"], key="ik2")
+                    ik_dor = st.slider("Nível da Pior Dor (0=Pior, 10=Nenhuma)", 0, 10, _val_prom("ik1", 10), key="ik1")
+                    ik_freq = st.selectbox("Frequência da Dor", op_ik_freq, index=_idx_prom(op_ik_freq, "ik2", 0), key="ik2")
                     ik_pts_freq = 0 if "0 pts" in ik_freq else 2 if "2 pts" in ik_freq else 4 if "4 pts" in ik_freq else 7 if "7 pts" in ik_freq else 10
                 with c_ik2:
-                    ik_func = st.slider("Função do Joelho Antes da Lesão (0-10)", 0, 10, 10, key="ik3")
-                    ik_func_atual = st.slider("Função do Joelho Atual (0-10)", 0, 10, 5, key="ik4")
+                    ik_func = st.slider("Função do Joelho Antes da Lesão (0-10)", 0, 10, _val_prom("ik3", 10), key="ik3")
+                    ik_func_atual = st.slider("Função do Joelho Atual (0-10)", 0, 10, _val_prom("ik4", 5), key="ik4")
 
-                score_ikdc = min(100, ((ik_dor + ik_pts_freq + (ik_func_atual * 2)) / 40) * 100)
-                interp_ikdc = "🚨 Baixa Função Subjetiva" if score_ikdc < 60 else "🟡 Desempenho Moderado" if score_ikdc < 85 else "🟢 Excelente Desempenho"
-                st.info(f"📊 **Resultado IKDC:** **{score_ikdc:.1f}%** — {interp_ikdc} *(MCID: 9 pts | Irrgang 2006)*")
+                for k_ik, v_ik in [("ik1", ik_dor), ("ik2", ik_freq), ("ik3", ik_func), ("ik4", ik_func_atual)]:
+                    novas_respostas_proms[k_ik] = v_ik
+
+                score_ikdc_calc = min(100.0, ((ik_dor + ik_pts_freq + (ik_func_atual * 2)) / 40.0) * 100.0)
+                if modo_edicao and not respostas_salvas and round(score_ikdc_calc, 1) == 50.0 and float(dados.get("IKDC_Pct", 0) or 0) not in (0.0, 50.0, 75.0):
+                    score_ikdc_calc = float(dados.get("IKDC_Pct", 0))
+
+                interp_ikdc_calc = "🚨 Baixa Função Subjetiva" if score_ikdc_calc < 60 else "🟡 Desempenho Moderado" if score_ikdc_calc < 85 else "🟢 Excelente Desempenho"
+                st.info(f"📊 **Resultado IKDC:** **{score_ikdc_calc:.1f}%** — {interp_ikdc_calc} *(MCID: 9 pts | Irrgang 2006)*")
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     # ============================================================
-    # 3. MOTOR DE SALVAMENTO INTELIGENTE (RETROCOMPATÍVEL + IA READY)
+    # 3. MOTOR DE SALVAMENTO INTELIGENTE (DINAMOMETRIA PURA + SEM FALSOS PROMS)
     # ============================================================
-    modo_edicao = st.session_state.get("doc_id_avaliacao") is not None
     texto_botao = "🔄 ATUALIZAR AVALIAÇÃO INICIAL" if modo_edicao else "💾 SALVAR NOVA AVALIAÇÃO INICIAL"
 
     if st.button(texto_botao, width='stretch', type="primary"):
@@ -893,16 +1027,34 @@ def render():
         if qp.strip() == "":
             toast("A 'Queixa Principal (QP)' na aba Anamnese é obrigatória para salvar o prontuário.", "error")
         else:
-            # Determina Força Lesado vs Saudável para alimentar automaticamente ia_clinica.py (LSI)
-            forca_ref_d = din_ext_d if (din_ext_d > 0 or din_ext_e > 0) else float(fg_ext_d)
-            forca_ref_e = din_ext_e if (din_ext_d > 0 or din_ext_e > 0) else float(fg_ext_e)
-
-            if "Direito" in lado_acometido or "Dir > Esq" in lado_acometido:
-                din_lesado, din_saudavel = forca_ref_d, forca_ref_e
-            elif "Esquerdo" in lado_acometido or "Esq > Dir" in lado_acometido:
-                din_lesado, din_saudavel = forca_ref_e, forca_ref_d
+            # CORREÇÃO PBE: Dinamometria_Lesado e Dinamometria_Saudavel usam EXCLUSIVAMENTE a dinamometria (kgf).
+            # Se a dinamometria não foi preenchida (0.0), salva 0.0 (jamais usa Oxford 0-5).
+            if din_ext_d > 0 or din_ext_e > 0:
+                if "Direito" in lado_acometido or "Dir > Esq" in lado_acometido:
+                    din_lesado, din_saudavel = float(din_ext_d), float(din_ext_e)
+                elif "Esquerdo" in lado_acometido or "Esq > Dir" in lado_acometido:
+                    din_lesado, din_saudavel = float(din_ext_e), float(din_ext_d)
+                else:
+                    din_lesado, din_saudavel = float(min(din_ext_d, din_ext_e)), float(max(din_ext_d, din_ext_e))
             else:
-                din_lesado, din_saudavel = min(forca_ref_d, forca_ref_e), max(forca_ref_d, forca_ref_e)
+                din_lesado, din_saudavel = 0.0, 0.0
+
+            # Apenas os questionários marcados em `proms_aplicados` têm seus scores salvos (> 0)
+            pct_lefs_final = pct_lefs_calc if "LEFS" in proms_aplicados else 0.0
+            pts_lefs_80_final = pts_lefs_80_calc if "LEFS" in proms_aplicados else 0.0
+            interp_lefs_final = interp_lefs_calc if "LEFS" in proms_aplicados else "Não aplicado"
+
+            score_visap_final = score_visap_calc if "VISA-P" in proms_aplicados else 0
+            interp_visap_final = interp_visap_calc if "VISA-P" in proms_aplicados else "Não aplicado"
+
+            score_lysholm_final = score_lysholm_calc if "Lysholm" in proms_aplicados else 0
+            interp_lysholm_final = interp_lysholm_calc if "Lysholm" in proms_aplicados else "Não aplicado"
+
+            pct_womac_final = pct_womac_calc if "WOMAC" in proms_aplicados else 0.0
+            interp_womac_final = interp_womac_calc if "WOMAC" in proms_aplicados else "Não aplicado"
+
+            pct_koos_final = pct_koos_calc if "KOOS" in proms_aplicados else 0.0
+            score_ikdc_final = score_ikdc_calc if "IKDC" in proms_aplicados else 0.0
 
             perim_formatada = f"Dir: {perimetria_d} cm | Esq: {perimetria_e} cm"
             if perimetria_obs.strip():
@@ -915,7 +1067,7 @@ def render():
             flex_comb = f"Dir: {', '.join(flexibilidade_d) if flexibilidade_d else 'Normal'} | Esq: {', '.join(flexibilidade_e) if flexibilidade_e else 'Normal'}"
 
             dados_avaliacao = {
-                "Data_Avaliacao": datetime.now().strftime("%d/%m/%Y"),
+                "Data_Avaliacao": data_aval_input.strftime("%d/%m/%Y"),
                 "Paciente": st.session_state.paciente,
                 "Membro": st.session_state.membro_ativo,
                 "Lado_Acometido": lado_acometido,
@@ -940,7 +1092,6 @@ def render():
                 "Fatores_Sociais": ", ".join(fat_sociais) if fat_sociais else "Nenhum",
                 "Blue_Flags": fat_sociais if fat_sociais else ["Nenhum"],
                 "Comorbidades": ", ".join(comorbidades) if comorbidades else "Nenhuma",
-                # Campos Bilaterais Novos + Chaves Combinadas Retrocompatíveis (para Painel e PDF)
                 "Derrame_Dir": derrame_d,
                 "Derrame_Esq": derrame_e,
                 "Derrame": f"Dir: {derrame_d} | Esq: {derrame_e}",
@@ -973,12 +1124,10 @@ def render():
                 "Testes_Femoropatelar_Dir": ", ".join(t_pat_d) if t_pat_d else "Nenhum",
                 "Testes_Femoropatelar_Esq": ", ".join(t_pat_e) if t_pat_e else "Nenhum",
                 "Testes_Femoropatelar": t_pat_comb,
-                # Objetivo Funcional (PSFS + SANE)
                 "Objetivo_Paciente": check_vazio(obj_paciente),
                 "PSFS_Baseline": psfs_baseline,
                 "SANE_Baseline_Pct": sane_baseline,
                 "Distancia_Objetivo_Pct": 100 - sane_baseline,
-                # Força e Dinamometria + Chaves LSI para ia_clinica.py
                 "Forca_Geral_Dir": f"Ext:{fg_ext_d} Flex:{fg_flex_d} Abd:{fg_abd_d} Add:{fg_add_d}",
                 "Forca_Geral_Esq": f"Ext:{fg_ext_e} Flex:{fg_flex_e} Abd:{fg_abd_e} Add:{fg_add_e}",
                 "Dinamometria_Dir": f"Ext:{din_ext_d} Flex:{din_flex_d} Abd:{din_abd_d} Add:{din_add_d}",
@@ -996,17 +1145,19 @@ def render():
                 "CM_Membro_Esq": f"Agach:{cm_agach_uni_e} | StepDown:{cm_step_down_e} | StepUp:{cm_step_up_e} | Afundo:{cm_afundo_e} | Eq:{cm_eq_uni_e}",
                 "Exames_Apresentados": ", ".join(tipos_exames) if tipos_exames else "Nenhum",
                 "Testes_Alvo": testes_alvo,
-                "LEFS_Pct": pct_lefs,
-                "LEFS_Pts_80": pts_lefs_80,
-                "Interpretacao_LEFS": interp_lefs,
-                "VISA_P_Pts": score_visap,
-                "Interpretacao_VISA_P": interp_visap,
-                "Lysholm_Pts": score_lysholm,
-                "Interpretacao_Lysholm": interp_lysholm,
-                "WOMAC_Pct": pct_womac,
-                "Interpretacao_WOMAC": interp_womac,
-                "KOOS_Pct": pct_koos,
-                "IKDC_Pct": score_ikdc,
+                "PROMs_Aplicados": proms_aplicados,
+                "Respostas_PROMs": novas_respostas_proms if proms_aplicados else {},
+                "LEFS_Pct": pct_lefs_final,
+                "LEFS_Pts_80": pts_lefs_80_final,
+                "Interpretacao_LEFS": interp_lefs_final,
+                "VISA_P_Pts": score_visap_final,
+                "Interpretacao_VISA_P": interp_visap_final,
+                "Lysholm_Pts": score_lysholm_final,
+                "Interpretacao_Lysholm": interp_lysholm_final,
+                "WOMAC_Pct": pct_womac_final,
+                "Interpretacao_WOMAC": interp_womac_final,
+                "KOOS_Pct": pct_koos_final,
+                "IKDC_Pct": score_ikdc_final,
                 "Profissional_ID": st.session_state.get("user_email", "admin"),
             }
 
