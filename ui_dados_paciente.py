@@ -1,9 +1,51 @@
-"""GENUA | Tela de Cadastro e Seleção de Paciente (Estilo Apple HIG)."""
+"""GENUA | Tela de Cadastro, Edição e Seleção de Paciente (Estilo Apple HIG)."""
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-from config import CORES_GENUA, titulo, secao
+from datetime import datetime, date
+from config import CORES_GENUA, titulo, secao, toast
 from firebase_client import db, conn, invalidar_cache
+
+
+def _calcular_idade_exata(dt_nasc: date) -> int:
+    """Calcula a idade exata em anos considerando anos bissextos (mês e dia)."""
+    hoje = datetime.now().date()
+    return hoje.year - dt_nasc.year - ((hoje.month, hoje.day) < (dt_nasc.month, dt_nasc.day))
+
+
+def _parse_data_nasc(data_str: str) -> date:
+    """Converte string DD/MM/YYYY ou YYYY-MM-DD em objeto date seguro."""
+    if not data_str:
+        return date(2000, 1, 1)
+    s = str(data_str).strip()[:10]
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except Exception:
+            pass
+    return date(2000, 1, 1)
+
+
+def _limpar_contexto_paciente_anterior():
+    """
+    Limpa variáveis de sessão da Avaliação, Mapa da Dor e Check-in ao trocar de paciente,
+    impedindo vazamento de dados (state bleed) entre prontuários.
+    """
+    chaves_limpar = [
+        "doc_id_avaliacao",
+        "dados_antigos",
+        "pontos_dor",
+        "last_click",
+        "_ultimo_doc_mapa",
+        "confirmar_exclusao_aval",
+        "doc_id_checkin",
+        "dados_checkin_antigos",
+        "confirmar_exclusao_chk",
+        "seletor_avaliacao",
+        "seletor_checkin",
+        "editando_cadastro_pac",
+    ]
+    for k in chaves_limpar:
+        st.session_state.pop(k, None)
 
 
 def render():
@@ -55,20 +97,20 @@ def render():
         with st.container(border=True):
             secao(
                 "📋 Identificação do Novo Paciente",
-                "Preencha os dados basais e a hipótese diagnóstica de encaminhamento."
+                "Preencha os dados basais, médico indicador e a hipótese diagnóstica de encaminhamento."
             )
 
             nome = st.text_input("Nome Completo *", placeholder="Ex: Gabriel Medina")
 
             c_cad1, c_cad2, c_cad3 = st.columns(3)
             with c_cad1:
-                data_padrao = datetime(2000, 1, 1)
-                data_minima = datetime(datetime.now().year - 100, 1, 1)
+                data_padrao = date(2000, 1, 1)
+                data_minima = date(datetime.now().year - 105, 1, 1)
                 dt_nasc = st.date_input(
                     "Data de Nascimento *",
                     value=data_padrao,
                     min_value=data_minima,
-                    max_value=datetime.today(),
+                    max_value=datetime.today().date(),
                     format="DD/MM/YYYY"
                 )
             with c_cad2:
@@ -87,26 +129,35 @@ def render():
             st.markdown("<hr style='margin: 20px 0;'>", unsafe_allow_html=True)
 
             secao(
-                "🎯 Diagnóstico Clínico (Triagem)",
-                "O motor de IA Clínica usará este campo para calibrar o fenótipo (ex: Pós-LCA, Tendinopatia Patelar, Condromalácia, Menisco, Artrose)."
+                "🎯 Diagnóstico Clínico & Encaminhamento Médico (Triagem)",
+                "O motor de IA Clínica usará o diagnóstico para calibrar o fenótipo (ex: Pós-LCA, Tendinopatia Patelar, Condromalácia, Menisco, Artrose)."
             )
-            dx_clinico = st.text_input(
-                "Diagnóstico Clínico / Médico",
-                placeholder="Ex: Reconstrução de LCA, Tendinopatia Patelar, Condropatia Femoropatelar..."
-            )
+            c_dx1, c_dx2 = st.columns([1.8, 1.2])
+            with c_dx1:
+                dx_clinico = st.text_input(
+                    "Diagnóstico Clínico / Médico",
+                    placeholder="Ex: Reconstrução de LCA, Tendinopatia Patelar, Condropatia Femoropatelar..."
+                )
+            with c_dx2:
+                medico_indicador = st.text_input(
+                    "👨‍⚕️ Médico Assistente / Quem Indicou",
+                    placeholder="Ex: Dr. Felipe (CRM) / Demanda Espontânea"
+                )
 
             st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-            # Botão de Ação Principal (Pílula Apple)
             if st.button("💾 Salvar e Abrir Prontuário", width="stretch", type="primary"):
-                if nome.strip() == "":
+                nome_limpo = nome.strip()
+                if nome_limpo == "":
                     st.error("⚠️ O Nome Completo é obrigatório para abrir o prontuário.")
+                elif any(n.lower() == nome_limpo.lower() for n in lista_nomes):
+                    st.warning(f"⚠️ Já existe um paciente cadastrado como **{nome_limpo}**. Selecione-o na barra de busca acima para abrir ou editar seu prontuário.")
                 else:
                     with st.spinner("🔄 Sincronizando prontuário no Firebase..."):
                         try:
-                            idade_calc = (datetime.now().date() - dt_nasc).days // 365
+                            idade_calc = _calcular_idade_exata(dt_nasc)
                             novo_cad = {
-                                "Nome": nome.strip(),
+                                "Nome": nome_limpo,
                                 "Data_Nascimento": dt_nasc.strftime("%d/%m/%Y"),
                                 "Idade": idade_calc,
                                 "CPF": cpf.strip(),
@@ -115,21 +166,24 @@ def render():
                                 "Cidade_Estado": cidade.strip(),
                                 "Ocupacao": ocupacao.strip(),
                                 "Diagnostico_Clinico": dx_clinico.strip(),
+                                "Medico_Indicador": medico_indicador.strip(),
                                 "Historia": "",
                             }
 
                             db.collection("Cadastro").add(novo_cad)
                             invalidar_cache("Cadastro")
 
-                            st.session_state.paciente = nome.strip()
+                            _limpar_contexto_paciente_anterior()
+                            st.session_state.paciente = nome_limpo
                             st.session_state.membro_ativo = "Joelho"
+                            st.session_state.modulo_ativo = "Avaliação Inicial 🔎"
                             st.session_state.pagina = "painel_clinico"
                             st.rerun()
 
                         except Exception as e:
                             st.error(f"❌ Falha crítica reportada pelo servidor: {e}")
 
-    # 4. MODO B: PACIENTE EXISTENTE SELECIONADO (Card de Resumo Rápido estilo Apple Health)
+    # 4. MODO B: PACIENTE EXISTENTE SELECIONADO (Card de Resumo + Edição Rápida de Cadastro)
     else:
         dados_pac = {}
         if not df_cad.empty and "Nome" in df_cad.columns:
@@ -137,10 +191,17 @@ def render():
             if not filtro.empty:
                 dados_pac = filtro.iloc[-1].to_dict()
 
-        idade_exib = dados_pac.get("Idade", "—")
+        # Recalcula a idade dinamicamente se houver Data_Nascimento válida
+        dt_nasc_salva = dados_pac.get("Data_Nascimento")
+        if dt_nasc_salva and str(dt_nasc_salva).strip():
+            idade_exib = _calcular_idade_exata(_parse_data_nasc(str(dt_nasc_salva)))
+        else:
+            idade_exib = dados_pac.get("Idade", "—")
+
         dx_exib = dados_pac.get("Diagnostico_Clinico") or "Não informado na triagem"
         ocup_exib = dados_pac.get("Ocupacao") or "Não informada"
         tel_exib = dados_pac.get("Telefone") or "—"
+        med_exib = dados_pac.get("Medico_Indicador") or "—"
 
         with st.container(border=True):
             st.markdown(f"""
@@ -159,7 +220,7 @@ def render():
                 </div>
             """, unsafe_allow_html=True)
 
-            c_info1, c_info2, c_info3 = st.columns(3)
+            c_info1, c_info2, c_info3, c_info4 = st.columns(4)
             with c_info1:
                 st.caption("🎯 DIAGNÓSTICO DE TRIAGEM")
                 st.markdown(f"**{dx_exib}**")
@@ -167,12 +228,67 @@ def render():
                 st.caption("🏃 OCUPAÇÃO / ESPORTE")
                 st.markdown(f"**{ocup_exib}**")
             with c_info3:
+                st.caption("👨‍⚕️ MÉDICO INDICADOR")
+                st.markdown(f"**{med_exib}**")
+            with c_info4:
                 st.caption("📱 CONTATO")
                 st.markdown(f"**{tel_exib}**")
 
-            st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+            # Expander para editar dados cadastrais sem precisar recriar o paciente
+            with st.expander("✏️ Editar Dados Cadastrais / Diagnóstico de Triagem"):
+                ec1, ec2, ec3 = st.columns(3)
+                with ec1:
+                    ed_dt_nasc = st.date_input(
+                        "Data de Nascimento",
+                        value=_parse_data_nasc(dados_pac.get("Data_Nascimento", "01/01/2000")),
+                        min_value=date(datetime.now().year - 105, 1, 1),
+                        max_value=datetime.today().date(),
+                        format="DD/MM/YYYY",
+                        key="ed_dt_nasc"
+                    )
+                with ec2:
+                    ed_tel = st.text_input("Telefone (WhatsApp)", value=str(dados_pac.get("Telefone", "") or ""), key="ed_tel")
+                with ec3:
+                    ed_ocup = st.text_input("Ocupação / Esporte", value=str(dados_pac.get("Ocupacao", "") or ""), key="ed_ocup")
+
+                ec4, ec5 = st.columns([1.8, 1.2])
+                with ec4:
+                    ed_dx = st.text_input("Diagnóstico Clínico / Médico", value=str(dados_pac.get("Diagnostico_Clinico", "") or ""), key="ed_dx")
+                with ec5:
+                    ed_med = st.text_input("Médico Assistente / Indicação", value=str(dados_pac.get("Medico_Indicador", "") or ""), key="ed_med")
+
+                if st.button("💾 Atualizar Cadastro", type="secondary", key="btn_salvar_ed_cad"):
+                    with st.spinner("Atualizando ficha cadastral no Firebase..."):
+                        try:
+                            idade_nova = _calcular_idade_exata(ed_dt_nasc)
+                            campos_atualizados = {
+                                "Data_Nascimento": ed_dt_nasc.strftime("%d/%m/%Y"),
+                                "Idade": idade_nova,
+                                "Telefone": ed_tel.strip(),
+                                "Ocupacao": ed_ocup.strip(),
+                                "Diagnostico_Clinico": ed_dx.strip(),
+                                "Medico_Indicador": ed_med.strip(),
+                            }
+                            docs_pac = list(db.collection("Cadastro").where("Nome", "==", paciente).stream())
+                            if docs_pac:
+                                for d_ref in docs_pac:
+                                    db.collection("Cadastro").document(d_ref.id).update(campos_atualizados)
+                            else:
+                                campos_atualizados["Nome"] = paciente
+                                db.collection("Cadastro").add(campos_atualizados)
+
+                            invalidar_cache("Cadastro")
+                            toast("Dados cadastrais atualizados com sucesso!", "success")
+                            st.rerun()
+                        except Exception as e:
+                            toast(f"Erro ao atualizar cadastro: {e}", "error")
+
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
             if st.button("🚀 Abrir Prontuário Clínico", width="stretch", type="primary"):
+                _limpar_contexto_paciente_anterior()
                 st.session_state.paciente = paciente
                 st.session_state.membro_ativo = "Joelho"
                 st.session_state.pagina = "painel_clinico"
