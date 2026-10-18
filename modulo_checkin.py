@@ -5,6 +5,19 @@ from config import CORES_GENUA, titulo, secao, toast
 from firebase_client import conn, db, invalidar_cache
 
 
+def _parse_data_segura(data_val) -> datetime:
+    """Converte string de data (YYYY-MM-DD ou DD/MM/YYYY) em datetime para ordenação cronológica exata."""
+    if not data_val:
+        return datetime(2000, 1, 1)
+    s = str(data_val).strip()[:10]
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s, fmt)
+        except Exception:
+            pass
+    return datetime(2000, 1, 1)
+
+
 def _seletor_ios(label: str, opcoes: list, valor_atual: str, key: str):
     """Renderiza st.pills (botões de toque único estilo iOS) com fallback seguro."""
     padrao = valor_atual if valor_atual in opcoes else opcoes[0]
@@ -16,7 +29,6 @@ def _seletor_ios(label: str, opcoes: list, valor_atual: str, key: str):
             selection_mode="single",
             key=key,
         )
-        # Se o usuário clicar novamente na pílula ativa (retornando None), mantém o padrão seguro
         return escolha if escolha in opcoes else padrao
     else:
         idx = opcoes.index(padrao)
@@ -62,7 +74,7 @@ def render():
                 if doc_id:
                     sessoes_existentes.append({"id": doc_id, "data": row_dict})
             sessoes_existentes.sort(
-                key=lambda x: str(x["data"].get("Data", "0000-00-00")),
+                key=lambda x: _parse_data_segura(x["data"].get("Data", "2000-01-01")),
                 reverse=True
             )
     except Exception:
@@ -128,7 +140,7 @@ def render():
     modo_edicao_chk = st.session_state.doc_id_checkin is not None
 
     # ============================================================
-    # 2. RESGATE DA AVALIAÇÃO INICIAL (Testes Alvo, Lateralidade e Objetivo)
+    # 2. RESGATE DA AVALIAÇÃO INICIAL (ORDENAÇÃO CRONOLÓGICA CORRIGIDA)
     # ============================================================
     testes_para_hoje = ["Agachamento Bipodal"]
     lado_acometido_base = "Direito"
@@ -140,7 +152,11 @@ def render():
         df_aval = conn.read_paciente("Avaliacao_Inicial", st.session_state.paciente)
         if not df_aval.empty:
             lista_aval = df_aval.to_dict("records")
-            ultima_aval = sorted(lista_aval, key=lambda x: str(x.get("Data_Avaliacao", "")))[-1]
+            # CORREÇÃO: Ordena usando _parse_data_segura (evita erro de comparar DD/MM/YYYY como texto)
+            ultima_aval = sorted(
+                lista_aval,
+                key=lambda x: _parse_data_segura(x.get("Data_Avaliacao", "01/01/2000"))
+            )[-1]
 
             testes_salvos = ultima_aval.get("Testes_Alvo")
             if testes_salvos:
@@ -156,7 +172,6 @@ def render():
     except Exception:
         pass
 
-    # Se já houver sessões anteriores, usa o SANE da última sessão como default inteligente para hoje
     sane_ultimo_registrado = sane_baseline
     if sessoes_existentes and not modo_edicao_chk:
         try:
@@ -173,14 +188,10 @@ def render():
             "Ajuste a intensidade álgica (EVA), amplitude articular e marcadores de recuperação."
         )
 
-        # Seletor de escopo lateral da sessão (herda o lado da Avaliação Inicial, mas permite comparar D x E)
         c_top1, c_top2 = st.columns([1.3, 2])
         with c_top1:
             if modo_edicao_chk and dados.get("Data"):
-                try:
-                    data_default = datetime.strptime(str(dados["Data"])[:10], "%Y-%m-%d")
-                except Exception:
-                    data_default = datetime.now()
+                data_default = _parse_data_segura(dados["Data"])
             else:
                 data_default = datetime.now()
 
@@ -212,7 +223,6 @@ def render():
         opts_sono = ["Bem", "Acordou com dor", "Insônia"]
 
         if not eh_bilateral_chk:
-            # --- MODO PADRÃO (1-Tap Rápido — Focado no Membro Acometido) ---
             c_chk1, c_chk2 = st.columns(2, gap="large")
 
             with c_chk1:
@@ -258,7 +268,6 @@ def render():
                     key="pill_sono"
                 )
 
-            # Espelha variáveis laterais para manter o schema consistente no Firestore
             if "Esquerdo" in lado_acometido_base:
                 dor_d, dor_e = 0, eva_diaria
                 flex_d, flex_e = 135, adm_flex_atual
@@ -271,7 +280,6 @@ def render():
                 inc_d, inc_e = inchaco_atual, "Nenhum"
 
         else:
-            # --- MODO BILATERAL (Direito x Esquerdo Separados) ---
             col_d, col_e = st.columns(2, gap="large")
 
             with col_d:
@@ -345,8 +353,6 @@ def render():
                     key="pill_sono_bi"
                 )
 
-            # Define os valores titulares (chaves legadas Dor, Flexao, Extensao, Inchaço) pelo lado mais sintomático
-            # para não quebrar gráficos no modulo_painel.py nem o pdf_laudo.py
             eva_diaria = max(dor_d, dor_e)
             adm_flex_atual = min(flex_d, flex_e)
             adm_ext_atual = ext_d if opts_ext.index(ext_d) >= opts_ext.index(ext_e) else ext_e
@@ -406,7 +412,6 @@ def render():
             </div>
         """, unsafe_allow_html=True)
 
-        # 5.1 GROC (Global Rating of Change)
         opcoes_groc = list(MAPA_GROC_SCORE.keys())
         groc_default = (
             dados.get("GROC_Label", "⚪ Igual / Sem Mudança (0)")
@@ -426,7 +431,6 @@ def render():
         c_pass, c_sane = st.columns([1.3, 1.7], gap="large")
 
         with c_pass:
-            # 5.2 PASS (Patient Acceptable Symptom State)
             opcoes_pass = [
                 "👍 Sim — Satisfeito com o estado atual",
                 "👎 Não — Ainda insatisfeito / Precisa evoluir"
@@ -445,7 +449,6 @@ def render():
             pass_atingido_bool = pass_escolhido.startswith("👍")
 
         with c_sane:
-            # 5.3 SANE / Distância da Meta hoje
             sane_val_default = (
                 int(float(dados.get("SANE_Pct", sane_ultimo_registrado)))
                 if modo_edicao_chk
@@ -461,7 +464,6 @@ def render():
         distancia_meta_hoje = 100 - sane_hoje
         ganho_sane = sane_hoje - sane_baseline
 
-        # Feedback visual imediato PBE para o fisioterapeuta durante a sessão
         k1, k2, k3 = st.columns(3)
         k1.metric(
             "Progresso rumo ao Objetivo",
@@ -494,7 +496,6 @@ def render():
         dados_sessao = {
             "Data": data_sessao.strftime("%Y-%m-%d"),
             "Paciente": st.session_state.paciente,
-            # Chaves Principais Retrocompatíveis (lidas pelo modulo_painel.py, ia_clinica.py e pdf_laudo.py)
             "Dor": eva_diaria,
             "EVA_Semanal": eva_semanal,
             "Flexao": adm_flex_atual,
@@ -503,7 +504,6 @@ def render():
             "Sono": sono_atual,
             "Testes_Funcionais": resultados_testes,
             "Agachamento": texto_agachamento,
-            # Chaves Bilaterais (Direito x Esquerdo)
             "Registro_Bilateral": eh_bilateral_chk,
             "Lado_Referencia": lado_acometido_base,
             "Dor_Dir": dor_d,
@@ -514,7 +514,6 @@ def render():
             "Extensao_Esq": ext_e,
             "Inchaco_Dir": inc_d,
             "Inchaco_Esq": inc_e,
-            # Novas Métricas PBE (GROC, PASS e Evolução do Objetivo SANE)
             "GROC_Label": groc_escolhido,
             "GROC_Score": groc_score_num,
             "PASS_Satisfacao": pass_escolhido,
@@ -522,7 +521,6 @@ def render():
             "SANE_Pct": sane_hoje,
             "Distancia_Objetivo_Pct": distancia_meta_hoje,
             "Ganho_SANE_Pct": ganho_sane,
-            # Metadados
             "Profissional_ID": st.session_state.get("user_email", "admin"),
             "Membro": st.session_state.get("membro_ativo", "Joelho"),
         }
