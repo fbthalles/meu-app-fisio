@@ -14,7 +14,7 @@ Princípios inegociáveis:
 Estrutura:
     - CONSTANTES CLÍNICAS: MCID, thresholds LSI, GROC, PASS, PSFS/SANE e bandeiras.
     - analisar_estagnacao(historico, score)           → detecta estagnação por MCID
-    - calcular_lsi(lado_lesado, lado_saudavel, fonte) → LSI + classificação de risco
+    - calcular_lsi(lado_lesado, lado_saudavel, fonte) → LSI + classificação de risco (Exclusivo Dinamometria)
     - analisar_percepcao_metas(avaliacao, df_evo)     → GROC, PASS, SANE e PSFS
     - analisar_bandeiras(avaliacao)                   → red/yellow/blue/black flags
     - analisar_paciente(paciente_nome)                → orquestra tudo (função pública)
@@ -81,7 +81,7 @@ MCID = {
 }
 
 # --- Detector de estagnação ---
-SESSOES_MINIMAS_ESTAGNACAO = 5    # bem conservador (Edgar Jun/2026)
+SESSOES_MINIMAS_ESTAGNACAO = 5
 
 # --- LSI (Limb Symmetry Index) thresholds pós-LCA ---
 LSI_ALTA_FUNCIONAL = 90.0     # ≥90% = critério de alta funcional
@@ -146,9 +146,7 @@ FENOTIPOS = {
 
 
 def normalizar_diagnostico(texto_diagnostico: str) -> dict:
-    """
-    Detecta o fenótipo clínico a partir do texto livre de diagnóstico.
-    """
+    """Detecta o fenótipo clínico a partir do texto livre de diagnóstico."""
     if not texto_diagnostico:
         return {
             "fenotipo": "generico",
@@ -269,11 +267,10 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
 
     janela = historico[-SESSOES_MINIMAS_ESTAGNACAO:]
 
-    # Para dor: melhora = redução; para funcionais: melhora = aumento
     if score == "Dor":
-        melhora = janela[0] - janela[-1]       # positivo = dor caindo
+        melhora = janela[0] - janela[-1]
     else:
-        melhora = janela[-1] - janela[0]       # positivo = função subindo
+        melhora = janela[-1] - janela[0]
 
     if abs(melhora) < mcid_valor:
         status = "estagnacao"
@@ -307,9 +304,9 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
 
 
 # ============================================================
-# FUNÇÃO 2: Cálculo de LSI (Limb Symmetry Index)
+# FUNÇÃO 2: Cálculo de LSI (Limb Symmetry Index — Exclusivo Dinamometria)
 # ============================================================
-def calcular_lsi(lado_lesado: float, lado_saudavel: float, fonte: str = "Dinamometria Extensão (kgf)") -> dict:
+def calcular_lsi(lado_lesado: float, lado_saudavel: float, fonte: str = "Dinamometria Quadríceps (kgf)") -> dict:
     """
     Calcula o Limb Symmetry Index e classifica o risco de re-lesão.
     LSI = (lado_lesado / lado_saudavel) * 100
@@ -319,7 +316,7 @@ def calcular_lsi(lado_lesado: float, lado_saudavel: float, fonte: str = "Dinamom
             "valor": None,
             "classificacao": "indefinido",
             "fonte": fonte,
-            "racional": "Dados bilaterais insuficientes para calcular LSI.",
+            "racional": "Dinamometria bilateral (kgf) não preenchida para calcular LSI.",
             "referencia": LSI_REF
         }
 
@@ -328,15 +325,15 @@ def calcular_lsi(lado_lesado: float, lado_saudavel: float, fonte: str = "Dinamom
     if lsi >= LSI_ALTA_FUNCIONAL:
         classificacao = "alta_funcional"
         cor = "🟢"
-        acao = f"Simetria adequada ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f}). Critério de alta funcional atingido."
+        acao = f"Simetria adequada ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f} kgf). Critério de alta funcional atingido."
     elif lsi >= LSI_ATENCAO:
         classificacao = "atencao"
         cor = "🟡"
-        acao = f"Zona de atenção ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f}). Progredir carga unilateral com cautela antes da alta."
+        acao = f"Zona de atenção ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f} kgf). Progredir carga unilateral com cautela antes da alta."
     else:
         classificacao = "risco"
         cor = "🔴"
-        acao = f"LSI < {LSI_ATENCAO}% ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f}). Risco de re-lesão 2-4x aumentado. NÃO liberar para alta."
+        acao = f"LSI < {LSI_ATENCAO}% ({fonte}: {lado_lesado:.1f} vs {lado_saudavel:.1f} kgf). Risco de re-lesão 2-4x aumentado. NÃO liberar para alta."
 
     return {
         "valor": round(lsi, 1),
@@ -357,12 +354,6 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
     """
     Analisa o alinhamento entre a meta funcional inicial do paciente (PSFS/SANE)
     e a percepção longitudinal nas sessões de check-in (GROC, PASS e evolução do SANE).
-
-    Referências:
-        - PSFS: Stratford 1995 / Hefford 2012 (MCID = 2.0 pts)
-        - GROC: Kamper 2009 (JOSPT — corte clínico ≥ +3 pts)
-        - PASS: Tubach 2005 (Arthritis Rheum — Estado de Sintoma Aceitável)
-        - SANE: Shelbourne 2009 (AJSM — Single Assessment Numeric Evaluation)
     """
     objetivo = str(avaliacao.get("Objetivo_Paciente", "Não especificado") or "Não especificado")
     if objetivo == "Não relatado":
@@ -416,7 +407,6 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
     distancia_meta = max(0.0, 100.0 - sane_atual)
     ganho_sane = sane_atual - sane_base
 
-    # Regra de Decisão PBE para Status Subjetivo & Alinhamento de Expectativa
     if pass_atingido is True and (groc_score is not None and groc_score >= 3) and sane_atual >= 85:
         status = "meta_atingida"
         cor = "🟢"
@@ -474,7 +464,6 @@ def analisar_bandeiras(avaliacao: dict) -> list:
     """
     bandeiras_ativas = []
 
-    # --- 1. Bandeiras Vermelhas ---
     red_flags = _normalizar_lista_flags(
         avaliacao.get("Red_Flags") or avaliacao.get("Bandeiras_Vermelhas")
     )
@@ -488,7 +477,6 @@ def analisar_bandeiras(avaliacao: dict) -> list:
             "referencia": BANDEIRAS["vermelha"]["referencia"]
         })
 
-    # --- 2. Bandeiras Amarelas (Yellow_Flags ou Yellow_Cog) ---
     yellow_flags = _normalizar_lista_flags(
         avaliacao.get("Yellow_Flags") or avaliacao.get("Yellow_Cog") or avaliacao.get("Bandeiras_Amarelas")
     )
@@ -502,7 +490,6 @@ def analisar_bandeiras(avaliacao: dict) -> list:
             "referencia": BANDEIRAS["amarela"]["referencia"]
         })
 
-    # --- 3. Bandeiras Azuis e Negras (Blue_Flags ou Fatores_Sociais) ---
     blue_black_raw = _normalizar_lista_flags(
         avaliacao.get("Blue_Flags") or avaliacao.get("Fatores_Sociais") or avaliacao.get("Bandeiras_Azuis")
     )
@@ -520,7 +507,6 @@ def analisar_bandeiras(avaliacao: dict) -> list:
             "referencia": BANDEIRAS[tipo_chave]["referencia"]
         })
 
-    # --- 4. Dor noturna / Distúrbio severo do sono (regra clínica automática) ---
     dor_noturna = str(avaliacao.get("Dor_Noturna", "")).strip().lower()
     sono_aval = str(avaliacao.get("Sono", "")).strip().lower()
     if dor_noturna in ["sim", "s", "presente", "true", "yes"]:
@@ -590,7 +576,6 @@ def analisar_paciente(paciente_nome: str) -> dict:
 
         resultado["sessoes_registradas"] = len(df_evo)
 
-        # --- Análise de estagnação da Dor (EVA) ---
         if "Dor" in df_evo.columns:
             historico_dor = pd.to_numeric(df_evo["Dor"], errors="coerce").dropna().tolist()
             if historico_dor:
@@ -612,28 +597,13 @@ def analisar_paciente(paciente_nome: str) -> dict:
         # --- Bandeiras ---
         resultado["bandeiras"] = analisar_bandeiras(ultima_aval)
 
-        # --- LSI (Compatível com campos diretos novos OU strings legadas Dinamometria_Dir/Esq) ---
-        lado_lesado = ultima_aval.get("Forca_Lesado") or ultima_aval.get("Dinamometria_Lesado")
-        lado_saudavel = ultima_aval.get("Forca_Saudavel") or ultima_aval.get("Dinamometria_Saudavel")
-        fonte_lsi = "Dinamometria Extensão (kgf)"
+        # --- LSI EXCLUSIVO POR DINAMOMETRIA ISOMÉTRICA (kgf) ---
+        # Ignora completamente Forca_Geral_Dir/Esq (Escala de Oxford 0-5)
+        ext_d = _extrair_valor_prefixo(ultima_aval.get("Dinamometria_Dir"), "Ext")
+        ext_e = _extrair_valor_prefixo(ultima_aval.get("Dinamometria_Esq"), "Ext")
+        fonte_lsi = "Dinamometria Quadríceps (kgf)"
 
-        try:
-            val_les = float(lado_lesado) if lado_lesado is not None else 0.0
-            val_sau = float(lado_saudavel) if lado_saudavel is not None else 0.0
-        except (ValueError, TypeError):
-            val_les, val_sau = 0.0, 0.0
-
-        # Fallback automático: extrai de Dinamometria_Dir / Dinamometria_Esq se campos diretos forem 0
-        if val_les <= 0 and val_sau <= 0:
-            ext_d = _extrair_valor_prefixo(ultima_aval.get("Dinamometria_Dir"), "Ext")
-            ext_e = _extrair_valor_prefixo(ultima_aval.get("Dinamometria_Esq"), "Ext")
-            if ext_d > 0 or ext_e > 0:
-                fonte_lsi = "Dinamometria Quadríceps (kgf)"
-            else:
-                ext_d = _extrair_valor_prefixo(ultima_aval.get("Forca_Geral_Dir"), "Ext")
-                ext_e = _extrair_valor_prefixo(ultima_aval.get("Forca_Geral_Esq"), "Ext")
-                fonte_lsi = "Força Manual Quadríceps (Oxford 0-5)"
-
+        if ext_d > 0 or ext_e > 0:
             lado_ref = str(ultima_aval.get("Lado_Acometido", "")).lower()
             if "direito" in lado_ref or "dir > esq" in lado_ref:
                 val_les, val_sau = ext_d, ext_e
@@ -642,8 +612,17 @@ def analisar_paciente(paciente_nome: str) -> dict:
             else:
                 val_les, val_sau = min(ext_d, ext_e), max(ext_d, ext_e)
 
-        if val_sau > 0:
-            resultado["lsi"] = calcular_lsi(val_les, val_sau, fonte=fonte_lsi)
+            if val_sau > 0:
+                resultado["lsi"] = calcular_lsi(val_les, val_sau, fonte=fonte_lsi)
+        elif "Dinamometria_Dir" not in ultima_aval and "Dinamometria_Esq" not in ultima_aval:
+            # Retrocompatibilidade apenas para registros que tinham Forca_Lesado/Saudavel diretos sem string
+            try:
+                val_les = float(ultima_aval.get("Dinamometria_Lesado") or 0.0)
+                val_sau = float(ultima_aval.get("Dinamometria_Saudavel") or 0.0)
+            except (ValueError, TypeError):
+                val_les, val_sau = 0.0, 0.0
+            if val_sau > 5.0:  # > 5 kgf garante que não é grau de Oxford (0-5)
+                resultado["lsi"] = calcular_lsi(val_les, val_sau, fonte=fonte_lsi)
 
         # --- Estagnação Funcional (SANE, LEFS ou KOOS se coletados no check-in) ---
         for score_func in ["SANE_Pct", "LEFS", "KOOS"]:
@@ -673,7 +652,7 @@ def renderizar_insights(insights: dict, cores: dict):
                     padding: 20px; border-radius: 16px; color: white; margin-bottom: 20px;'>
             <h3 style='color: white; margin: 0;'>🧠 Insights Clínicos — IA Baseada em Evidência</h3>
             <p style='color: #E0F7FA; margin: 8px 0 0 0; font-size: 0.95rem;'>
-                Análise determinística de estagnação (MCID), simetria bilateral (LSI), percepção de mudança (GROC/PASS) e bandeiras clínicas.
+                Análise determinística de estagnação (MCID), simetria bilateral por dinamometria (LSI), percepção de mudança (GROC/PASS) e bandeiras clínicas.
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -704,9 +683,9 @@ def renderizar_insights(insights: dict, cores: dict):
         st.metric("🚩 Bandeiras Ativas", n_bandeiras, delta=None if n_bandeiras == 0 else "Atenção", delta_color="inverse")
     with col3:
         if insights.get("lsi") and insights["lsi"].get("valor") is not None:
-            st.metric(f"{insights['lsi']['cor']} LSI (Força)", f"{insights['lsi']['valor']}%")
+            st.metric(f"{insights['lsi']['cor']} LSI (Dinamometria)", f"{insights['lsi']['valor']}%")
         else:
-            st.metric("📊 LSI (Força)", "N/D", help="Preencha a dinamometria ou força bilateral na Avaliação Inicial")
+            st.metric("📊 LSI (Dinamometria)", "N/D", help="Requer preenchimento da Dinamometria (kgf) na Avaliação Inicial")
     with col4:
         if pm.get("sane_atual") is not None:
             st.metric(
@@ -771,10 +750,10 @@ def renderizar_insights(insights: dict, cores: dict):
         st.error(f"🔴 **PIORA CLÍNICA**\n\n{est['racional']}")
         st.caption(f"📚 Referência: {est['referencia']}")
 
-    # ==== 3. LSI ====
+    # ==== 3. LSI (SOMENTE SE DINAMOMETRIA PREENCHIDA) ====
     if insights.get("lsi") and insights["lsi"].get("valor") is not None:
         st.markdown("---")
-        titulo("⚖️ Limb Symmetry Index (LSI — Força Muscular)")
+        titulo("⚖️ Limb Symmetry Index (LSI — Dinamometria Isométrica em kgf)")
         lsi_data = insights["lsi"]
 
         if lsi_data["classificacao"] == "alta_funcional":
