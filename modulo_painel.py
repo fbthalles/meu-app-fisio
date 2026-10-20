@@ -100,7 +100,6 @@ def _detectar_proms_preenchidos(av_p: dict, prom_fenotipo: str = "LEFS") -> list
     if not av_p:
         return []
 
-    # Se a avaliação já tiver a chave explícita de PROMs aplicados, respeita-a
     if isinstance(av_p.get("PROMs_Aplicados"), list) and av_p.get("PROMs_Aplicados"):
         return av_p.get("PROMs_Aplicados")
 
@@ -112,22 +111,16 @@ def _detectar_proms_preenchidos(av_p: dict, prom_fenotipo: str = "LEFS") -> list
     ikdc_v = float(av_p.get("IKDC_Pct", 0) or 0)
 
     candidatos = []
-    # LEFS começa em 0 por padrão; se > 0, foi preenchido pelo fisioterapeuta
     if lefs_v > 0:
         candidatos.append("LEFS")
-    # VISA-P começa em 50 por padrão nos sliders não tocados
     if visap_v > 0 and round(visap_v, 1) != 50.0:
         candidatos.append("VISA-P")
-    # Lysholm começa em 100 por padrão nos selectboxes não tocados
     if lysh_v > 0 and round(lysh_v, 1) != 100.0:
         candidatos.append("Lysholm")
-    # WOMAC começa em 100% por padrão
     if womac_v > 0 and round(womac_v, 1) != 100.0:
         candidatos.append("WOMAC")
-    # KOOS começa em 100% por padrão
     if koos_v > 0 and round(koos_v, 1) != 100.0:
         candidatos.append("KOOS")
-    # IKDC começa em 75% por padrão
     if ikdc_v > 0 and round(ikdc_v, 1) != 75.0:
         candidatos.append("IKDC")
 
@@ -139,6 +132,99 @@ def _detectar_proms_preenchidos(av_p: dict, prom_fenotipo: str = "LEFS") -> list
         return [candidatos[0]]
 
     return []
+
+
+def _calcular_curva_prognostica_sane(
+    df_completo: pd.DataFrame,
+    df_janela: pd.DataFrame,
+    sane_base: float,
+    semanas_esperadas: int = None
+) -> dict:
+    """
+    Calcula a trajetória prognóstica esperada (PBE) vs. evolução real do paciente na escala SANE (0-100%).
+
+    Equação:
+        E(t_i) = S_0 + (max(85.0, S_0) - S_0) * min(1.0, t_i / W_esp)^0.75
+    Onde:
+        - S_0: SANE Baseline (Marco Zero, %)
+        - 85.0%: Limiar de alta funcional subjetiva (Shelbourne et al., 2009)
+        - t_i: Tempo decorrido em semanas desde a 1ª sessão registrada (ou fallback de 2 sessões/semana)
+        - W_esp: Janela prognóstica do fenótipo em semanas (ex: LCA=36, Tendinopatia=24, SFP=12)
+        - Expoente 0.75: Cinética de adaptação tecidual e neuromotora (ganho inicial rápido e maturação progressiva)
+    """
+    w_esp = float(semanas_esperadas) if (semanas_esperadas and semanas_esperadas > 0) else 16.0
+    s0 = float(np.clip(sane_base, 0.0, 100.0))
+    meta_alta = max(85.0, s0)
+
+    dt_inicio = df_completo['Data_dt'].iloc[0] if (not df_completo.empty and 'Data_dt' in df_completo.columns) else pd.NaT
+
+    tempos_semanas = []
+    esperado_vals = []
+
+    for idx_row, row in df_janela.iterrows():
+        dt_atual = row.get('Data_dt', pd.NaT)
+        # Posição real da sessão no histórico completo do paciente
+        try:
+             matches = df_completo.index[df_completo['Sessão_Num'] == row['Sessão_Num']].tolist()
+             pos_global = matches[0] if matches else idx_row
+        except Exception:
+            pos_global = idx_row
+
+        if pd.notna(dt_inicio) and pd.notna(dt_atual):
+            dias = max(0.0, float((dt_atual - dt_inicio).days))
+            t_sem = dias / 7.0
+            # Fallback se múltiplas sessões de teste foram lançadas na mesma data
+            if t_sem == 0.0 and pos_global > 0:
+                t_sem = pos_global * 0.5
+        else:
+            t_sem = pos_global * 0.5  # 2 sessões por semana como padrão fisiológico
+
+        tau = min(1.0, max(0.0, t_sem / w_esp))
+        val_esp = s0 + (meta_alta - s0) * (tau ** 0.75)
+
+        tempos_semanas.append(round(t_sem, 1))
+        esperado_vals.append(round(float(val_esp), 1))
+
+    sane_real_serie = df_janela['SANE_Pct_Num'].fillna(s0).tolist()
+    real_atual = float(sane_real_serie[-1]) if sane_real_serie else s0
+    esp_atual = float(esperado_vals[-1]) if esperado_vals else s0
+    desvio = round(real_atual - esp_atual, 1)
+
+    if desvio >= 5.0:
+        status = "acima"
+        cor = "🟢"
+        resumo = (
+            f"Paciente está **{desvio:+.1f}% acima** da curva prognóstica esperada para a semana "
+            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Esperado PBE: **{esp_atual:.0f}%**)."
+        )
+    elif desvio >= -10.0:
+        status = "dentro"
+        cor = "🔵"
+        resumo = (
+            f"Paciente evolui **dentro da janela prognóstica esperada** pela literatura na semana "
+            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Esperado PBE: **{esp_atual:.0f}%** · Δ {desvio:+.1f}%)."
+        )
+    else:
+        status = "abaixo"
+        cor = "🔴"
+        resumo = (
+            f"Paciente encontra-se **{abs(desvio):.1f}% abaixo** da trajetória esperada na semana "
+            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Esperado PBE: **{esp_atual:.0f}%**). "
+            f"Revisar barreiras biopsicossociais, adesão ou dosagem de carga."
+        )
+
+    return {
+        "semanas_janela": int(w_esp),
+        "tempos_semanas": tempos_semanas,
+        "esperado": esperado_vals,
+        "real": sane_real_serie,
+        "real_atual": round(real_atual, 1),
+        "esp_atual": round(esp_atual, 1),
+        "desvio": desvio,
+        "status": status,
+        "cor": cor,
+        "resumo": resumo,
+    }
 
 
 def render():
@@ -851,37 +937,81 @@ def render():
             st.pyplot(fig2)
             plt.close(fig2)
 
-        # Card 3: Curva de Aproximação ao Objetivo do Paciente (SANE % — até 10 sessões)
+        # Card 3: Prognóstico por Fenótipo — Trajetória Esperada (PBE) vs. Evolução Real (SANE %)
         with st.container(border=True):
+            prog_data = _calcular_curva_prognostica_sane(
+                df_completo=df_p,
+                df_janela=df_janela,
+                sane_base=sane_base_av,
+                semanas_esperadas=fen_info.get("tempo_esperado_semanas")
+            )
+
             secao(
-                f"🏆 Trajetória Rumo ao Objetivo do Paciente: SANE % (Últimas {len(df_janela)} sessões)",
-                f"Objetivo: '{av_objetivo}' · MCID do SANE = +15% · Limiar de Alta Subjetiva ≥ 85% (Shelbourne et al., 2009)."
+                f"🏆 Prognóstico por Fenótipo: Trajetória Esperada (PBE) × Evolução Real (Últimas {len(df_janela)} sessões)",
+                f"Fenótipo: {fen_info['label']} (Janela PBE: {prog_data['semanas_janela']} semanas) · "
+                f"Objetivo: '{av_objetivo}' · Limiar de Alta ≥ 85% (Shelbourne et al., 2009)."
             )
-            fig_sane, ax_s = plt.subplots(figsize=(10, 3.5), dpi=120)
-            sane_serie = df_janela['SANE_Pct_Num'].fillna(sane_base_av)
-            ax_s.axhline(y=85, color=CORES_GENUA['alerta_sucesso'], linestyle='--', lw=1.6, alpha=0.85, label="Limiar de Alta (85%)")
-            ax_s.axhline(y=min(100.0, sane_base_av + 15.0), color=CORES_GENUA['alerta_aviso'], linestyle='-.', lw=1.3, alpha=0.75, label=f"Meta MCID (+15% = {min(100.0, sane_base_av + 15.0):.0f}%)")
-            ax_s.axhline(y=sane_base_av, color=CORES_GENUA['texto_suave'], linestyle=':', lw=1.3, alpha=0.7, label=f"Marco Zero ({sane_base_av:.0f}%)")
+
+            fig_sane, ax_s = plt.subplots(figsize=(10, 3.8), dpi=120)
+            x_prog = np.arange(len(df_janela))
+            sane_serie = np.array(prog_data["real"], dtype=float)
+            esp_serie = np.array(prog_data["esperado"], dtype=float)
+
+            # Faixa de tolerância fisiológica (±10% em torno da trajetória esperada da literatura)
+            faixa_inf = np.clip(esp_serie - 10.0, 0.0, 100.0)
+            faixa_sup = np.clip(esp_serie + 5.0, 0.0, 100.0)
+            ax_s.fill_between(
+                x_prog, faixa_inf, faixa_sup,
+                color=CORES_GENUA['secundaria'], alpha=0.11,
+                label="Janela Fisiológica Esperada (-10% a +5%)"
+            )
+
+            # Linha Pontilhada: Trajetória Esperada pela Literatura (PBE)
             ax_s.plot(
-                df_janela['Sessão_Num'], sane_serie,
-                color=CORES_GENUA['primaria'], marker='o', markersize=7, lw=2.8, label="SANE Atual (%)"
+                x_prog, esp_serie,
+                color=CORES_GENUA['secundaria'], linestyle='--', marker='^', markersize=5.5,
+                lw=2.2, alpha=0.9, label=f"Trajetória Esperada PBE ({prog_data['semanas_janela']} sem)"
             )
-            ax_s.fill_between(range(len(df_janela)), sane_serie, alpha=0.10, color=CORES_GENUA['secundaria'])
-            ax_s.set_ylabel("Capacidade Percebida (%)", fontweight='600', color=CORES_GENUA['primaria'])
+
+            # Linha Sólida: Evolução Real do Paciente (SANE %)
+            ax_s.plot(
+                x_prog, sane_serie,
+                color=CORES_GENUA['primaria'], linestyle='-', marker='o', markersize=7.5,
+                lw=3.0, zorder=5, label="Paciente — SANE Real (%)"
+            )
+
+            # Linhas horizontais de referência clínica
+            ax_s.axhline(y=85, color=CORES_GENUA['alerta_sucesso'], linestyle=':', lw=1.5, alpha=0.85, label="Critério de Alta (85%)")
+            ax_s.axhline(y=sane_base_av, color=CORES_GENUA['texto_suave'], linestyle=':', lw=1.1, alpha=0.6, label=f"Marco Zero ({sane_base_av:.0f}%)")
+
+            ax_s.set_xticks(x_prog)
+            labels_eixo_x = [
+                f"{sess}\n(Sem {sem:.1f})"
+                for sess, sem in zip(df_janela['Sessão_Num'], prog_data['tempos_semanas'])
+            ]
+            ax_s.set_xticklabels(labels_eixo_x, rotation=20, ha='right', fontsize=8.5)
+            ax_s.set_ylabel("Capacidade Funcional — SANE (%)", fontweight='600', color=CORES_GENUA['primaria'])
             ax_s.set_ylim(-5, 108)
             ax_s.spines['top'].set_visible(False)
             ax_s.spines['right'].set_visible(False)
-            plt.setp(ax_s.get_xticklabels(), rotation=25, ha='right', fontsize=9)
             ax_s.legend(
                 loc='upper center',
                 bbox_to_anchor=(0.5, 1.18),
-                ncol=4,
+                ncol=3,
                 frameon=False,
-                fontsize=8.6
+                fontsize=8.3
             )
             fig_sane.tight_layout()
             st.pyplot(fig_sane)
             plt.close(fig_sane)
+
+            # Feedback executivo auditável sobre o ritmo prognóstico
+            if prog_data["status"] == "acima":
+                st.success(f"{prog_data['cor']} **PROGNÓSTICO ACIMA DO ESPERADO** — {prog_data['resumo']}")
+            elif prog_data["status"] == "dentro":
+                st.info(f"{prog_data['cor']} **DENTRO DA CURVA PROGNÓSTICA PBE** — {prog_data['resumo']}")
+            else:
+                st.warning(f"{prog_data['cor']} **ABAIXO DA CURVA ESPERADA PELA LITERATURA** — {prog_data['resumo']}")
 
     # ------------------------------------------------------------
     # ABA 3: INTELIGÊNCIA CLÍNICA & CHECKLIST DE ALTA (6 GATEKEEPERS)
