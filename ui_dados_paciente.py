@@ -1,9 +1,35 @@
 """GENUA | Tela de Cadastro, Edição e Seleção de Paciente (Estilo Apple HIG)."""
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, date
 from config import CORES_GENUA, titulo, secao, toast
 from firebase_client import db, conn, invalidar_cache
+
+
+def _ativar_wake_lock_mobile():
+    """Mantém a tela do celular ativa (Wake Lock API) e envia heartbeat para não cair a sessão."""
+    components.html(
+        """
+        <script>
+        (function() {
+            async function manterTelaViva() {
+                try {
+                    if ('wakeLock' in navigator) {
+                        await navigator.wakeLock.request('screen');
+                    }
+                } catch (e) {}
+            }
+            manterTelaViva();
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') manterTelaViva();
+            });
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
 
 def _calcular_idade_exata(dt_nasc: date) -> int:
@@ -43,12 +69,15 @@ def _limpar_contexto_paciente_anterior():
         "seletor_avaliacao",
         "seletor_checkin",
         "editando_cadastro_pac",
+        "_ultimo_hash_autosave",
     ]
     for k in chaves_limpar:
         st.session_state.pop(k, None)
 
 
 def render():
+    _ativar_wake_lock_mobile()
+
     # Cabeçalho limpo estilo macOS / iPadOS
     st.markdown(f"""
         <div style='margin-bottom: 24px;'>
@@ -92,12 +121,15 @@ def render():
         with c_stat:
             st.metric("Total na Base", f"{len(lista_nomes)}", "Pacientes")
 
+    # Limite de 100 anos exatos conforme solicitado
+    data_minima_100_anos = date(datetime.now().year - 100, 1, 1)
+
     # 3. MODO A: CADASTRO DE NOVO PACIENTE
     if paciente == "+ Novo Paciente":
         with st.container(border=True):
             secao(
                 "📋 Identificação do Novo Paciente",
-                "Preencha os dados basais, médico indicador e a hipótese diagnóstica de encaminhamento."
+                "Preencha os dados basais, indicação e a hipótese diagnóstica de encaminhamento."
             )
 
             nome = st.text_input("Nome Completo *", placeholder="Ex: Gabriel Medina")
@@ -105,11 +137,10 @@ def render():
             c_cad1, c_cad2, c_cad3 = st.columns(3)
             with c_cad1:
                 data_padrao = date(2000, 1, 1)
-                data_minima = date(datetime.now().year - 105, 1, 1)
                 dt_nasc = st.date_input(
                     "Data de Nascimento *",
                     value=data_padrao,
-                    min_value=data_minima,
+                    min_value=data_minima_100_anos,
                     max_value=datetime.today().date(),
                     format="DD/MM/YYYY"
                 )
@@ -118,18 +149,16 @@ def render():
             with c_cad3:
                 telefone = st.text_input("Telefone (WhatsApp)", placeholder="(11) 99999-9999")
 
-            c_cad4, c_cad5, c_cad6 = st.columns(3)
+            c_cad4, c_cad5 = st.columns(2)
             with c_cad4:
                 email = st.text_input("E-mail", placeholder="paciente@email.com")
             with c_cad5:
-                cidade = st.text_input("Cidade e Estado", placeholder="Ex: São Paulo - SP")
-            with c_cad6:
                 ocupacao = st.text_input("Atividade Ocupacional / Esporte", placeholder="Ex: Atleta Amador / Engenheiro")
 
             st.markdown("<hr style='margin: 20px 0;'>", unsafe_allow_html=True)
 
             secao(
-                "🎯 Diagnóstico Clínico & Encaminhamento Médico (Triagem)",
+                "🎯 Diagnóstico Clínico & Indicação (Triagem)",
                 "O motor de IA Clínica usará o diagnóstico para calibrar o fenótipo (ex: Pós-LCA, Tendinopatia Patelar, Condromalácia, Menisco, Artrose)."
             )
             c_dx1, c_dx2 = st.columns([1.8, 1.2])
@@ -140,8 +169,8 @@ def render():
                 )
             with c_dx2:
                 medico_indicador = st.text_input(
-                    "👨‍⚕️ Médico Assistente / Quem Indicou",
-                    placeholder="Ex: Dr. Felipe (CRM) / Demanda Espontânea"
+                    "🤝 Indicação",
+                    placeholder="Ex: Dr. Felipe / Paciente João / Instagram / Demanda Espontânea"
                 )
 
             st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
@@ -163,7 +192,7 @@ def render():
                                 "CPF": cpf.strip(),
                                 "Telefone": telefone.strip(),
                                 "Email": email.strip(),
-                                "Cidade_Estado": cidade.strip(),
+                                "Cidade_Estado": "",
                                 "Ocupacao": ocupacao.strip(),
                                 "Diagnostico_Clinico": dx_clinico.strip(),
                                 "Medico_Indicador": medico_indicador.strip(),
@@ -178,6 +207,7 @@ def render():
                             st.session_state.membro_ativo = "Joelho"
                             st.session_state.modulo_ativo = "Avaliação Inicial 🔎"
                             st.session_state.pagina = "painel_clinico"
+                            st.query_params["pac"] = nome_limpo
                             st.rerun()
 
                         except Exception as e:
@@ -194,8 +224,10 @@ def render():
         # Recalcula a idade dinamicamente se houver Data_Nascimento válida
         dt_nasc_salva = dados_pac.get("Data_Nascimento")
         if dt_nasc_salva and str(dt_nasc_salva).strip():
-            idade_exib = _calcular_idade_exata(_parse_data_nasc(str(dt_nasc_salva)))
+            dt_parsed = max(_parse_data_nasc(str(dt_nasc_salva)), data_minima_100_anos)
+            idade_exib = _calcular_idade_exata(dt_parsed)
         else:
+            dt_parsed = date(2000, 1, 1)
             idade_exib = dados_pac.get("Idade", "—")
 
         dx_exib = dados_pac.get("Diagnostico_Clinico") or "Não informado na triagem"
@@ -228,7 +260,7 @@ def render():
                 st.caption("🏃 OCUPAÇÃO / ESPORTE")
                 st.markdown(f"**{ocup_exib}**")
             with c_info3:
-                st.caption("👨‍⚕️ MÉDICO INDICADOR")
+                st.caption("🤝 INDICAÇÃO")
                 st.markdown(f"**{med_exib}**")
             with c_info4:
                 st.caption("📱 CONTATO")
@@ -242,8 +274,8 @@ def render():
                 with ec1:
                     ed_dt_nasc = st.date_input(
                         "Data de Nascimento",
-                        value=_parse_data_nasc(dados_pac.get("Data_Nascimento", "01/01/2000")),
-                        min_value=date(datetime.now().year - 105, 1, 1),
+                        value=dt_parsed,
+                        min_value=data_minima_100_anos,
                         max_value=datetime.today().date(),
                         format="DD/MM/YYYY",
                         key="ed_dt_nasc"
@@ -257,7 +289,7 @@ def render():
                 with ec4:
                     ed_dx = st.text_input("Diagnóstico Clínico / Médico", value=str(dados_pac.get("Diagnostico_Clinico", "") or ""), key="ed_dx")
                 with ec5:
-                    ed_med = st.text_input("Médico Assistente / Indicação", value=str(dados_pac.get("Medico_Indicador", "") or ""), key="ed_med")
+                    ed_med = st.text_input("🤝 Indicação", value=str(dados_pac.get("Medico_Indicador", "") or ""), key="ed_med")
 
                 if st.button("💾 Atualizar Cadastro", type="secondary", key="btn_salvar_ed_cad"):
                     with st.spinner("Atualizando ficha cadastral no Firebase..."):
@@ -292,4 +324,5 @@ def render():
                 st.session_state.paciente = paciente
                 st.session_state.membro_ativo = "Joelho"
                 st.session_state.pagina = "painel_clinico"
+                st.query_params["pac"] = paciente
                 st.rerun()
