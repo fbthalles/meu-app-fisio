@@ -5,7 +5,8 @@ Exporta:
  - gerar_laudo_html(): Laudo executivo Clean Light nas cores oficiais GENUA (#103E55 / #2E8B9A)
    com Resumo Executivo Semafórico Dinâmico, Gráficos Clean em 300 DPI (últimas 10 sessões com Data/S#),
    Velocímetro SVG de ADM, Renderização Condicional Estrita (só exibe o que foi preenchido),
-   Força Muscular vinculada EXCLUSIVAMENTE à Dinamometria (kgf), Checklist dos 6 Pontos de Alta (Gatekeepers PBE)
+   Força Muscular vinculada EXCLUSIVAMENTE à Dinamometria (kgf) com LSI + Razão I:Q,
+   Objetivos centrados em SANE & GROC (-7 a +7) sem PSFS, Checklist dos 6 Pontos de Alta (Gatekeepers PBE)
    e Conclusões Automáticas PBE 100% Editáveis ao clique (contenteditable) antes de imprimir.
  - gerar_laudo(): Gerador em bytes via FPDF2 para retrocompatibilidade.
 
@@ -150,13 +151,20 @@ def _mapear_inchaco_grau(val) -> int:
         return 0
 
 
-def _mapa_func_dor_equivalente(resultado_texto):
+def _mapa_func_dor_equivalente(resultado_texto, dor_num_override=None):
     """
-    Mapeia a resposta qualitativa do teste funcional para escala de dificuldade/dor (0 a 10),
-    onde 0 = Sem dor/Normal e 10 = Incapaz.
+    Mapeia a resposta do teste funcional para escala de dificuldade/dor (0 a 10),
+    priorizando o valor exato da barra deslizante de dor (0 a 10) quando disponível.
     """
-    if not resultado_texto:
+    if dor_num_override is not None and str(dor_num_override).strip() != "":
+        try:
+            return float(max(0.0, min(10.0, float(dor_num_override))))
+        except Exception:
+            pass
+    if resultado_texto is None:
         return None
+    if isinstance(resultado_texto, (int, float)):
+        return float(max(0.0, min(10.0, float(resultado_texto))))
     s = str(resultado_texto).strip()
     mapa = {
         "Sem Dor (0)": 0.0, "Sem Dor": 0.0,
@@ -292,8 +300,8 @@ def _gerar_grafico_dor_clean_b64(hist):
 def _gerar_grafico_testes_clean_b64(hist):
     """
     Gera gráfico Clean Light de evolução dos Testes Funcionais Específicos (até 10 sessões)
-    e retorna (b64_img, lista_conclusoes_testes, qtd_testes_melhoraram, total_testes_validos).
-    Se nenhum teste funcional foi preenchido, retorna b64_img = "".
+    suportando a barra deslizante de dor (0 a 10) e retorna:
+    (b64_img, lista_conclusoes_testes, qtd_testes_melhoraram, total_testes_validos).
     """
     marcos = _selecionar_ultimas_sessoes(hist, max_sessoes=10)
     if not marcos:
@@ -306,9 +314,11 @@ def _gerar_grafico_testes_clean_b64(hist):
     nomes_testes = []
     for e in evs:
         tf = e.get('Testes_Funcionais', {})
+        tf_num = e.get('Testes_Funcionais_Dor_Num', {})
         if isinstance(tf, dict):
             for k, val_resp in tf.items():
-                if _mapa_func_dor_equivalente(val_resp) is not None and k not in nomes_testes:
+                dor_num_k = tf_num.get(k) if isinstance(tf_num, dict) else None
+                if _mapa_func_dor_equivalente(val_resp, dor_num_k) is not None and k not in nomes_testes:
                     nomes_testes.append(k)
 
     if not nomes_testes:
@@ -329,10 +339,15 @@ def _gerar_grafico_testes_clean_b64(hist):
         textos_raw = []
         for e in evs:
             tf = e.get('Testes_Funcionais', {})
+            tf_num = e.get('Testes_Funcionais_Dor_Num', {})
             resp = tf.get(t_nome) if isinstance(tf, dict) else None
-            sc_dor = _mapa_func_dor_equivalente(resp)
+            dor_num_k = tf_num.get(t_nome) if isinstance(tf_num, dict) else None
+            sc_dor = _mapa_func_dor_equivalente(resp, dor_num_k)
             valores_y.append(sc_dor if sc_dor is not None else np.nan)
-            textos_raw.append(resp)
+            if dor_num_k is not None and "Incapaz" not in str(resp):
+                textos_raw.append(f"Dor {int(float(dor_num_k))}/10")
+            else:
+                textos_raw.append(resp)
 
         arr_y = np.array(valores_y, dtype=float)
         mask = ~np.isnan(arr_y)
@@ -354,24 +369,24 @@ def _gerar_grafico_testes_clean_b64(hist):
                 pct_red = ((v_ini - v_fim) / max(1.0, v_ini)) * 100.0
                 conclusoes_testes.append((
                     "verde",
-                    f"Melhora clínica significativa de {pct_red:.0f}% na tolerância ao teste {t_nome} ({r_ini_str} → {r_fim_str}, escore álgico {v_ini:.1f} → {v_fim:.1f})."
+                    f"Melhora clínica significativa de {pct_red:.0f}% na tolerância ao movimento {t_nome} ({r_ini_str} → {r_fim_str}, dor {v_ini:.1f} → {v_fim:.1f})."
                 ))
             elif v_fim == v_ini:
                 if v_fim == 0:
                     melhoraram += 1
                     conclusoes_testes.append((
                         "verde",
-                        f"Teste {t_nome} realizado com capacidade plena e sem dor ({r_fim_str}) ao longo do período."
+                        f"Movimento {t_nome} realizado com capacidade plena e sem dor ({r_fim_str}) ao longo do período."
                     ))
                 else:
                     conclusoes_testes.append((
                         "neutro",
-                        f"Teste {t_nome} sem mudança clínica relevante no período ({v_ini:.1f} → {v_fim:.1f} · {r_fim_str})."
+                        f"Movimento {t_nome} estável no período (dor {v_ini:.1f} → {v_fim:.1f} · {r_fim_str})."
                     ))
             else:
                 conclusoes_testes.append((
                     "laranja",
-                    f"Aumento de sensibilidade mecânica no teste {t_nome} ({v_ini:.1f} → {v_fim:.1f} · {r_fim_str}). Ajustar controle excêntrico."
+                    f"Oscilação de sensibilidade mecânica no movimento {t_nome} ({v_ini:.1f} → {v_fim:.1f} · {r_fim_str}). Ajustar controle de carga."
                 ))
 
     if testes_plotados == 0:
@@ -403,7 +418,6 @@ def _gerar_grafico_sane_clean_b64(hist, sane_base: float):
     if marcos:
         labels = [m[0] for m in marcos]
         valores = [_safe_float(m[1].get('SANE_Pct'), sane_base) for m in marcos]
-        # Se a 1ª sessão do gráfico for a S1 absoluta do paciente e não tiver SANE explícito, ancora no baseline
         if len(hist) <= 10 and len(valores) >= 1 and marcos[0][1].get('SANE_Pct') is None:
             valores[0] = sane_base
     else:
@@ -519,15 +533,15 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     """
     Gera o Laudo de Evolução Clínica no padrão Clean Light GENUA:
     - Gráficos com até 10 sessões rotuladas com S# e Data (DD/MM).
-    - Força Muscular vinculada EXCLUSIVAMENTE à Dinamometria (kgf).
-    - Ocultação estrita de qualquer seção/campo não preenchido.
+    - Força Muscular vinculada EXCLUSIVAMENTE à Dinamometria (kgf) com LSI e Razão I:Q.
+    - Objetivos centrados em SANE (0-100%) e GROC (-7 a +7), sem PSFS.
     - Checklist dos 6 Pontos de Objetivo para Atingir (Gatekeepers PBE de Alta Funcional).
     """
     dados_aval, hist = _normalizar_entradas(dados_aval, historico)
     n_sessoes = len(hist)
     ultimas_10 = _selecionar_ultimas_sessoes(hist, max_sessoes=10)
 
-    # --- 1. METADADOS DO CABEÇALHO (RENDERIZAÇÃO CONDICIONAL DE CAMPOS PREENCHIDOS) ---
+    # --- 1. METADADOS DO CABEÇALHO ---
     dx_raw = dados_aval.get('Diagnostico_Clinico') or dados_aval.get('Diagnostico_Cadastro')
     idade_raw = dados_aval.get('Idade') or dados_aval.get('Idade_Cadastro')
     ocupacao_raw = dados_aval.get('Ocupacao_Esporte') or dados_aval.get('Ocupacao')
@@ -549,7 +563,6 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     else:
         periodo_avaliado = dados_aval.get("Data_Avaliacao", data_emissao)
 
-    # Monta dinamicamente apenas os metadados preenchidos no cabeçalho
     paciente_label = f"{paciente_nome} ({idade_raw} anos)" if _tem_valor_util(idade_raw) else str(paciente_nome)
     meta_items_html = f"""
         <div class="meta-item">
@@ -567,7 +580,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     if _tem_valor_util(medico_raw):
         meta_items_html += f"""
         <div class="meta-item">
-            <span class="meta-lbl">Médico / Indicação</span>
+            <span class="meta-lbl">Indicação</span>
             <span class="meta-val" contenteditable="true">{_esc(medico_raw)}</span>
         </div>
         """
@@ -595,10 +608,9 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
     """
 
-    # Lista dinâmica de pílulas do Resumo Executivo (só entra o que foi preenchido)
     exec_pills_list = []
 
-    # --- 2. EVOLUÇÃO DA DOR (EVA) — SÓ APARECE SE HOUVER REGISTRO DE DOR ---
+    # --- 2. EVOLUÇÃO DA DOR (EVA) ---
     tem_dor_preenchida = any(h.get('Dor') is not None for h in hist)
     html_secao_dor = ""
     dor_atual = 0.0
@@ -660,21 +672,21 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
         """
 
-    # --- 3. TESTES FUNCIONAIS ESPECÍFICOS — SÓ APARECE SE HOUVER TESTES PREENCHIDOS ---
+    # --- 3. TESTES FUNCIONAIS ESPECÍFICOS (RELACIONAL FUNCIONAL COM BARRA DE DOR 0-10) ---
     b64_testes, conclusoes_testes, qtd_melhorou, total_testes = (
         _gerar_grafico_testes_clean_b64(hist) if n_sessoes >= 1 else ("", [], 0, 0)
     )
     html_secao_testes = ""
     if b64_testes and total_testes > 0:
         cor_kpi_func = "#16A34A" if qtd_melhorou >= max(1, total_testes // 2) else "#D97706"
-        txt_kpi_func = f"{qtd_melhorou}/{total_testes} testes"
+        txt_kpi_func = f"{qtd_melhorou}/{total_testes} gestos"
         sub_kpi_func = "em evolução positiva"
 
         exec_pills_list.append(f"""
             <div class="exec-pill">
                 <div class="exec-icon" style="background:{cor_kpi_func};">↑</div>
                 <div class="exec-info" contenteditable="true">
-                    <span class="exec-lbl">FUNÇÃO</span>
+                    <span class="exec-lbl">FUNÇÃO × DOR</span>
                     <span class="exec-main" style="color:{cor_kpi_func};">{_esc(txt_kpi_func)}</span>
                     <span class="exec-sub">{_esc(sub_kpi_func)}</span>
                 </div>
@@ -686,13 +698,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         ])
         html_secao_testes = f"""
         <div class="section-card">
-            <div class="section-title">TESTES FUNCIONAIS ESPECÍFICOS — ÚLTIMAS {len(ultimas_10)} SESSÕES</div>
+            <div class="section-title">RELACIONAL FUNCIONAL (DOR 0–10 DURANTE O GESTO) — ÚLTIMAS {len(ultimas_10)} SESSÕES</div>
             <img class="chart-img" src="data:image/png;base64,{b64_testes}" alt="Testes Funcionais" />
             {boxes_conclusao_testes_html}
         </div>
         """
 
-    # --- 4. AMPLITUDE DE MOVIMENTO (ADM) — SÓ APARECE SE HOUVER GONIOMETRIA OU CHECK-IN ---
+    # --- 4. AMPLITUDE DE MOVIMENTO (ADM) ---
     adm_fl_d_av = _extrair_chave_str(dados_aval.get("ADM_Joelho_Flexao", ""), "Dir", 0.0)
     adm_fl_e_av = _extrair_chave_str(dados_aval.get("ADM_Joelho_Flexao", ""), "Esq", 0.0)
     lado_str_low = str(lado_acom).lower()
@@ -846,7 +858,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
         """
 
-    # --- 5. QUESTIONÁRIOS / PROMs — SÓ APARECE SE REALMENTE PREENCHIDO ---
+    # --- 5. QUESTIONÁRIOS / PROMs ---
     catalogo_proms = {
         "LEFS": {
             "sub": "Escala Funcional da Extremidade Inferior",
@@ -910,7 +922,6 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         },
     }
 
-    # Respeita a seleção explícita do painel; se None, detecta apenas o que não é default automático
     if "PROMs_Selecionados" in dados_aval and isinstance(dados_aval["PROMs_Selecionados"], list):
         proms_escolhidos = [
             p for p in dados_aval["PROMs_Selecionados"]
@@ -1001,7 +1012,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
         """
 
-    # --- 6. OBJETIVOS DO PACIENTE (PSFS / SANE) — ATÉ 10 SESSÕES (SÓ SE PREENCHIDO) ---
+    # --- 6. OBJETIVOS DO PACIENTE (SANE & GROC -7 A +7 — SEM PSFS) ---
     obj_raw = dados_aval.get('Objetivo_Paciente')
     tem_sane_historico = any(h.get('SANE_Pct') is not None for h in hist)
     tem_obj_preenchido = _tem_valor_util(obj_raw) or tem_sane_historico
@@ -1009,27 +1020,35 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     html_secao_sane = ""
     sane_base = _safe_float(dados_aval.get('SANE_Baseline_Pct', 30.0), 30.0)
     sane_atual = _safe_float(hist[-1].get('SANE_Pct', sane_base), sane_base) if hist else sane_base
+    groc_ult = hist[-1].get('GROC_Score') if hist else None
 
     if tem_obj_preenchido:
         obj_paciente = obj_raw if _tem_valor_util(obj_raw) else "Retorno à função e esporte sem dor"
-        psfs_base = int(_safe_float(dados_aval.get('PSFS_Baseline', 3), 3.0))
         ganho_sane = sane_atual - sane_base
         b64_sane = _gerar_grafico_sane_clean_b64(hist, sane_base)
+
+        groc_str_sub = ""
+        if groc_ult is not None and str(groc_ult).strip() != "":
+            try:
+                groc_int = int(float(groc_ult))
+                groc_str_sub = f" & Mudança Global GROC ({groc_int:+d} em -7/+7)"
+            except Exception:
+                pass
 
         status_sane = "verde" if (sane_atual >= 80 or ganho_sane >= 15) else "amarelo"
         conc_sane_txt = (
             f"Evolução de {ganho_sane:+.0f} pontos percentuais na percepção de capacidade funcional para '{obj_paciente}' "
-            f"desde o início do tratamento ({sane_base:.0f}% → {sane_atual:.0f}% na escala SANE)."
+            f"desde o início do tratamento ({sane_base:.0f}% → {sane_atual:.0f}% na escala SANE){groc_str_sub}."
         )
 
         html_secao_sane = f"""
         <div class="section-card">
-            <div class="section-title">OBJETIVOS DO PACIENTE · PSFS / SANE — ÚLTIMAS {max(1, len(ultimas_10))} SESSÕES</div>
+            <div class="section-title">OBJETIVO FUNCIONAL DO PACIENTE · SANE & GROC (-7 A +7) — ÚLTIMAS {max(1, len(ultimas_10))} SESSÕES</div>
             <div class="sub-card" style="margin-bottom:0;">
                 <div class="sub-card-header">
                     <div>
                         <span class="sub-card-title">🎯 {_esc(obj_paciente)}</span>
-                        <span class="sub-card-caption"> · Escala SANE (0–100%) & PSFS Inicial ({psfs_base}/10)</span>
+                        <span class="sub-card-caption"> · Escala SANE (0–100% · Marco Zero: {sane_base:.0f}%){_esc(groc_str_sub)}</span>
                     </div>
                     <span class="sub-card-meta">Meta Final: 100% (Alta Subjetiva ≥ 85%)</span>
                 </div>
@@ -1039,8 +1058,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
         """
 
-    # --- 7. FORÇA MUSCULAR — VINCULADA EXCLUSIVAMENTE À DINAMOMETRIA (kgf) ---
-    # Escala de Oxford (0-5) é ignorada no PDF por ser subjetiva. Se dinamometria = 0, a seção inteira some.
+    # --- 7. FORÇA MUSCULAR — DINAMOMETRIA (kgf) + LSI + RAZÃO I:Q ---
     din_d_str = dados_aval.get('Dinamometria_Dir', '')
     din_e_str = dados_aval.get('Dinamometria_Esq', '')
 
@@ -1065,6 +1083,10 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     if tem_dinamometria:
         cards_forca_html = ""
         deficit_ref_resumo = 0.0
+        ext_d_val = _extrair_chave_str(din_d_str, "Ext", 0.0)
+        ext_e_val = _extrair_chave_str(din_e_str, "Ext", 0.0)
+        flex_d_val = _extrair_chave_str(din_d_str, "Flex", 0.0)
+        flex_e_val = _extrair_chave_str(din_e_str, "Flex", 0.0)
 
         for idx_g, (nome_g, pref_g, vd, ve) in enumerate(grupos_din_preenchidos):
             max_v = max(vd, ve, 0.1)
@@ -1141,6 +1163,20 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             </div>
             """
 
+        # Banner de Razão Isquiotibiais : Quadríceps (I:Q Ratio)
+        banner_iq_html = ""
+        iq_d = (flex_d_val / ext_d_val * 100.0) if (ext_d_val > 0 and flex_d_val > 0) else None
+        iq_e = (flex_e_val / ext_e_val * 100.0) if (ext_e_val > 0 and flex_e_val > 0) else None
+        if iq_d is not None or iq_e is not None:
+            txt_iq_d = f"Direito: {iq_d:.0f}% ({iq_d/100:.2f})" if iq_d is not None else "Direito: N/D"
+            txt_iq_e = f"Esquerdo: {iq_e:.0f}% ({iq_e/100:.2f})" if iq_e is not None else "Esquerdo: N/D"
+            banner_iq_html = f"""
+            <div class="ref-banner" style="margin-top:14px; margin-bottom:0; background:#F0F9FF; border-color:#BAE6FD;">
+                <span style="color:#103E55; font-weight:700;">⚖️ Equilíbrio Agonista:Antagonista — Razão Isquiotibiais : Quadríceps (I:Q Ratio)</span>
+                <strong style="color:#103E55;" contenteditable="true">{_esc(txt_iq_d)} · {_esc(txt_iq_e)} (Alvo PBE: 55% a 65%)</strong>
+            </div>
+            """
+
         cor_kpi_forca = "#16A34A" if deficit_ref_resumo <= 10 else ("#D97706" if deficit_ref_resumo <= 20 else "#DC2626")
         txt_kpi_forca = f"{deficit_ref_resumo:.0f}% déficit" if deficit_ref_resumo > 0 else "Simétrico"
         sub_kpi_forca = f"LSI Dinamometria: {100.0 - deficit_ref_resumo:.0f}%"
@@ -1159,10 +1195,11 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         grid_class_forca = "grid-2" if len(grupos_din_preenchidos) > 1 else ""
         html_secao_forca = f"""
         <div class="section-card">
-            <div class="section-title">FORÇA MUSCULAR ISOMÉTRICA (DINAMOMETRIA · KGF) · DIREITO × ESQUERDO</div>
+            <div class="section-title">FORÇA MUSCULAR ISOMÉTRICA (DINAMOMETRIA · KGF) · LSI & RAZÃO I:Q</div>
             <div class="{grid_class_forca}">
                 {cards_forca_html}
             </div>
+            {banner_iq_html}
         </div>
         """
 
@@ -1215,7 +1252,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             (
                 "5. Simetria de Força de Quadríceps (LSI ≥ 90%)",
                 crit_5_ok if lsi_quad_din is not None else None,
-                f"Atual: LSI {lsi_quad_din:.0f}% (Dinamometria kgf)" if lsi_quad_din is not None else "Aguardando Dinamometria (kgf)",
+                f"Atual: LSI {lsi_quad_din:.0f}% (Dinamometria kgf)" if lsi_quad_din is not None else "Opcional / Aguardando Dinamometria",
                 "Grindem et al., 2016"
             ),
             (
@@ -1226,7 +1263,6 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             ),
         ]
 
-        # Se a dinamometria não foi preenchida ainda, calcula o progresso sobre os critérios avaliados ou exibe N/D elegante
         total_atingidos = sum(1 for _, st_ok, _, _ in criterios_6_pontos if st_ok is True)
         pct_6_pontos = (total_atingidos / 6.0) * 100.0
         cor_barra_6 = "#16A34A" if total_atingidos >= 5 else ("#2E8B9A" if total_atingidos >= 3 else "#D97706")
@@ -1244,7 +1280,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                 bg_c = "#F8FAFC"
                 icone_c = "—"
                 cor_icone = "#64748B"
-                tag_status = "PENDENTE MEDIÇÃO"
+                tag_status = "OPCIONAL / PENDENTE"
             else:
                 borda_c = "#F59E0B"
                 bg_c = "#FFFBEB"
@@ -1283,7 +1319,6 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
         """
 
-    # Monta a seção de Resumo Executivo apenas se houver pelo menos 1 indicador preenchido
     html_resumo_executivo = ""
     if exec_pills_list:
         ncols_exec = len(exec_pills_list)
@@ -1318,7 +1353,6 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             f"Recomendamos manutenção da progressão de carga específica até o cumprimento integral das 6 metas funcionais de alta (PBE)."
         )
 
-    # Logo no Header
     logo_b64 = _carregar_logo_b64()
     if logo_b64:
         logo_html = f'<img src="data:image/png;base64,{logo_b64}" alt="GENUA" style="max-height:66px; width:auto; border-radius:10px;" />'
@@ -1790,13 +1824,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         </div>
     </div>
 
-    <!-- 2. RESUMO EXECUTIVO DINÂMICO (SÓ EXIBE PILARES PREENCHIDOS) -->
+    <!-- 2. RESUMO EXECUTIVO DINÂMICO -->
     {html_resumo_executivo}
 
     <!-- 3. EVOLUÇÃO DA DOR (EVA) — ÚLTIMAS 10 SESSÕES -->
     {html_secao_dor}
 
-    <!-- 4. TESTES FUNCIONAIS ESPECÍFICOS — ÚLTIMAS 10 SESSÕES -->
+    <!-- 4. RELACIONAL FUNCIONAL (DOR 0-10) — ÚLTIMAS 10 SESSÕES -->
     {html_secao_testes}
 
     <!-- 5. AMPLITUDE DE MOVIMENTO (ADM) -->
@@ -1805,7 +1839,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     <!-- 6. QUESTIONÁRIO / PROM APLICADO -->
     {html_secao_prom}
 
-    <!-- 7. OBJETIVOS DO PACIENTE (PSFS / SANE) — ÚLTIMAS 10 SESSÕES -->
+    <!-- 7. OBJETIVO DO PACIENTE (SANE & GROC -7 A +7) — ÚLTIMAS 10 SESSÕES -->
     {html_secao_sane}
 
     <!-- 8. FORÇA MUSCULAR (SOMENTE SE DINAMOMETRIA > 0 KGF) -->
@@ -1887,9 +1921,10 @@ def gerar_laudo(paciente_nome, dados_aval=None, historico=None, insights=None, f
     lado = dados_aval.get('Lado_Acometido', '-')
     med = dados_aval.get('Medico_Indicador', '-')
     obj = dados_aval.get('Objetivo_Paciente', '-')
-    pdf.cell(0, 6, f'Diagnostico: {_limpar_texto(dx)} | Lado: {_limpar_texto(lado)} | Medico: {_limpar_texto(med)}', 0, 1, 'L')
+    sane_b = dados_aval.get('SANE_Baseline_Pct', 30)
+    pdf.cell(0, 6, f'Diagnostico: {_limpar_texto(dx)} | Lado: {_limpar_texto(lado)} | Indicacao: {_limpar_texto(med)}', 0, 1, 'L')
     pdf.set_font('Arial', '', 9)
-    pdf.cell(0, 6, f'Objetivo Funcional (PSFS): {_limpar_texto(obj)}', 0, 1, 'L')
+    pdf.cell(0, 6, f'Objetivo Funcional (SANE Inicial {sane_b}%): {_limpar_texto(obj)}', 0, 1, 'L')
 
     try:
         saida = pdf.output(dest='S')
