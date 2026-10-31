@@ -2,6 +2,7 @@
 GENUA | Inteligência Clínica
 Entrypoint: orquestra roteamento e Top Navigation Bar estilo Apple (Sem Sidebar).
 """
+from services.patient_context import limpar_contexto_paciente
 import streamlit as st
 
 # 1) Configuração visual (set_page_config DEVE ser o 1º comando Streamlit)
@@ -27,28 +28,8 @@ import modulo_painel
 # Helper de Isolamento de Sessão entre Pacientes (Anti-State Bleed)
 # ============================================================
 def _limpar_estado_paciente_ativo():
-    """
-    Remove variáveis transitórias da Avaliação, Mapa da Dor, Check-in e Laudo
-    sempre que o utilizador troca de paciente ou volta para a lista geral.
-    """
-    chaves_transitorias = [
-        "doc_id_avaliacao",
-        "dados_antigos",
-        "pontos_dor",
-        "last_click",
-        "_ultimo_doc_mapa",
-        "confirmar_exclusao_aval",
-        "doc_id_checkin",
-        "dados_checkin_antigos",
-        "confirmar_exclusao_chk",
-        "seletor_avaliacao",
-        "seletor_checkin",
-        "input_medico_laudo",
-        "input_conclusao_livre_laudo",
-        "editando_cadastro_pac",
-    ]
-    for chave in chaves_transitorias:
-        st.session_state.pop(chave, None)
+    """Descarta todo o estado clínico anterior e preserva autenticação/navegação."""
+    limpar_contexto_paciente(st.session_state)
 
 
 # ============================================================

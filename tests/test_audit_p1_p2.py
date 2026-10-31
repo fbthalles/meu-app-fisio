@@ -57,7 +57,7 @@ class AuditP1P2(unittest.TestCase):
 
     def test_checkin_two_consecutive_autosaves_same_payload(self):
         db = MemoryDB()
-        ui = UI({'_payload_checkin_atual':{'Paciente':'Ficticio A','Dor':4},'autosave_checkin_ativo':True})
+        ui = UI({'paciente':'Ficticio A','_payload_checkin_atual':{'Paciente':'Ficticio A','Dor':4},'autosave_checkin_ativo':True})
         mod = isolated('modulo_checkin.py',ui,db)
         mod._fragmento_autosave_checkin()
         mod._fragmento_autosave_checkin()
@@ -66,7 +66,7 @@ class AuditP1P2(unittest.TestCase):
 
     def test_assessment_two_consecutive_autosaves_same_payload(self):
         db = MemoryDB()
-        ui = UI({'_payload_avaliacao_atual':{'Paciente':'Ficticio A','QP':'Queixa fictícia'}})
+        ui = UI({'paciente':'Ficticio A','_payload_avaliacao_atual':{'Paciente':'Ficticio A','QP':'Queixa fictícia'}})
         mod = isolated('modulo_avaliacao.py',ui,db)
         mod._fragmento_autosave_avaliacao()
         mod._fragmento_autosave_avaliacao()
@@ -74,7 +74,7 @@ class AuditP1P2(unittest.TestCase):
 
     def test_edit_same_session_reuses_document(self):
         db = MemoryDB()
-        ui = UI({'_payload_checkin_atual':{'Paciente':'Ficticio A','Dor':4},'autosave_checkin_ativo':True})
+        ui = UI({'paciente':'Ficticio A','_payload_checkin_atual':{'Paciente':'Ficticio A','Dor':4},'autosave_checkin_ativo':True})
         mod = isolated('modulo_checkin.py',ui,db)
         mod._fragmento_autosave_checkin()
         ui.session_state['_payload_checkin_atual']['Dor'] = 2
@@ -83,21 +83,18 @@ class AuditP1P2(unittest.TestCase):
         self.assertEqual(len(db.writes),2)
         self.assertEqual(next(iter(db.records.values()))['Dor'],2)
 
-    @unittest.expectedFailure
     def test_p1_03_top_navigation_clears_previous_payload(self):
         ui = UI({'paciente':'Ficticio B','doc_id_avaliacao':'fake-a','_payload_avaliacao_atual':{'Paciente':'Ficticio A','QP':'Queixa A'},'qp':'Queixa A','sane_baseline':80})
         isolated('streamlit_app.py',ui)._limpar_estado_paciente_ativo()
         self.assertNotIn('_payload_avaliacao_atual',ui.session_state)
         self.assertNotIn('qp',ui.session_state)
 
-    @unittest.expectedFailure
     def test_p1_04_patient_list_clears_checkin_payload(self):
-        ui = UI({'_payload_checkin_atual':{'Paciente':'Ficticio A'},'autosave_checkin_ativo':True})
+        ui = UI({'paciente':'Ficticio A','_payload_checkin_atual':{'Paciente':'Ficticio A'},'autosave_checkin_ativo':True})
         isolated('ui_dados_paciente.py',ui)._limpar_contexto_paciente_anterior()
         self.assertNotIn('_payload_checkin_atual',ui.session_state)
         self.assertFalse(ui.session_state.get('autosave_checkin_ativo',False))
 
-    @unittest.expectedFailure
     def test_p1_05_recovery_without_new_draft_must_clear_old_data(self):
         ui = UI()
         mod = isolated('services/session_resilience.py',ui)
@@ -117,7 +114,7 @@ class AuditP1P2(unittest.TestCase):
     def test_p1_06_retry_after_lost_ack_does_not_duplicate(self):
         db = MemoryDB()
         db.timeout_after_add = True
-        ui = UI({'_payload_checkin_atual':{'Paciente':'Ficticio A','Data':'2026-01-01'},'autosave_checkin_ativo':True})
+        ui = UI({'paciente':'Ficticio A','_payload_checkin_atual':{'Paciente':'Ficticio A','Data':'2026-01-01'},'autosave_checkin_ativo':True})
         mod = isolated('modulo_checkin.py',ui,db)
         mod._fragmento_autosave_checkin()
         mod._fragmento_autosave_checkin()
@@ -127,14 +124,14 @@ class AuditP1P2(unittest.TestCase):
     def test_p1_07_two_clients_same_logical_session_do_not_duplicate(self):
         db = MemoryDB()
         for _ in range(2):
-            ui = UI({'_payload_checkin_atual':{'Paciente':'Ficticio A','Data':'2026-01-01','Sessao_ID':'fake-same-session'},'autosave_checkin_ativo':True})
+            ui = UI({'paciente':'Ficticio A','_payload_checkin_atual':{'Paciente':'Ficticio A','Data':'2026-01-01','Sessao_ID':'fake-same-session'},'autosave_checkin_ativo':True})
             isolated('modulo_checkin.py',ui,db)._fragmento_autosave_checkin()
         self.assertEqual(len(db.records),1)
 
     def test_failed_write_does_not_mark_hash_saved(self):
         db = MemoryDB()
         db.fail_writes = True
-        ui = UI({'_payload_checkin_atual':{'Paciente':'Ficticio A'},'autosave_checkin_ativo':True})
+        ui = UI({'paciente':'Ficticio A','_payload_checkin_atual':{'Paciente':'Ficticio A'},'autosave_checkin_ativo':True})
         isolated('modulo_checkin.py',ui,db)._fragmento_autosave_checkin()
         self.assertNotIn('_ultimo_hash_autosave_chk',ui.session_state)
         self.assertEqual(len(db.records),0)
@@ -143,7 +140,7 @@ class AuditP1P2(unittest.TestCase):
     def test_p1_08_failed_write_must_not_show_stale_green_status(self):
         db = MemoryDB()
         db.fail_writes = True
-        ui = UI({'_payload_checkin_atual':{'Paciente':'Ficticio A'},'autosave_checkin_ativo':True,'_horario_autosave_chk':'12:00:00'})
+        ui = UI({'paciente':'Ficticio A','_payload_checkin_atual':{'Paciente':'Ficticio A'},'autosave_checkin_ativo':True,'_horario_autosave_chk':'12:00:00'})
         isolated('modulo_checkin.py',ui,db)._fragmento_autosave_checkin()
         self.assertFalse(any('🟢' in message for message in ui.messages))
 
@@ -190,7 +187,6 @@ class AuditP1P2(unittest.TestCase):
         result=panel_longitudinal(pd.DataFrame([{'Data':'2026-01-01'}]))
         self.assertTrue(pd.isna(result.iloc[0]['Dor']))
 
-    @unittest.expectedFailure
     def test_p1_14_stale_patient_payload_is_not_saved_after_switch(self):
         db=MemoryDB()
         ui=UI({'paciente':'Ficticio B','doc_id_avaliacao':'fake-A','_payload_avaliacao_atual':{'Paciente':'Ficticio A','QP':'Queixa fictícia'}})
@@ -202,7 +198,7 @@ class AuditP1P2(unittest.TestCase):
     def test_p1_15_stale_client_must_not_silently_overwrite_recent_save(self):
         db=MemoryDB()
         for pain in [2,8]:  # recent value followed by stale second-client payload
-            ui=UI({'doc_id_checkin':'same-fake-document','autosave_checkin_ativo':True,'_payload_checkin_atual':{'Paciente':'Ficticio A','Dor':pain}})
+            ui=UI({'paciente':'Ficticio A','doc_id_checkin':'same-fake-document','autosave_checkin_ativo':True,'_payload_checkin_atual':{'Paciente':'Ficticio A','Dor':pain}})
             isolated('modulo_checkin.py',ui,db)._fragmento_autosave_checkin()
         self.assertEqual(db.records[('Evolucao','same-fake-document')]['Dor'],2)
 

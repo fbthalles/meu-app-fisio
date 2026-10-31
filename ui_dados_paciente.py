@@ -1,4 +1,5 @@
 """GENUA | Tela de Cadastro, Edição e Seleção de Paciente (Estilo Apple HIG)."""
+from services.patient_context import limpar_contexto_paciente
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -52,27 +53,8 @@ def _parse_data_nasc(data_str: str) -> date:
 
 
 def _limpar_contexto_paciente_anterior():
-    """
-    Limpa variáveis de sessão da Avaliação, Mapa da Dor e Check-in ao trocar de paciente,
-    impedindo vazamento de dados (state bleed) entre prontuários.
-    """
-    chaves_limpar = [
-        "doc_id_avaliacao",
-        "dados_antigos",
-        "pontos_dor",
-        "last_click",
-        "_ultimo_doc_mapa",
-        "confirmar_exclusao_aval",
-        "doc_id_checkin",
-        "dados_checkin_antigos",
-        "confirmar_exclusao_chk",
-        "seletor_avaliacao",
-        "seletor_checkin",
-        "editando_cadastro_pac",
-        "_ultimo_hash_autosave",
-    ]
-    for k in chaves_limpar:
-        st.session_state.pop(k, None)
+    """Descarta todo o estado clínico anterior e preserva autenticação/navegação."""
+    limpar_contexto_paciente(st.session_state)
 
 
 def render():
