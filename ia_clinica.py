@@ -222,6 +222,25 @@ def _normalizar_lista_flags(valor_bruto) -> list:
 # ============================================================
 # FUNÇÃO 1: Detector de Estagnação por MCID
 # ============================================================
+def _numero_finito(valor):
+    """Normaliza medidas escalares; ausências e não finitos não são medidas."""
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return numero if float("-inf") < numero < float("inf") else None
+
+
+def _sane_valido(valor, default=30.0):
+    numero = _numero_finito(valor)
+    return numero if numero is not None and 0 <= numero <= 100 else default
+
+
+def _groc_valido(valor):
+    numero = _numero_finito(valor)
+    return int(numero) if numero is not None and numero.is_integer() and -7 <= numero <= 7 else None
+
+
 def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
     """Detecta estagnação clínica nas últimas 5 sessões com base no MCID."""
     if score not in MCID:
@@ -229,6 +248,8 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
 
     mcid_valor = MCID[score]["valor"]
     ref = MCID[score]["referencia"]
+
+    historico = [n for valor in historico if (n := _numero_finito(valor)) is not None]
 
     if len(historico) < SESSOES_MINIMAS_ESTAGNACAO:
         return {
@@ -292,6 +313,10 @@ def calcular_lsi(
     Calcula o Limb Symmetry Index (LSI) de Quadríceps e Isquiotibiais
     e a Razão Isquiotibiais:Quadríceps (I:Q Ratio) para avaliar equilíbrio agonista/antagonista.
     """
+    lado_lesado = _numero_finito(lado_lesado)
+    lado_saudavel = _numero_finito(lado_saudavel)
+    flex_lesado = _numero_finito(flex_lesado)
+    flex_saudavel = _numero_finito(flex_saudavel)
     if lado_saudavel is None or lado_saudavel <= 0 or lado_lesado is None or lado_lesado < 0:
         return {
             "valor": None,
@@ -305,9 +330,9 @@ def calcular_lsi(
         }
 
     lsi = (lado_lesado / lado_saudavel) * 100.0
-    lsi_isquios = (flex_lesado / flex_saudavel * 100.0) if (flex_saudavel and flex_saudavel > 0 and flex_lesado >= 0) else None
-    razao_iq_les = (flex_lesado / lado_lesado * 100.0) if (lado_lesado > 0 and flex_lesado > 0) else None
-    razao_iq_sau = (flex_saudavel / lado_saudavel * 100.0) if (lado_saudavel > 0 and flex_saudavel > 0) else None
+    lsi_isquios = (flex_lesado / flex_saudavel * 100.0) if (flex_saudavel and flex_saudavel > 0 and flex_lesado is not None and flex_lesado >= 0) else None
+    razao_iq_les = (flex_lesado / lado_lesado * 100.0) if (lado_lesado > 0 and flex_lesado is not None and flex_lesado > 0) else None
+    razao_iq_sau = (flex_saudavel / lado_saudavel * 100.0) if (lado_saudavel > 0 and flex_saudavel is not None and flex_saudavel > 0) else None
 
     if lsi >= LSI_ALTA_FUNCIONAL:
         classificacao = "alta_funcional"
@@ -360,10 +385,7 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
     if objetivo == "Não relatado":
         objetivo = "Não especificado"
 
-    try:
-        sane_base = float(avaliacao.get("SANE_Baseline_Pct", 30.0) or 30.0)
-    except (ValueError, TypeError):
-        sane_base = 30.0
+    sane_base = _sane_valido(avaliacao.get("SANE_Baseline_Pct"))
 
     sane_atual = sane_base
     groc_score = None
@@ -375,13 +397,13 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
         ultima_sessao = df_evo.iloc[-1]
         if "SANE_Pct" in df_evo.columns and pd.notna(ultima_sessao.get("SANE_Pct")):
             try:
-                sane_atual = float(ultima_sessao.get("SANE_Pct"))
+                sane_atual = _sane_valido(ultima_sessao.get("SANE_Pct"), sane_base)
             except (ValueError, TypeError):
                 sane_atual = sane_base
 
         if "GROC_Score" in df_evo.columns and pd.notna(ultima_sessao.get("GROC_Score")):
             try:
-                groc_score = int(float(ultima_sessao.get("GROC_Score")))
+                groc_score = _groc_valido(ultima_sessao.get("GROC_Score"))
             except (ValueError, TypeError):
                 groc_score = None
 
@@ -593,8 +615,14 @@ def analisar_paciente(paciente_nome: str) -> dict:
                 val_les, val_sau = ext_e, ext_d
                 fl_les, fl_sau = flex_e, flex_d
             else:
-                val_les, val_sau = min(ext_d, ext_e), max(ext_d, ext_e)
-                fl_les, fl_sau = min(flex_d, flex_e), max(flex_d, flex_e)
+                # Use the extension reference limb for both muscle groups:
+                # I:Q must never combine flexion and extension from different limbs.
+                if ext_d <= ext_e:
+                    val_les, val_sau = ext_d, ext_e
+                    fl_les, fl_sau = flex_d, flex_e
+                else:
+                    val_les, val_sau = ext_e, ext_d
+                    fl_les, fl_sau = flex_e, flex_d
 
             if val_sau > 0:
                 resultado["lsi"] = calcular_lsi(val_les, val_sau, fonte=fonte_lsi, flex_lesado=fl_les, flex_saudavel=fl_sau)

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from config import CORES_GENUA, titulo, secao, toast, aplicar_tema_matplotlib
 from firebase_client import conn
-from ia_clinica import analisar_paciente, renderizar_insights, normalizar_diagnostico
+from ia_clinica import analisar_paciente, renderizar_insights, normalizar_diagnostico, _sane_valido, _groc_valido
 from modulo_avaliacao import gerar_pdf_somente_avaliacao
 
 
@@ -79,6 +79,10 @@ def _calcular_lsi_seguro(val_d: float, val_e: float, lado_acometido: str) -> tup
     Retorna (lsi_pct, val_lesado, val_saudavel, status_cor).
     Fórmula: (Lado Lesado / Lado Saudável) * 100 (Grindem et al., 2016).
     """
+    val_d = pd.to_numeric(val_d, errors="coerce")
+    val_e = pd.to_numeric(val_e, errors="coerce")
+    if pd.isna(val_d) or pd.isna(val_e) or not np.isfinite(val_d) or not np.isfinite(val_e) or val_d < 0 or val_e < 0:
+        return None, 0.0, 0.0, "⚪"
     if val_d <= 0 and val_e <= 0:
         return None, 0.0, 0.0, "⚪"
 
@@ -103,7 +107,7 @@ def _detectar_proms_preenchidos(av_p: dict, prom_fenotipo: str = "KOOS") -> list
     if not av_p:
         return []
 
-    if isinstance(av_p.get("PROMs_Aplicados"), list) and av_p.get("PROMs_Aplicados"):
+    if isinstance(av_p.get("PROMs_Aplicados"), list):
         return av_p.get("PROMs_Aplicados")
 
     lefs_v = float(av_p.get("LEFS_Pct", 0) or 0)
@@ -264,7 +268,7 @@ def render():
     label_fenotipo_exib = av_fenotipo_salvo if av_fenotipo_salvo else fen_info['label']
 
     try:
-        sane_base_av = float(av_p.get('SANE_Baseline_Pct', 30.0) or 30.0) if tem_av else 30.0
+        sane_base_av = _sane_valido(av_p.get('SANE_Baseline_Pct')) if tem_av else 30.0
     except (ValueError, TypeError):
         sane_base_av = 30.0
 
@@ -572,13 +576,13 @@ def render():
         )
 
     sane_sessao = ultima.get('SANE_Pct_Num')
-    sane_sessao = float(sane_sessao) if pd.notna(sane_sessao) else sane_base_av
+    sane_sessao = _sane_valido(sane_sessao, sane_base_av)
     dist_meta_sessao = max(0.0, 100.0 - sane_sessao)
     ganho_sane_sessao = sane_sessao - sane_base_av
 
     groc_sessao_val = ultima.get('GROC_Score')
     try:
-        groc_sessao_int = int(float(groc_sessao_val)) if pd.notna(groc_sessao_val) else None
+        groc_sessao_int = _groc_valido(groc_sessao_val)
     except (ValueError, TypeError):
         groc_sessao_int = None
 

@@ -1053,15 +1053,16 @@ def render():
                         else:
                             lesado, saudavel = min(val_d, val_e), max(val_d, val_e)
 
-                        lsi_g = (lesado / saudavel * 100.0) if saudavel > 0 else 0.0
+                        lsi_g = (lesado / saudavel * 100.0) if saudavel > 0 else None
                         diff_kg = abs(val_d - val_e)
-                        partes_resumo_lsi.append(f"LSI {nome_g}: {lsi_g:.0f}%")
+                        lsi_texto = f"{lsi_g:.0f}%" if lsi_g is not None else "N/D"
+                        partes_resumo_lsi.append(f"LSI {nome_g}: {lsi_texto}")
                         with cols_lsi[idx_l]:
                             st.metric(
                                 label=f"LSI {nome_g}",
-                                value=f"{lsi_g:.0f}%",
+                                value=lsi_texto,
                                 delta=f"Δ {diff_kg:.1f} kgf",
-                                delta_color="normal" if lsi_g >= 90 else "inverse",
+                                delta_color="off" if lsi_g is None else ("normal" if lsi_g >= 90 else "inverse"),
                             )
 
                 # Cálculo da Razão Isquiotibiais : Quadríceps (I:Q Ratio) para cada perna
@@ -1308,8 +1309,8 @@ def render():
                     ik_func = st.slider("4. Função do Joelho Antes da Lesão (0-10)", 0, 10, _val_prom("ik3", 10), key="ik3")
                     ik_func_atual = st.slider("5. Função Global do Joelho Hoje (0-10)", 0, 10, _val_prom("ik4", 5), key="ik4")
 
-                ik_pts_freq = 0 if "0 pts" in ik_freq else 2 if "2 pts" in ik_freq else 4 if "4 pts" in ik_freq else 7 if "7 pts" in ik_freq else 10
-                ik_pts_at = 0 if "0 pts" in ik_at_nivel else 3 if "3 pts" in ik_at_nivel else 6 if "6 pts" in ik_at_nivel else 10
+                ik_pts_freq = 0 if "(0 pts)" in ik_freq else 2 if "(2 pts)" in ik_freq else 4 if "(4 pts)" in ik_freq else 7 if "(7 pts)" in ik_freq else 10
+                ik_pts_at = 0 if "(0 pts)" in ik_at_nivel else 3 if "(3 pts)" in ik_at_nivel else 6 if "(6 pts)" in ik_at_nivel else 10
                 for k_ik, v_ik in [("ik1", ik_dor), ("ik2", ik_freq), ("ik_at", ik_at_nivel), ("ik3", ik_func), ("ik4", ik_func_atual)]:
                     novas_respostas_proms[k_ik] = v_ik
 
@@ -1374,8 +1375,8 @@ def render():
                     novas_respostas_proms[k_vp] = v_vp
 
                 score_visap_calc = vp1 + vp2 + vp3 + vp4 + vp5 + vp6
-                score_visap_calc += 0 if "0 pts" in p7 else 4 if "4 pts" in p7 else 7 if "7 pts" in p7 else 10
-                score_visap_calc += 0 if "0 pts" in p8 else 7 if "7 pts" in p8 else 15 if "15 pts" in p8 else 30
+                score_visap_calc += 0 if "(0 pts)" in p7 else 4 if "(4 pts)" in p7 else 7 if "(7 pts)" in p7 else 10
+                score_visap_calc += 0 if "(0 pts)" in p8 else 7 if "(7 pts)" in p8 else 15 if "(15 pts)" in p8 else 30
                 interp_visap_calc = "🚨 Tendinopatia Severa/Aguda" if score_visap_calc < 50 else "🟡 Fase Reativa" if score_visap_calc < 80 else "🟢 Remodelamento/Alta"
                 st.info(f"📊 **Resultado VISA-P:** **{score_visap_calc}/100 pontos** — {interp_visap_calc} *(MCID: 13 pts | Hernandez-Sanchez 2014)*")
 
