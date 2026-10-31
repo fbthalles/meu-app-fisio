@@ -1,0 +1,275 @@
+{
+  "base_commit": "613f7428cfc5399f8c833f7969b53bb1b5964278",
+  "branch": "audit/p1-p2",
+  "tests_run": 62,
+  "passed": 47,
+  "known_failures": 15,
+  "unexpected_failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "results": [
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_assessment_two_consecutive_autosaves_same_payload",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_characterize_prognostic_real_series_imputes_missing_sane",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_checkin_two_consecutive_autosaves_same_payload",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_edit_same_session_reuses_document",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_explicit_prom_not_applied_survives_legacy_values",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_failed_write_does_not_mark_hash_saved",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_five_sessions_different_dates_temporal_characterization",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_legacy_parsers_are_read_only_and_accept_existing_formats",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_longitudinal_dates_sorted_with_legacy_records",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_01_zero_pain_does_not_imply_performed_test",
+      "status": "known_failure",
+      "assertion": "10.0 is not None"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_02_absent_sane_is_not_observed_thirty",
+      "status": "known_failure",
+      "assertion": "30.0 is not None"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_03_top_navigation_clears_previous_payload",
+      "status": "known_failure",
+      "assertion": "'_payload_avaliacao_atual' unexpectedly found in {'paciente': 'Ficticio B', '_payload_avaliacao_atual': {'Paciente': 'Ficticio A', 'QP': 'Queixa A'}, 'qp': 'Queixa A', 'sane_baseline': 80}"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_04_patient_list_clears_checkin_payload",
+      "status": "known_failure",
+      "assertion": "'_payload_checkin_atual' unexpectedly found in {'_payload_checkin_atual': {'Paciente': 'Ficticio A'}, 'autosave_checkin_ativo': True}"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_05_recovery_without_new_draft_must_clear_old_data",
+      "status": "known_failure",
+      "assertion": "{'Paciente': 'Ficticio A'} != {}\n- {'Paciente': 'Ficticio A'}\n+ {}"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_06_retry_after_lost_ack_does_not_duplicate",
+      "status": "known_failure",
+      "assertion": "2 != 1"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_07_two_clients_same_logical_session_do_not_duplicate",
+      "status": "known_failure",
+      "assertion": "2 != 1"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_08_failed_write_must_not_show_stale_green_status",
+      "status": "known_failure",
+      "assertion": "True is not false"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_09_legacy_not_tested_must_not_become_zero_pain",
+      "status": "known_failure",
+      "assertion": "0 is not None"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_10_no_tests_must_not_be_full_bilateral_symmetry",
+      "status": "known_failure",
+      "assertion": "False is not true"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_11_adapter_repeated_session_write_is_idempotent",
+      "status": "known_failure",
+      "assertion": "2 != 1"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_12_brazilian_dates_keep_calendar_order",
+      "status": "known_failure",
+      "assertion": "Lists differ: [5, 2] != [2, 5]\n\nFirst differing element 0:\n5\n2\n\n- [5, 2]\n+ [2, 5]"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_13_missing_pain_is_not_zero",
+      "status": "known_failure",
+      "assertion": "False is not true"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_14_stale_patient_payload_is_not_saved_after_switch",
+      "status": "known_failure",
+      "assertion": "{('Avaliacao_Inicial', 'fake-1'): {'Pacien[39 chars]ia'}} != {}\n+ {}\n- {('Avaliacao_Inicial', 'fake-1'): {'Paciente': 'Ficticio A',\n-                                    'QP': 'Queixa fictícia'}}"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_p1_15_stale_client_must_not_silently_overwrite_recent_save",
+      "status": "known_failure",
+      "assertion": "8 != 2"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_recovery_loads_existing_fake_draft",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_required_bilateral_values_and_zero_denominator",
+      "status": "passed"
+    },
+    {
+      "test": "test_audit_p1_p2.AuditP1P2.test_service_draft_hash_avoids_redundant_writes",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_all_ikdc_options_preserve_declared_points",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_all_visap_options_preserve_declared_points",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bilateral_iq_keeps_flexion_and_extension_on_same_limb",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_explicit_empty_proms_should_be_consistent",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_groc_outside_scale_should_not_enable_goal",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_ikdc_best_responses_should_sum_100",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_missing_history_must_not_look_like_deterioration",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_nan_lsi_must_be_unavailable",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_none_flexion_must_not_crash",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_sane_zero_baseline_must_remain_zero",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_bug_visap_best_responses_should_sum_100",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_characterize_iq_threshold_disagreement",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_evaluation_inline_lsi_and_iq",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_functional_item_missing_and_clamping",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_groc_requires_integer_within_scale",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_ikdc_intermediate_and_worst",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_iq_and_hamstring_lsi",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_koos_endpoints_midpoint",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_lefs_endpoints_midpoint_and_equivalent_points",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_lsi_exact_values_thresholds_and_over_100",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_lsi_invalid_denominators_and_missing",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_lsi_nonfinite_and_flexion_missing",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_lysholm_endpoints",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_no_flexion_measurement_is_not_ratio_zero",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_panel_laterality_and_consistency",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_patient_isolation_with_fake_adapter_and_unsorted_dates",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_perception_missing_and_malformed",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_prognosis_endpoints_and_missing_fallback",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_proms_explicit_metadata_preserves_zero",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_sane_groc_and_pass",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_sane_zero_and_invalid_bounds",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_stagnation_window_direction_and_threshold",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_visap_intermediate_and_worst",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_womac_endpoints_midpoint",
+      "status": "passed"
+    },
+    {
+      "test": "test_clinical.ClinicalTests.test_zero_denominator_consistent_between_screens",
+      "status": "passed"
+    }
+  ]
+}
