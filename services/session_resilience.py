@@ -61,6 +61,8 @@ def inicializar_estado_avaliacao(avaliacao_id: str, db_client: Any = None) -> No
         st.session_state["last_saved_hash"] = ""
         st.session_state["last_saved_time"] = None
 
+        st.session_state["avaliacao_atual"] = {}
+
         # Tenta recuperar rascunho salvo no Firestore
         if db_client is not None:
             try:

@@ -5,6 +5,7 @@ import hashlib
 import json
 from types import SimpleNamespace
 from clinical_source import load, tree, execute
+from services.patient_context import limpar_contexto_paciente, preparar_contexto_paciente, payload_do_paciente_ativo
 
 
 class State(dict):
@@ -70,6 +71,9 @@ def isolated(filename, ui=None, db=None):
         if callable(value) and hasattr(value, '__globals__'):
             value.__globals__.update(st=ui or UI(), db=db or MemoryDB(),
                                      json=json, hashlib=hashlib,
+                                     limpar_contexto_paciente=limpar_contexto_paciente,
+                                     preparar_contexto_paciente=preparar_contexto_paciente,
+                                     payload_do_paciente_ativo=payload_do_paciente_ativo,
                                      invalidar_cache=lambda *args: None)
     return module
 

@@ -1,4 +1,5 @@
 """GENUA | Módulo 2: Check-in Diário (O Mutante) — Estilo Apple HIG."""
+from services.patient_context import preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
 import hashlib
 import json
 from datetime import datetime
@@ -123,6 +124,9 @@ def _fragmento_autosave_checkin():
     payload = st.session_state.get("_payload_checkin_atual")
     if not payload or not isinstance(payload, dict):
         return
+    if not payload_do_paciente_ativo(payload, st.session_state):
+        st.caption("⚠️ Salvamento bloqueado: o registro não pertence ao paciente ativo.")
+        return
     if not st.session_state.get("autosave_checkin_ativo", False):
         return
 
@@ -150,6 +154,7 @@ def _fragmento_autosave_checkin():
 
 
 def render():
+    preparar_contexto_paciente(st.session_state)
     _injetar_wake_lock_checkin()
 
     # Cabeçalho limpo estilo Apple Health
@@ -303,7 +308,7 @@ def render():
             else:
                 data_default = datetime.now()
 
-            data_sessao = st.date_input("📅 Data da Sessão", data_default, format="DD/MM/YYYY")
+            data_sessao = st.date_input("📅 Data da Sessão", data_default, format="DD/MM/YYYY", key=chave_widget(st.session_state, 'checkin:data_sessao'))
 
         with c_top2:
             op_modo_lado = [
@@ -339,14 +344,15 @@ def render():
                     0,
                     10,
                     int(float(dados.get("Dor", 0))) if modo_edicao_chk else 0,
+                    key=chave_widget(st.session_state, 'checkin:eva_diaria'),
                 )
                 eva_semanal = st.slider(
                     "📉 EVA Semanal (Média da Semana: 0 a 10)",
                     0,
                     10,
                     int(float(dados.get("EVA_Semanal", 0))) if modo_edicao_chk else 0,
+                    key=chave_widget(st.session_state, 'checkin:eva_semanal'),
                 )
-
                 inchaco_default = dados.get("Inchaço", "Nenhum") if modo_edicao_chk else "Nenhum"
                 inchaco_atual = _seletor_ios(
                     "💧 Inchaço / Derrame Articular",
@@ -362,8 +368,8 @@ def render():
                     max_value=160,
                     step=5,
                     value=int(float(dados.get("Flexao", 90))) if modo_edicao_chk else 90,
+                    key=chave_widget(st.session_state, 'checkin:adm_flex_atual'),
                 )
-
                 ext_default = dados.get("Extensao", "Completa (0°)") if modo_edicao_chk else "Completa (0°)"
                 adm_ext_atual = _seletor_ios(
                     "📏 Extensão Terminal",
@@ -462,6 +468,7 @@ def render():
                     0,
                     10,
                     int(float(dados.get("EVA_Semanal", max(dor_d, dor_e)))) if modo_edicao_chk else max(dor_d, dor_e),
+                    key=chave_widget(st.session_state, 'checkin:eva_semanal_2'),
                 )
             with c_glob2:
                 sono_default = dados.get("Sono", "Bem") if modo_edicao_chk else "Bem"
@@ -514,8 +521,8 @@ def render():
             options=catalogo_testes_chk,
             default=default_ativos_hoje,
             help="Em Pós-Operatório imediato, você pode deixar apenas Marcha/Extensão ou deixar vazio se nenhum teste funcional de carga for realizado.",
+            key=chave_widget(st.session_state, 'checkin:testes_ativos_hoje'),
         )
-
         resultados_testes = {}
         resultados_testes_num = {}
 
@@ -627,8 +634,8 @@ def render():
                 step=5,
                 value=max(0, min(100, sane_val_default)),
                 help="0% = Estaca zero | 100% = Objetivo da fisioterapia 100% alcançado.",
+                key=chave_widget(st.session_state, 'checkin:sane_hoje'),
             )
-
         distancia_meta_hoje = 100 - sane_hoje
         ganho_sane = sane_hoje - sane_baseline
 
@@ -697,6 +704,9 @@ def render():
     texto_botao = "🔄 ATUALIZAR SESSÃO" if st.session_state.get("doc_id_checkin") else "💾 REGISTRAR SESSÃO DIÁRIA"
 
     if st.button(texto_botao, width="stretch", type="primary"):
+        if not payload_do_paciente_ativo(dados_sessao, st.session_state):
+            st.error("Salvamento bloqueado: o registro não pertence ao paciente ativo.")
+            return
         with st.spinner("Sincronizando sessão com a nuvem..."):
             try:
                 if st.session_state.get("doc_id_checkin"):

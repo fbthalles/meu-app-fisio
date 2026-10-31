@@ -1,4 +1,5 @@
 """GENUA | Módulo 1: Avaliação Inicial (O Marco Zero) — Estilo Apple HIG."""
+from services.patient_context import preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
 import hashlib
 import io
 import json
@@ -333,6 +334,9 @@ def _fragmento_autosave_avaliacao():
     payload = st.session_state.get("_payload_avaliacao_atual")
     if not payload or not isinstance(payload, dict):
         return
+    if not payload_do_paciente_ativo(payload, st.session_state):
+        st.caption("⚠️ Salvamento bloqueado: o registro não pertence ao paciente ativo.")
+        return
 
     qp_atual = str(payload.get("QP", "")).strip()
     paciente_atual = str(payload.get("Paciente", "")).strip()
@@ -367,6 +371,7 @@ def _fragmento_autosave_avaliacao():
 # 4. FUNÇÃO PRINCIPAL DE RENDERIZAÇÃO DA TELA
 # ============================================================
 def render():
+    preparar_contexto_paciente(st.session_state)
     _injetar_wake_lock_avaliacao()
 
     # Cabeçalho limpo estilo Apple Health
@@ -510,6 +515,7 @@ def render():
                     "Queixa Principal (QP) *",
                     value=dados.get("QP", ""),
                     placeholder="O que o paciente deixou de fazer devido à dor?",
+                    key=chave_widget(st.session_state, 'avaliacao:qp'),
                 )
             with c_lado:
                 op_lado = ["Direito", "Esquerdo", "Bilateral (Dir > Esq)", "Bilateral (Esq > Dir)", "Bilateral (Simétrico)"]
@@ -517,6 +523,7 @@ def render():
                     "🦵 Lado Acometido Principal *",
                     op_lado,
                     index=get_idx(op_lado, "Lado_Acometido"),
+                    key=chave_widget(st.session_state, 'avaliacao:lado_acometido'),
                 )
             with c_data_av:
                 dt_av_default = _parse_data_br(dados.get("Data_Avaliacao")) if modo_edicao and dados.get("Data_Avaliacao") else datetime.now()
@@ -524,8 +531,8 @@ def render():
                     "📅 Data da Avaliação",
                     value=dt_av_default,
                     format="DD/MM/YYYY",
+                    key=chave_widget(st.session_state, 'avaliacao:data_aval_input'),
                 )
-
             op_fenotipo = [
                 "Pós-Operatório Agudo / Proteção Tecidual",
                 "Pós-Operatório Intermediário / Remodelamento",
@@ -539,33 +546,34 @@ def render():
                 op_fenotipo,
                 index=get_idx(op_fenotipo, "Fenotipo_Clinico"),
                 help="Em casos de Pós-Operatório Agudo, a dinamometria máxima e testes de corrida/salto tornam-se opcionais automaticamente.",
+                key=chave_widget(st.session_state, 'avaliacao:fenotipo_clinico'),
             )
-
             hma = st.text_area(
                 "História da Moléstia Atual (HMA) *",
                 value=dados.get("HMA", ""),
                 placeholder="Descrição detalhada do mecanismo de lesão, data da cirurgia (se Pós-Op), início e evolução do quadro...",
                 height=100,
+                key=chave_widget(st.session_state, 'avaliacao:hma'),
             )
             sinais_sintomas = st.text_input(
                 "Sinais e Sintomas Associados",
                 value=dados.get("Sinais_Sintomas", ""),
                 placeholder="Ex: Dor na interlinha medial, crepitação, falseio, bloqueio...",
+                key=chave_widget(st.session_state, 'avaliacao:sinais_sintomas'),
             )
-
             c_an1, c_an2 = st.columns(2)
             with c_an1:
-                fat_alivio = st.text_input("🟢 Fatores de Alívio", value=dados.get("Fatores_Alivio", ""), placeholder="Ex: Repouso, crioterapia, extensão ativa...")
+                fat_alivio = st.text_input("🟢 Fatores de Alívio", value=dados.get("Fatores_Alivio", ""), placeholder="Ex: Repouso, crioterapia, extensão ativa...", key=chave_widget(st.session_state, 'avaliacao:fat_alivio'))
             with c_an2:
-                fat_piora = st.text_input("🔴 Fatores de Piora", value=dados.get("Fatores_Piora", ""), placeholder="Ex: Descer escadas, agachamento profundo, corrida...")
+                fat_piora = st.text_input("🔴 Fatores de Piora", value=dados.get("Fatores_Piora", ""), placeholder="Ex: Descer escadas, agachamento profundo, corrida...", key=chave_widget(st.session_state, 'avaliacao:fat_piora'))
 
             trat_previos = st.text_area(
                 "Tratamentos e Intervenções Anteriores",
                 value=dados.get("Tratamentos_Previos", ""),
                 placeholder="Cirurgias prévias, infiltrações, fisioterapia anterior...",
                 height=75,
+                key=chave_widget(st.session_state, 'avaliacao:trat_previos'),
             )
-
         # Card de Objetivo Funcional do Paciente na Aba Anamnese (SANE mantido, PSFS removido)
         with st.container(border=True):
             secao(
@@ -582,6 +590,7 @@ def render():
                     "🏆 Qual é o principal objetivo funcional do paciente?",
                     value=obj_val_antigo,
                     placeholder="Ex: Voltar a correr 10 km sem dor, jogar futebol, agachar e brincar com os filhos...",
+                    key=chave_widget(st.session_state, 'avaliacao:obj_paciente'),
                 )
             with c_obj2:
                 sane_baseline = st.slider(
@@ -591,15 +600,15 @@ def render():
                     step=5,
                     value=int(dados.get("SANE_Baseline_Pct", 30) if dados.get("SANE_Baseline_Pct") is not None else 30),
                     help="0% = Incapaz / Ponto zero | 100% = Plenamente recuperado.",
+                    key=chave_widget(st.session_state, 'avaliacao:sane_baseline'),
                 )
-
             conduta_avaliacao = st.text_area(
                 "🧭 Resumo da Conduta Inicial / Planejamento Terapêutico (Sairá no Laudo PDF da Avaliação)",
                 value=dados.get("Conduta_Avaliacao", ""),
                 placeholder="Ex: Fase 1 focada em controle de efusão articular, ganho de extensão terminal 0° e ativação isométrica de quadríceps...",
                 height=75,
+                key=chave_widget(st.session_state, 'avaliacao:conduta_avaliacao'),
             )
-
     # ------------------------------------------------------------
     # ABA 2: DOR E MAPA ANATÔMICO
     # ------------------------------------------------------------
@@ -614,11 +623,11 @@ def render():
                 "Não Aplicável",
             ]
             with c_dor1:
-                class_dor = st.selectbox("Classificação da Dor *", op_class, index=get_idx(op_class, "Class_Dor"))
+                class_dor = st.selectbox("Classificação da Dor *", op_class, index=get_idx(op_class, "Class_Dor"), key=chave_widget(st.session_state, 'avaliacao:class_dor'))
 
             op_origem = ["Traumática", "Insidiosa / Sobrecarga", "Pós-operatória", "Degenerativa", "Não Aplicável"]
             with c_dor2:
-                origem_dor = st.selectbox("Origem / Mecanismo *", op_origem, index=get_idx(op_origem, "Origem_Dor"))
+                origem_dor = st.selectbox("Origem / Mecanismo *", op_origem, index=get_idx(op_origem, "Origem_Dor"), key=chave_widget(st.session_state, 'avaliacao:origem_dor'))
 
         with st.container(border=True):
             secao("🎯 Mapa Anatômico Interativo da Dor", "Toque ou clique diretamente sobre a imagem do joelho para registrar os pontos álgicos.")
@@ -676,19 +685,21 @@ def render():
                         "📍 Zonas de Dor — Joelho DIREITO",
                         op_zonas,
                         default=get_list(op_zonas, "Zonas_Dor_Dir") or (get_list(op_zonas, "Zonas_Dor") if "Direito" in lado_acometido or "Bilateral" in lado_acometido else []),
+                        key=chave_widget(st.session_state, 'avaliacao:zonas_dor_d'),
                     )
                 with c_z2:
                     zonas_dor_e = st.multiselect(
                         "📍 Zonas de Dor — Joelho ESQUERDO",
                         op_zonas,
                         default=get_list(op_zonas, "Zonas_Dor_Esq") or (get_list(op_zonas, "Zonas_Dor") if "Esquerdo" in lado_acometido or "Bilateral" in lado_acometido else []),
+                        key=chave_widget(st.session_state, 'avaliacao:zonas_dor_e'),
                     )
-
                 mapa_dor = st.text_area(
                     "📝 Notas Detalhadas do Mapa da Dor",
                     value=dados.get("Mapa_Dor", ""),
                     placeholder="Ex: Dor puntiforme no polo inferior da patela direita ao agachar...",
                     height=115,
+                    key=chave_widget(st.session_state, 'avaliacao:mapa_dor'),
                 )
                 if st.button("🗑️ Limpar Marcadores do Mapa", type="secondary"):
                     st.session_state.pontos_dor = []
@@ -716,8 +727,8 @@ def render():
                 "🚨 Red Flags (Sinais de Alerta Estrutural/Sistêmico) *",
                 op_red,
                 default=get_list(op_red, "Red_Flags"),
+                key=chave_widget(st.session_state, 'avaliacao:red_flags'),
             )
-
             op_yellow = [
                 "Nenhum", "Cinesiofobia (Medo de movimento)", "Catastrofização",
                 "Baixa auto-eficácia", "Sintomas depressivos / Ansiedade",
@@ -727,12 +738,12 @@ def render():
                 "🟡 Yellow Flags (Fatores Cognitivo-Emocionais) *",
                 op_yellow,
                 default=get_list(op_yellow, "Yellow_Cog"),
+                key=chave_widget(st.session_state, 'avaliacao:yellow_cog'),
             )
-
             c_fl1, c_fl2 = st.columns(2)
             op_sono = ["Normal/Restaurador", "Irregular", "Ruim (Insônia/Acorda com dor)"]
             with c_fl1:
-                qualidade_sono = st.selectbox("🌙 Qualidade do Sono *", op_sono, index=get_idx(op_sono, "Sono"))
+                qualidade_sono = st.selectbox("🌙 Qualidade do Sono *", op_sono, index=get_idx(op_sono, "Sono"), key=chave_widget(st.session_state, 'avaliacao:qualidade_sono'))
 
             # Blue Flags: Retirado Litígio | Adicionados Problemas familiares, Movimentos Repetitivos, Longos períodos em posição mantida
             op_sociais = [
@@ -749,8 +760,8 @@ def render():
                     "🔵 Blue Flags (Fatores Ocupacionais e Contextuais) *",
                     op_sociais,
                     default=get_list(op_sociais, "Fatores_Sociais"),
+                    key=chave_widget(st.session_state, 'avaliacao:fat_sociais'),
                 )
-
             # Comorbidades: Adicionado Sedentarismo
             op_comorb = [
                 "Nenhuma",
@@ -768,8 +779,8 @@ def render():
                 "🩺 Comorbidades Associadas *",
                 op_comorb,
                 default=get_list(op_comorb, "Comorbidades"),
+                key=chave_widget(st.session_state, 'avaliacao:comorbidades'),
             )
-
     # ------------------------------------------------------------
     # ABA 4: EXAME FÍSICO, HIPOTROFISMO SEGMENTADO, PERIMETRIA PADRONIZADA E TESTES
     # ------------------------------------------------------------
@@ -781,7 +792,7 @@ def render():
             )
 
             op_mar = ["Normal", "Antálgica", "Claudicante", "Marcha em Flexo de Joelho", "Uso de dispositivo auxiliar (Muleta/Bengala)"]
-            marcha = st.selectbox("🚶 Padrão Global de Marcha", op_mar, index=get_idx(op_mar, "Marcha"))
+            marcha = st.selectbox("🚶 Padrão Global de Marcha", op_mar, index=get_idx(op_mar, "Marcha"), key=chave_widget(st.session_state, 'avaliacao:marcha'))
 
             st.markdown("<hr style='margin: 14px 0;'>", unsafe_allow_html=True)
 
@@ -911,14 +922,14 @@ def render():
             c_pele, c_perim_obs = st.columns(2)
             op_pele = ["Nenhuma", "Equimose", "Hematoma", "Cicatrizes Cirúrgicas", "Aderência Cicatricial", "Fístulas"]
             with c_pele:
-                pele = st.multiselect("Alterações Cutâneas / Cicatriciais", op_pele, default=get_list(op_pele, "Pele"))
+                pele = st.multiselect("Alterações Cutâneas / Cicatriciais", op_pele, default=get_list(op_pele, "Pele"), key=chave_widget(st.session_state, 'avaliacao:pele'))
             with c_perim_obs:
                 perimetria_obs = st.text_input(
                     "Notas Adicionais de Perimetria / Edema",
                     value=dados.get("Perimetria_Obs", ""),
                     placeholder="Ex: Edema residual perimaleolar ou supra-patelar",
+                    key=chave_widget(st.session_state, 'avaliacao:perimetria_obs'),
                 )
-
         # Card 3 da Aba Físico: Testes Especiais (Retirado Decline Squat, Adicionado Compressão Patelar)
         with st.container(border=True):
             secao(
@@ -985,8 +996,8 @@ def render():
                 op_modo_forca,
                 index=default_idx_forca,
                 horizontal=True,
+                key=chave_widget(st.session_state, 'avaliacao:modo_forca'),
             )
-
             # Inicializa valores padrão seguros
             fg_ext_d = fg_flex_d = fg_abd_d = fg_add_d = 5
             fg_ext_e = fg_flex_e = fg_abd_e = fg_add_e = 5
@@ -1008,30 +1019,30 @@ def render():
             elif modo_forca == "Escala Manual de Oxford (0 a 5)":
                 st.caption("Força Manual Qualitativa (Escala de Oxford 0 a 5 — Triagem Clínica)")
                 c_fg1, c_fg2, c_fg3, c_fg4 = st.columns(4)
-                fg_ext_d = c_fg1.number_input("Extensão (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Ext", 5))
-                fg_flex_d = c_fg2.number_input("Flexão (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Flex", 5))
-                fg_abd_d = c_fg3.number_input("Abdução (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Abd", 5))
-                fg_add_d = c_fg4.number_input("Adução (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Add", 5))
+                fg_ext_d = c_fg1.number_input("Extensão (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Ext", 5), key=chave_widget(st.session_state, 'avaliacao:fg_ext_d'))
+                fg_flex_d = c_fg2.number_input("Flexão (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Flex", 5), key=chave_widget(st.session_state, 'avaliacao:fg_flex_d'))
+                fg_abd_d = c_fg3.number_input("Abdução (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Abd", 5), key=chave_widget(st.session_state, 'avaliacao:fg_abd_d'))
+                fg_add_d = c_fg4.number_input("Adução (Dir) [0-5]", 0, 5, get_val_str("Forca_Geral_Dir", "Add", 5), key=chave_widget(st.session_state, 'avaliacao:fg_add_d'))
 
                 c_fg5, c_fg6, c_fg7, c_fg8 = st.columns(4)
-                fg_ext_e = c_fg5.number_input("Extensão (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Ext", 5))
-                fg_flex_e = c_fg6.number_input("Flexão (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Flex", 5))
-                fg_abd_e = c_fg7.number_input("Abdução (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Abd", 5))
-                fg_add_e = c_fg8.number_input("Adução (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Add", 5))
+                fg_ext_e = c_fg5.number_input("Extensão (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Ext", 5), key=chave_widget(st.session_state, 'avaliacao:fg_ext_e'))
+                fg_flex_e = c_fg6.number_input("Flexão (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Flex", 5), key=chave_widget(st.session_state, 'avaliacao:fg_flex_e'))
+                fg_abd_e = c_fg7.number_input("Abdução (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Abd", 5), key=chave_widget(st.session_state, 'avaliacao:fg_abd_e'))
+                fg_add_e = c_fg8.number_input("Adução (Esq) [0-5]", 0, 5, get_val_str("Forca_Geral_Esq", "Add", 5), key=chave_widget(st.session_state, 'avaliacao:fg_add_e'))
 
             else:
                 st.caption("Dinamometria Quantitativa (Handheld Dynamometer — kgf) · Calcula LSI Bilateral e Razão I:Q (Isquiotibiais : Quadríceps)")
                 c_din1, c_din2, c_din3, c_din4 = st.columns(4)
-                din_ext_d = c_din1.number_input("Quadríceps / Ext Dir (kgf)", 0.0, 200.0, din_ext_d, 1.0)
-                din_flex_d = c_din2.number_input("Isquios / Flex Dir (kgf)", 0.0, 200.0, din_flex_d, 1.0)
-                din_abd_d = c_din3.number_input("Abdução Dir (kgf)", 0.0, 200.0, din_abd_d, 1.0)
-                din_add_d = c_din4.number_input("Adução Dir (kgf)", 0.0, 200.0, din_add_d, 1.0)
+                din_ext_d = c_din1.number_input("Quadríceps / Ext Dir (kgf)", 0.0, 200.0, din_ext_d, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_ext_d'))
+                din_flex_d = c_din2.number_input("Isquios / Flex Dir (kgf)", 0.0, 200.0, din_flex_d, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_flex_d'))
+                din_abd_d = c_din3.number_input("Abdução Dir (kgf)", 0.0, 200.0, din_abd_d, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_abd_d'))
+                din_add_d = c_din4.number_input("Adução Dir (kgf)", 0.0, 200.0, din_add_d, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_add_d'))
 
                 c_din5, c_din6, c_din7, c_din8 = st.columns(4)
-                din_ext_e = c_din5.number_input("Quadríceps / Ext Esq (kgf)", 0.0, 200.0, din_ext_e, 1.0)
-                din_flex_e = c_din6.number_input("Isquios / Flex Esq (kgf)", 0.0, 200.0, din_flex_e, 1.0)
-                din_abd_e = c_din7.number_input("Abdução Esq (kgf)", 0.0, 200.0, din_abd_e, 1.0)
-                din_add_e = c_din8.number_input("Adução Esq (kgf)", 0.0, 200.0, din_add_e, 1.0)
+                din_ext_e = c_din5.number_input("Quadríceps / Ext Esq (kgf)", 0.0, 200.0, din_ext_e, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_ext_e'))
+                din_flex_e = c_din6.number_input("Isquios / Flex Esq (kgf)", 0.0, 200.0, din_flex_e, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_flex_e'))
+                din_abd_e = c_din7.number_input("Abdução Esq (kgf)", 0.0, 200.0, din_abd_e, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_abd_e'))
+                din_add_e = c_din8.number_input("Adução Esq (kgf)", 0.0, 200.0, din_add_e, 1.0, key=chave_widget(st.session_state, 'avaliacao:din_add_e'))
 
                 # Cálculos aprimorados de LSI Bilateral e Razão I:Q (H:Q Ratio)
                 pares_din = [
@@ -1106,8 +1117,8 @@ def render():
             avaliar_cm_bool = st.checkbox(
                 "✅ Habilitar Avaliação de Gestos Funcionais / Controle Motor nesta consulta",
                 value=bool(dados.get("Avaliar_Controle_Motor", "Pós-Operatório Agudo" not in fenotipo_clinico)),
+                key=chave_widget(st.session_state, 'avaliacao:avaliar_cm_bool'),
             )
-
             opcoes_dor_cm = [
                 "Não Aplicável (Fase Pós-Op)",
                 "Sem Dor (0)",
@@ -1128,24 +1139,24 @@ def render():
                 cm1, cm2, cm3 = st.columns(3)
                 with cm1:
                     st.caption("PADRÕES GLOBAIS")
-                    cm_marcha = st.selectbox("Marcha", opcoes_dor_cm, index=_idx_cm_dor("Marcha", 1))
-                    cm_agach_bi = st.selectbox("Agachamento Bipodal", opcoes_dor_cm, index=_idx_cm_dor("Agach_Bi", 1))
-                    cm_corrida = st.selectbox("Corrida", opcoes_dor_cm, index=_idx_cm_dor("Corrida", 0))
-                    cm_salto = st.selectbox("Salto Bipodal", opcoes_dor_cm, index=_idx_cm_dor("Salto", 0))
+                    cm_marcha = st.selectbox("Marcha", opcoes_dor_cm, index=_idx_cm_dor("Marcha", 1), key=chave_widget(st.session_state, 'avaliacao:cm_marcha'))
+                    cm_agach_bi = st.selectbox("Agachamento Bipodal", opcoes_dor_cm, index=_idx_cm_dor("Agach_Bi", 1), key=chave_widget(st.session_state, 'avaliacao:cm_agach_bi'))
+                    cm_corrida = st.selectbox("Corrida", opcoes_dor_cm, index=_idx_cm_dor("Corrida", 0), key=chave_widget(st.session_state, 'avaliacao:cm_corrida'))
+                    cm_salto = st.selectbox("Salto Bipodal", opcoes_dor_cm, index=_idx_cm_dor("Salto", 0), key=chave_widget(st.session_state, 'avaliacao:cm_salto'))
                 with cm2:
                     st.caption("MEMBRO DIREITO")
-                    cm_agach_uni_d = st.selectbox("Agachamento Uni (D)", opcoes_dor_cm, index=_idx_cm_dor("Agach_D", 1))
-                    cm_step_down_d = st.selectbox("Step Down (D)", opcoes_dor_cm, index=_idx_cm_dor("StepDown_D", 1))
-                    cm_step_up_d = st.selectbox("Step Up (D)", opcoes_dor_cm, index=_idx_cm_dor("StepUp_D", 1))
-                    cm_afundo_d = st.selectbox("Afundo (D)", opcoes_dor_cm, index=_idx_cm_dor("Afundo_D", 1))
-                    cm_eq_uni_d = st.selectbox("Equilíbrio Uni (D)", opcoes_dor_cm, index=_idx_cm_dor("Eq_D", 1))
+                    cm_agach_uni_d = st.selectbox("Agachamento Uni (D)", opcoes_dor_cm, index=_idx_cm_dor("Agach_D", 1), key=chave_widget(st.session_state, 'avaliacao:cm_agach_uni_d'))
+                    cm_step_down_d = st.selectbox("Step Down (D)", opcoes_dor_cm, index=_idx_cm_dor("StepDown_D", 1), key=chave_widget(st.session_state, 'avaliacao:cm_step_down_d'))
+                    cm_step_up_d = st.selectbox("Step Up (D)", opcoes_dor_cm, index=_idx_cm_dor("StepUp_D", 1), key=chave_widget(st.session_state, 'avaliacao:cm_step_up_d'))
+                    cm_afundo_d = st.selectbox("Afundo (D)", opcoes_dor_cm, index=_idx_cm_dor("Afundo_D", 1), key=chave_widget(st.session_state, 'avaliacao:cm_afundo_d'))
+                    cm_eq_uni_d = st.selectbox("Equilíbrio Uni (D)", opcoes_dor_cm, index=_idx_cm_dor("Eq_D", 1), key=chave_widget(st.session_state, 'avaliacao:cm_eq_uni_d'))
                 with cm3:
                     st.caption("MEMBRO ESQUERDO")
-                    cm_agach_uni_e = st.selectbox("Agachamento Uni (E)", opcoes_dor_cm, index=_idx_cm_dor("Agach_E", 1))
-                    cm_step_down_e = st.selectbox("Step Down (E)", opcoes_dor_cm, index=_idx_cm_dor("StepDown_E", 1))
-                    cm_step_up_e = st.selectbox("Step Up (E)", opcoes_dor_cm, index=_idx_cm_dor("StepUp_E", 1))
-                    cm_afundo_e = st.selectbox("Afundo (E)", opcoes_dor_cm, index=_idx_cm_dor("Afundo_E", 1))
-                    cm_eq_uni_e = st.selectbox("Equilíbrio Uni (E)", opcoes_dor_cm, index=_idx_cm_dor("Eq_E", 1))
+                    cm_agach_uni_e = st.selectbox("Agachamento Uni (E)", opcoes_dor_cm, index=_idx_cm_dor("Agach_E", 1), key=chave_widget(st.session_state, 'avaliacao:cm_agach_uni_e'))
+                    cm_step_down_e = st.selectbox("Step Down (E)", opcoes_dor_cm, index=_idx_cm_dor("StepDown_E", 1), key=chave_widget(st.session_state, 'avaliacao:cm_step_down_e'))
+                    cm_step_up_e = st.selectbox("Step Up (E)", opcoes_dor_cm, index=_idx_cm_dor("StepUp_E", 1), key=chave_widget(st.session_state, 'avaliacao:cm_step_up_e'))
+                    cm_afundo_e = st.selectbox("Afundo (E)", opcoes_dor_cm, index=_idx_cm_dor("Afundo_E", 1), key=chave_widget(st.session_state, 'avaliacao:cm_afundo_e'))
+                    cm_eq_uni_e = st.selectbox("Equilíbrio Uni (E)", opcoes_dor_cm, index=_idx_cm_dor("Eq_E", 1), key=chave_widget(st.session_state, 'avaliacao:cm_eq_uni_e'))
 
                 novo_cm_dor_dict = {
                     "Marcha": cm_marcha, "Agach_Bi": cm_agach_bi, "Corrida": cm_corrida, "Salto": cm_salto,
@@ -1213,7 +1224,7 @@ def render():
                     lista_testes_disp.append(t_antigo)
             if not def_alvos and "Pós-Operatório Agudo" not in fenotipo_clinico:
                 def_alvos = ["Agachamento Bipodal", "Step Down (D)" if "Direito" in lado_acometido else "Step Down (E)"]
-            testes_alvo = st.multiselect("Atividades / Testes que entrarão no Check-in Diário (Opcional):", lista_testes_disp, default=def_alvos)
+            testes_alvo = st.multiselect("Atividades / Testes que entrarão no Check-in Diário (Opcional):", lista_testes_disp, default=def_alvos, key=chave_widget(st.session_state, 'avaliacao:testes_alvo'))
 
     # ------------------------------------------------------------
     # ABA 6: EXAMES COMPLEMENTARES
@@ -1225,14 +1236,14 @@ def render():
                 "Nenhum", "Raio-X", "Ressonância Magnética (RM)",
                 "Tomografia Computadorizada (TC)", "Ultrassonografia (USG)", "Eletroneuromiografia"
             ]
-            tipos_exames = st.multiselect("Modalidades de Exame Apresentadas *", op_exames, default=get_list(op_exames, "Exames_Apresentados"))
+            tipos_exames = st.multiselect("Modalidades de Exame Apresentadas *", op_exames, default=get_list(op_exames, "Exames_Apresentados"), key=chave_widget(st.session_state, 'avaliacao:tipos_exames'))
             laudo_exames = st.text_area(
                 "Laudo / Achados Estruturais Relevantes *",
                 value=dados.get("Laudo_Exames", "Nenhum"),
                 placeholder="Descreva os achados de imagem (especificando lado Direito/Esquerdo) ou mantenha 'Nenhum'.",
                 height=140,
+                key=chave_widget(st.session_state, 'avaliacao:laudo_exames'),
             )
-
     # ------------------------------------------------------------
     # ABA 7: QUESTIONÁRIOS (PROMs — VERSÕES QUICK + COMPLETAS POR DOMÍNIO)
     # ------------------------------------------------------------
@@ -1249,8 +1260,8 @@ def render():
                 "✅ Questionários Aplicados nesta Avaliação:",
                 options=opcoes_todos_proms,
                 default=[p for p in default_proms_aplicados if p in opcoes_todos_proms],
+                key=chave_widget(st.session_state, 'avaliacao:proms_aplicados'),
             )
-
             respostas_salvas = dados.get("Respostas_PROMs") if isinstance(dados.get("Respostas_PROMs"), dict) else {}
 
             def _idx_prom(lista_op, chave_item, idx_padrao=0):
@@ -1632,6 +1643,9 @@ def render():
             if qp.strip() == "":
                 toast("A 'Queixa Principal (QP)' na aba Anamnese é obrigatória para salvar o prontuário.", "error")
             else:
+                if not payload_do_paciente_ativo(dados_avaliacao, st.session_state):
+                    st.error("Salvamento bloqueado: o registro não pertence ao paciente ativo.")
+                    return
                 with st.spinner("Sincronizando Avaliação Inicial com o Firebase..."):
                     try:
                         if st.session_state.get("doc_id_avaliacao"):
