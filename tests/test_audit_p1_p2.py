@@ -23,11 +23,9 @@ class AuditP1P2(unittest.TestCase):
         self.assertEqual(ia.calcular_lsi(40,40,flex_lesado=24)['razao_iq_lesado'],60)
         self.assertIsNone(ia.calcular_lsi(36,0)['valor'])
 
-    @unittest.expectedFailure
     def test_p1_01_zero_pain_does_not_imply_performed_test(self):
         self.assertIsNone(load('modulo_painel.py')._score_funcional_item('Não testado',dor_num_override=0))
 
-    @unittest.expectedFailure
     def test_p1_02_absent_sane_is_not_observed_thirty(self):
         r = load('ia_clinica.py').analisar_percepcao_metas({},pd.DataFrame())
         self.assertIsNone(r['sane_atual'])
@@ -110,7 +108,6 @@ class AuditP1P2(unittest.TestCase):
         isolated('services/session_resilience.py',ui).inicializar_estado_avaliacao('draft_fake_A',db)
         self.assertEqual(ui.session_state['avaliacao_atual']['QP'],'Fictícia')
 
-    @unittest.expectedFailure
     def test_p1_06_retry_after_lost_ack_does_not_duplicate(self):
         db = MemoryDB()
         db.timeout_after_add = True
@@ -120,7 +117,6 @@ class AuditP1P2(unittest.TestCase):
         mod._fragmento_autosave_checkin()
         self.assertEqual(len(db.records),1)
 
-    @unittest.expectedFailure
     def test_p1_07_two_clients_same_logical_session_do_not_duplicate(self):
         db = MemoryDB()
         for _ in range(2):
@@ -136,7 +132,6 @@ class AuditP1P2(unittest.TestCase):
         self.assertNotIn('_ultimo_hash_autosave_chk',ui.session_state)
         self.assertEqual(len(db.records),0)
 
-    @unittest.expectedFailure
     def test_p1_08_failed_write_must_not_show_stale_green_status(self):
         db = MemoryDB()
         db.fail_writes = True
@@ -154,20 +149,17 @@ class AuditP1P2(unittest.TestCase):
         self.assertEqual(check._categoria_antiga_para_dor_num(record['Agachamento']),(5,False))
         self.assertEqual(record,before)
 
-    @unittest.expectedFailure
     def test_p1_09_legacy_not_tested_must_not_become_zero_pain(self):
         self.assertIsNone(isolated('modulo_checkin.py')._categoria_antiga_para_dor_num('Não testado')[0])
 
-    @unittest.expectedFailure
     def test_p1_10_no_tests_must_not_be_full_bilateral_symmetry(self):
         result = panel_longitudinal(pd.DataFrame([{'Data':'2026-01-01','Dor':0,'Testes_Funcionais':{}}]))
-        self.assertTrue(pd.isna(result.iloc[0]['LSI']))
+        self.assertNotIn('LSI', result.columns)
 
     def test_longitudinal_dates_sorted_with_legacy_records(self):
         result=panel_longitudinal(pd.DataFrame([{'Data':'2026-01-02','Dor':3},{'Data':'2026-01-01','Dor':5}]))
         self.assertEqual(result['Dor'].tolist(),[5,3])
 
-    @unittest.expectedFailure
     def test_p1_11_adapter_repeated_session_write_is_idempotent(self):
         db=MemoryDB()
         adapter=adapter_class()
@@ -177,12 +169,10 @@ class AuditP1P2(unittest.TestCase):
         adapter().update('Evolucao',frame)
         self.assertEqual(len(db.records),1)
 
-    @unittest.expectedFailure
     def test_p1_12_brazilian_dates_keep_calendar_order(self):
         result=panel_longitudinal(pd.DataFrame([{'Data':'02/01/2026','Dor':2},{'Data':'01/02/2026','Dor':5}]))
         self.assertEqual(result['Dor'].tolist(),[2,5])
 
-    @unittest.expectedFailure
     def test_p1_13_missing_pain_is_not_zero(self):
         result=panel_longitudinal(pd.DataFrame([{'Data':'2026-01-01'}]))
         self.assertTrue(pd.isna(result.iloc[0]['Dor']))
@@ -194,7 +184,6 @@ class AuditP1P2(unittest.TestCase):
         isolated('modulo_avaliacao.py',ui,db)._fragmento_autosave_avaliacao()
         self.assertEqual(db.records,{})
 
-    @unittest.expectedFailure
     def test_p1_15_stale_client_must_not_silently_overwrite_recent_save(self):
         db=MemoryDB()
         for pain in [2,8]:  # recent value followed by stale second-client payload
@@ -202,11 +191,11 @@ class AuditP1P2(unittest.TestCase):
             isolated('modulo_checkin.py',ui,db)._fragmento_autosave_checkin()
         self.assertEqual(db.records[('Evolucao','same-fake-document')]['Dor'],2)
 
-    def test_characterize_prognostic_real_series_imputes_missing_sane(self):
+    def test_prognostic_real_series_preserves_missing_sane(self):
         df=pd.DataFrame({'Data_dt':pd.to_datetime(['2026-01-01']),'Sessão_Num':['S1'],'SANE_Pct_Num':[float('nan')]})
         result=load('modulo_painel.py')._calcular_curva_prognostica_sane(df,df,30)
-        self.assertEqual(result['real'],[30])
-        self.assertEqual(result['real_atual'],30)
+        self.assertTrue(pd.isna(result['real'][0]))
+        self.assertEqual(result['status'],'incompleto')
 
     def test_service_draft_hash_avoids_redundant_writes(self):
         db=MemoryDB()

@@ -12,10 +12,12 @@ Exporta:
 
 Dependências: fpdf2, matplotlib, numpy, io, os, base64, datetime
 """
+from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto
 import io
 import os
 import base64
 import html
+import re
 import math
 from datetime import datetime
 import matplotlib
@@ -55,6 +57,11 @@ def _safe_float(valor, padrao=0.0):
         return float(s)
     except (ValueError, TypeError):
         return padrao
+
+
+def _medida(valor, minimo, maximo):
+    numero = _safe_float(valor, float("nan"))
+    return numero if minimo <= numero <= maximo else float("nan")
 
 
 def _tem_valor_util(valor) -> bool:
@@ -120,18 +127,11 @@ def _extrair_chave_str(texto_bruto, prefixo: str, default: float = 0.0) -> float
 
 def _extrair_def_extensao_graus(val_ext) -> float:
     """Converte string ou número de extensão ('Completa (0°)', 'Déficit de -5°', etc.) em graus numéricos."""
-    if val_ext is None or val_ext == "":
+    texto = str(val_ext).strip().lower()
+    if "completa" in texto:
         return 0.0
-    if isinstance(val_ext, (int, float)):
-        return abs(float(val_ext))
-    s = str(val_ext).lower()
-    if "10" in s:
-        return 10.0
-    if "5" in s:
-        return 5.0
-    if "completa" in s or "0" in s:
-        return 0.0
-    return abs(_safe_float(s, 0.0))
+    numero = re.search(r"[-+]?\d+(?:[.,]\d+)?", texto)
+    return abs(_safe_float(numero.group())) if numero else float("nan")
 
 
 def _mapear_inchaco_grau(val) -> int:
@@ -151,31 +151,6 @@ def _mapear_inchaco_grau(val) -> int:
         return 0
 
 
-def _mapa_func_dor_equivalente(resultado_texto, dor_num_override=None):
-    """
-    Mapeia a resposta do teste funcional para escala de dificuldade/dor (0 a 10),
-    priorizando o valor exato da barra deslizante de dor (0 a 10) quando disponível.
-    """
-    if dor_num_override is not None and str(dor_num_override).strip() != "":
-        try:
-            return float(max(0.0, min(10.0, float(dor_num_override))))
-        except Exception:
-            pass
-    if resultado_texto is None:
-        return None
-    if isinstance(resultado_texto, (int, float)):
-        return float(max(0.0, min(10.0, float(resultado_texto))))
-    s = str(resultado_texto).strip()
-    mapa = {
-        "Sem Dor (0)": 0.0, "Sem Dor": 0.0,
-        "Dor Leve (1 - 3)": 2.0, "Dor Leve": 2.0,
-        "Dor Moderada (4 - 7)": 5.5, "Dor Moderada": 5.5,
-        "Dor Grave (8 - 10)": 8.5, "Dor Grave": 8.5,
-        "Incapaz (Não realiza)": 10.0, "Incapaz (Nao realiza)": 10.0, "Incapaz": 10.0,
-    }
-    return mapa.get(s)
-
-
 def _normalizar_entradas(dados_aval, historico):
     """Garante que dados_aval seja dict e historico seja list[dict] ordenada cronologicamente."""
     if hasattr(dados_aval, 'to_dict'):
@@ -192,7 +167,7 @@ def _normalizar_entradas(dados_aval, historico):
         historico = []
 
     hist_limpo = [h for h in historico if isinstance(h, dict)]
-    hist_ord = sorted(hist_limpo, key=lambda x: str(x.get('Data', '')))
+    hist_ord = sorted(hist_limpo, key=lambda registro: _data_sessao(registro.get('Data')) or datetime.min)
     return dados_aval, hist_ord
 
 
@@ -205,17 +180,19 @@ def _fig_to_base64(fig, dpi=300, facecolor='#FFFFFF'):
     return base64.b64encode(buf.getvalue()).decode('utf-8')
 
 
-def _formatar_data_curta(data_raw) -> str:
-    """Formata string de data YYYY-MM-DD ou DD/MM/YYYY para DD/MM."""
-    if not data_raw:
-        return ""
-    s = str(data_raw).strip()[:10]
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
+def _data_sessao(valor):
+    texto = str(valor or "").strip()[:10]
+    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
         try:
-            return datetime.strptime(s, fmt).strftime("%d/%m")
-        except Exception:
-            pass
-    return s[:5]
+            return datetime.strptime(texto, formato)
+        except ValueError:
+            continue
+    return None
+
+
+def _formatar_data_curta(data_raw) -> str:
+    data = _data_sessao(data_raw)
+    return data.strftime("%d/%m") if data else ""
 
 
 def _selecionar_ultimas_sessoes(hist: list, max_sessoes: int = 10) -> list:
@@ -256,8 +233,8 @@ def _gerar_grafico_dor_clean_b64(hist):
     tem_bilateral = any(bool(e.get('Registro_Bilateral')) for e in evs)
 
     if tem_bilateral:
-        dores_d = [_safe_float(e.get('Dor_Dir', e.get('Dor', 0))) for e in evs]
-        dores_e = [_safe_float(e.get('Dor_Esq', e.get('Dor', 0))) for e in evs]
+        dores_d = [_medida(e.get('Dor_Dir'), 0, 10) for e in evs]
+        dores_e = [_medida(e.get('Dor_Esq'), 0, 10) for e in evs]
         ax.plot(x_idx, dores_d, color='#103E55', lw=2.5, marker='o', markersize=6.5, label='EVA Joelho D', zorder=4)
         ax.plot(x_idx, dores_e, color='#16A34A', lw=2.5, marker='o', markersize=6.5, label='EVA Joelho E', zorder=4)
         for i in range(len(x_idx)):
@@ -269,7 +246,7 @@ def _gerar_grafico_dor_clean_b64(hist):
                         fontsize=8, fontweight='bold', color='#16A34A')
         ax.legend(loc='upper right', frameon=False, fontsize=8.5, ncol=2)
     else:
-        dores = [_safe_float(e.get('Dor', 0)) for e in evs]
+        dores = [_medida(e.get('Dor'), 0, 10) for e in evs]
         ax.fill_between(x_idx, dores, color='#2E8B9A', alpha=0.08)
         ax.plot(x_idx, dores, color='#103E55', lw=2.6, marker='o', markersize=7.0,
                 markerfacecolor='#FFFFFF', markeredgecolor='#103E55', markeredgewidth=2.1,
@@ -315,11 +292,11 @@ def _gerar_grafico_testes_clean_b64(hist):
     for e in evs:
         tf = e.get('Testes_Funcionais', {})
         tf_num = e.get('Testes_Funcionais_Dor_Num', {})
-        if isinstance(tf, dict):
-            for k, val_resp in tf.items():
-                dor_num_k = tf_num.get(k) if isinstance(tf_num, dict) else None
-                if _mapa_func_dor_equivalente(val_resp, dor_num_k) is not None and k not in nomes_testes:
-                    nomes_testes.append(k)
+        tf = tf if isinstance(tf, dict) else {}
+        tf_num = tf_num if isinstance(tf_num, dict) else {}
+        for nome in dict.fromkeys([*tf, *tf_num]):
+            if nome not in nomes_testes and nota_dor_gesto(tf.get(nome), tf_num.get(nome)) is not None:
+                nomes_testes.append(nome)
 
     if not nomes_testes:
         return "", [], 0, 0
@@ -336,24 +313,19 @@ def _gerar_grafico_testes_clean_b64(hist):
     for idx_t, t_nome in enumerate(nomes_testes[:4]):
         cor_t = cores_linhas[idx_t % len(cores_linhas)]
         valores_y = []
-        textos_raw = []
         for e in evs:
             tf = e.get('Testes_Funcionais', {})
             tf_num = e.get('Testes_Funcionais_Dor_Num', {})
             resp = tf.get(t_nome) if isinstance(tf, dict) else None
             dor_num_k = tf_num.get(t_nome) if isinstance(tf_num, dict) else None
-            sc_dor = _mapa_func_dor_equivalente(resp, dor_num_k)
+            sc_dor = nota_dor_gesto(resp, dor_num_k)
             valores_y.append(sc_dor if sc_dor is not None else np.nan)
-            if dor_num_k is not None and "Incapaz" not in str(resp):
-                textos_raw.append(f"Dor {int(float(dor_num_k))}/10")
-            else:
-                textos_raw.append(resp)
 
         arr_y = np.array(valores_y, dtype=float)
         mask = ~np.isnan(arr_y)
         if mask.sum() >= 1:
             testes_plotados += 1
-            ax.plot(x_idx[mask], arr_y[mask], color=cor_t, lw=2.4, marker='o', markersize=6.5, label=t_nome, zorder=3 + idx_t)
+            ax.plot(x_idx, arr_y, color=cor_t, lw=2.4, marker='o', markersize=6.5, label=t_nome, zorder=3 + idx_t)
             for xi, yi in zip(x_idx[mask], arr_y[mask]):
                 ax.annotate(f"{yi:.1f}".replace(".", ","), (xi, yi),
                             textcoords="offset points", xytext=(0, 7), ha='center',
@@ -361,33 +333,16 @@ def _gerar_grafico_testes_clean_b64(hist):
 
             v_ini = arr_y[mask][0]
             v_fim = arr_y[mask][-1]
-            r_ini_str = textos_raw[int(np.where(mask)[0][0])] or "—"
-            r_fim_str = textos_raw[int(np.where(mask)[0][-1])] or "—"
-
+            indices = np.flatnonzero(mask)
+            primeira = marcos[indices[0]][2]
+            ultima = marcos[indices[-1]][2]
+            if len(indices) == 1:
+                texto = f"{t_nome}: registro único de {v_fim:g}/10 em {ultima}."
+            else:
+                texto = f"{t_nome}: dor de {v_ini:g}/10 em {primeira} e {v_fim:g}/10 em {ultima}."
             if v_fim < v_ini:
                 melhoraram += 1
-                pct_red = ((v_ini - v_fim) / max(1.0, v_ini)) * 100.0
-                conclusoes_testes.append((
-                    "verde",
-                    f"Melhora clínica significativa de {pct_red:.0f}% na tolerância ao movimento {t_nome} ({r_ini_str} → {r_fim_str}, dor {v_ini:.1f} → {v_fim:.1f})."
-                ))
-            elif v_fim == v_ini:
-                if v_fim == 0:
-                    melhoraram += 1
-                    conclusoes_testes.append((
-                        "verde",
-                        f"Movimento {t_nome} realizado com capacidade plena e sem dor ({r_fim_str}) ao longo do período."
-                    ))
-                else:
-                    conclusoes_testes.append((
-                        "neutro",
-                        f"Movimento {t_nome} estável no período (dor {v_ini:.1f} → {v_fim:.1f} · {r_fim_str})."
-                    ))
-            else:
-                conclusoes_testes.append((
-                    "laranja",
-                    f"Oscilação de sensibilidade mecânica no movimento {t_nome} ({v_ini:.1f} → {v_fim:.1f} · {r_fim_str}). Ajustar controle de carga."
-                ))
+            conclusoes_testes.append(("neutro", texto))
 
     if testes_plotados == 0:
         plt.close(fig)
@@ -417,9 +372,7 @@ def _gerar_grafico_sane_clean_b64(hist, sane_base: float):
     marcos = _selecionar_ultimas_sessoes(hist, max_sessoes=10)
     if marcos:
         labels = [m[0] for m in marcos]
-        valores = [_safe_float(m[1].get('SANE_Pct'), sane_base) for m in marcos]
-        if len(hist) <= 10 and len(valores) >= 1 and marcos[0][1].get('SANE_Pct') is None:
-            valores[0] = sane_base
+        valores = [_medida(m[1].get('SANE_Pct'), 0, 100) for m in marcos]
     else:
         labels = ["Aval."]
         valores = [sane_base]
@@ -458,51 +411,25 @@ def _gerar_grafico_sane_clean_b64(hist, sane_base: float):
 # ============================================================
 # COMPONENTES VISUAIS SVG (GAUGE DE FLEXÃO + DONUT DE EXTENSÃO)
 # ============================================================
-def _construir_svg_gauge_flexao(flex_atual: float, flex_ref: float = 135.0) -> str:
-    """Constrói o Velocímetro Semicircular (Gauge SVG) da Flexão de Joelho."""
-    pct = max(0.0, min(1.0, flex_atual / flex_ref)) if flex_ref > 0 else 0.0
-    pct_exib = round((flex_atual / flex_ref) * 100.0) if flex_ref > 0 else 0
-
-    raio = 80.0
-    perimetro = math.pi * raio
-    dash_offset = perimetro * (1.0 - pct)
-
-    ang = pct * math.pi
-    cx_dot = 100.0 - raio * math.cos(ang)
-    cy_dot = 100.0 - raio * math.sin(ang)
-
-    cor_arco = "#16A34A" if flex_atual >= 125 else ("#2E8B9A" if flex_atual >= 105 else ("#D97706" if flex_atual >= 80 else "#DC2626"))
-
+def _mostrador_adm(valor, limite, legenda, cor):
+    """Mesma geometria para os dois arcos; cada legenda identifica sua escala."""
+    if not np.isfinite(valor):
+        return '<span>Não avaliada</span>'
+    fracao = min(max(valor / limite, 0), 1)
+    angulo = math.pi * fracao
+    x = 100 - 80 * math.cos(angulo)
+    y = 100 - 80 * math.sin(angulo)
     return f"""
-    <div style="text-align:center; padding: 6px 0 2px 0;">
-        <svg viewBox="0 0 200 122" style="width:100%; max-width:250px; height:auto; overflow:visible;">
-            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#E2E8F0" stroke-width="14" stroke-linecap="round"/>
-            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="{cor_arco}" stroke-width="14" stroke-linecap="round"
-                  stroke-dasharray="{perimetro:.2f}" stroke-dashoffset="{dash_offset:.2f}"/>
-            <circle cx="{cx_dot:.2f}" cy="{cy_dot:.2f}" r="7.5" fill="{cor_arco}" stroke="#FFFFFF" stroke-width="2.5"/>
-            <text x="100" y="78" text-anchor="middle" font-size="30" font-weight="800" fill="#103E55" font-family="Inter, sans-serif">{flex_atual:.0f}°</text>
-            <text x="100" y="96" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2E8B9A" font-family="Inter, sans-serif">{pct_exib}% da referência</text>
-            <text x="20" y="118" text-anchor="middle" font-size="10.5" font-weight="800" fill="#475569" font-family="Inter, sans-serif">0°</text>
-            <text x="180" y="114" text-anchor="middle" font-size="10.5" font-weight="800" fill="#103E55" font-family="Inter, sans-serif">{flex_ref:.0f}°</text>
-            <text x="180" y="124" text-anchor="middle" font-size="7.5" font-weight="700" fill="#2E8B9A" font-family="Inter, sans-serif">REFERÊNCIA</text>
-        </svg>
-    </div>
-    """
-
-
-def _construir_svg_donut_extensao(def_ext_atual: float) -> str:
-    """Constrói o anel circular (Donut SVG) de Extensão Terminal de Joelho (Meta 0°)."""
-    cor_anel = "#16A34A" if def_ext_atual == 0 else ("#D97706" if def_ext_atual <= 5 else "#DC2626")
-    txt_sub = "Completa (0°)" if def_ext_atual == 0 else f"Déficit de {def_ext_atual:.0f}°"
-    return f"""
-    <svg viewBox="0 0 110 110" style="width:105px; height:105px; flex-shrink:0;">
-        <circle cx="55" cy="55" r="44" fill="none" stroke="#E2E8F0" stroke-width="9"/>
-        <circle cx="55" cy="55" r="44" fill="none" stroke="{cor_anel}" stroke-width="9"
-                stroke-dasharray="276.46" stroke-dashoffset="{0 if def_ext_atual == 0 else 75}"/>
-        <text x="55" y="54" text-anchor="middle" font-size="22" font-weight="800" fill="#103E55" font-family="Inter, sans-serif">{def_ext_atual:.0f}°</text>
-        <text x="55" y="70" text-anchor="middle" font-size="8.5" font-weight="700" fill="{cor_anel}" font-family="Inter, sans-serif">{txt_sub}</text>
-    </svg>
-    """
+    <svg viewBox="0 0 200 125" role="img" aria-label="{valor:g} graus · {legenda}">
+        <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#E2E8F0" stroke-width="12"/>
+        <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="{cor}" stroke-width="12"
+              pathLength="100" stroke-dasharray="{100 * fracao:.2f} 101"/>
+        <circle cx="{x:.2f}" cy="{y:.2f}" r="6" fill="{cor}" stroke="white" stroke-width="2"/>
+        <text x="100" y="82" text-anchor="middle" font-size="29" font-weight="800">{valor:g}°</text>
+        <text x="100" y="102" text-anchor="middle" font-size="11">{legenda}</text>
+        <text x="20" y="120" text-anchor="middle" font-size="10">0°</text>
+        <text x="180" y="120" text-anchor="middle" font-size="10">{limite}°{'+' if limite == 10 else ''}</text>
+    </svg>"""
 
 
 def _box_conclusao_editavel(cor_status: str, texto_conclusao: str) -> str:
@@ -611,46 +538,22 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     exec_pills_list = []
 
     # --- 2. EVOLUÇÃO DA DOR (EVA) ---
-    tem_dor_preenchida = any(h.get('Dor') is not None for h in hist)
+    sessao_atual = hist[-1] if hist else {}
+    dor_atual = _medida(sessao_atual.get("Dor"), 0, 10)
+    dor_inicial = _medida(hist[0].get("Dor"), 0, 10) if hist else float("nan")
+    tem_dor_preenchida = bool(np.isfinite(dor_atual))
     html_secao_dor = ""
-    dor_atual = 0.0
 
-    if tem_dor_preenchida and n_sessoes >= 1:
-        dor_inicial = _safe_float(hist[0].get('Dor', 0))
-        dor_atual = _safe_float(hist[-1].get('Dor', 0))
-        delta_dor = dor_inicial - dor_atual
-        pct_dor = ((delta_dor / dor_inicial) * 100.0) if dor_inicial > 0 else 0.0
-
-        if delta_dor > 0:
-            cor_kpi_dor = "#16A34A" if (delta_dor >= 2 or dor_atual <= 2) else "#D97706"
-            icone_kpi_dor = "↓"
-            txt_kpi_dor = f"↓ {pct_dor:.0f}%" if dor_inicial > 0 else f"↓ {delta_dor:.0f} pts"
-            sub_kpi_dor = f"({dor_inicial:.1f} → {dor_atual:.1f})".replace(".", ",")
-            status_conc_dor = "verde" if (delta_dor >= 2 or dor_atual <= 2) else "amarelo"
-            conc_dor_txt = (
-                f"Redução clinicamente significativa da dor em {pct_dor:.0f}% ({dor_inicial:.1f} → {dor_atual:.1f} na escala EVA), "
-                f"indicando excelente modulação inflamatória/álgica e aumento da tolerância à carga mecânica."
-            ).replace(".", ",")
-        elif delta_dor == 0:
-            cor_kpi_dor = "#16A34A" if dor_atual <= 2 else "#D97706"
-            icone_kpi_dor = "="
-            txt_kpi_dor = "Estável"
-            sub_kpi_dor = f"({dor_inicial:.1f} → {dor_atual:.1f})".replace(".", ",")
-            status_conc_dor = "verde" if dor_atual <= 2 else "amarelo"
-            conc_dor_txt = (
-                f"Quadro álgico mantido em nível controlado ({dor_atual:.1f}/10 na EVA) durante a progressão de demanda funcional."
-                if dor_atual <= 2 else
-                f"Estabilidade álgica ({dor_inicial:.1f} → {dor_atual:.1f} na EVA). Mantido controle de carga conforme irritabilidade tecidual."
-            ).replace(".", ",")
-        else:
-            cor_kpi_dor = "#DC2626"
-            icone_kpi_dor = "↑"
-            txt_kpi_dor = f"+{abs(delta_dor):.0f} pts"
-            sub_kpi_dor = f"({dor_inicial:.1f} → {dor_atual:.1f})".replace(".", ",")
-            status_conc_dor = "laranja"
-            conc_dor_txt = (
-                f"Oscilação reativa da dor ({dor_inicial:.1f} → {dor_atual:.1f} na EVA). Ajustado volume mecânico para respeitar a janela de reatividade de 24h."
-            ).replace(".", ",")
+    if tem_dor_preenchida or any(np.isfinite(_medida(h.get("Dor"), 0, 10)) for h in hist):
+        txt_kpi_dor = f"{dor_atual:g}/10" if tem_dor_preenchida else "Não avaliada"
+        sub_kpi_dor = "Sessão selecionada"
+        conc_dor_txt = f"EVA na sessão selecionada: {txt_kpi_dor}."
+        status_conc_dor = "amarelo"
+        cor_kpi_dor = "#103E55"
+        icone_kpi_dor = "EVA"
+        if n_sessoes > 1 and tem_dor_preenchida and np.isfinite(dor_inicial):
+            sub_kpi_dor = f"{dor_inicial:g} → {dor_atual:g}/10"
+            conc_dor_txt = f"EVA inicial de {dor_inicial:g}/10 e atual de {dor_atual:g}/10."
 
         exec_pills_list.append(f"""
             <div class="exec-pill">
@@ -680,7 +583,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     if b64_testes and total_testes > 0:
         cor_kpi_func = "#16A34A" if qtd_melhorou >= max(1, total_testes // 2) else "#D97706"
         txt_kpi_func = f"{qtd_melhorou}/{total_testes} gestos"
-        sub_kpi_func = "em evolução positiva"
+        sub_kpi_func = "com redução da dor na janela exibida"
 
         exec_pills_list.append(f"""
             <div class="exec-pill">
@@ -700,6 +603,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         <div class="section-card">
             <div class="section-title">RELACIONAL FUNCIONAL (DOR 0–10 DURANTE O GESTO) — ÚLTIMAS {len(ultimas_10)} SESSÕES</div>
             <img class="chart-img" src="data:image/png;base64,{b64_testes}" alt="Testes Funcionais" />
+            <p>Dor de 0 a 10. Registros antigos por faixa de dor usam valores aproximados.</p>
             {boxes_conclusao_testes_html}
         </div>
         """
@@ -710,151 +614,21 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     lado_str_low = str(lado_acom).lower()
     adm_base_aval = adm_fl_e_av if "esquerdo" in lado_str_low else adm_fl_d_av
 
-    tem_adm_preenchida = (adm_fl_d_av > 0 or adm_fl_e_av > 0) or any(_safe_float(h.get('Flexao', 0)) > 0 for h in hist)
+    flex_atual = _medida(sessao_atual.get("Flexao"), 0, 180) if hist else adm_base_aval
+    tem_adm_preenchida = bool(np.isfinite(flex_atual)) if hist else adm_base_aval > 0
+    ext_raw = sessao_atual.get("Extensao")
+    ext_atu_deg = _extrair_def_extensao_graus(ext_raw)
+    tem_extensao = bool(np.isfinite(ext_atu_deg))
     html_secao_adm = ""
-    flex_atual = 0.0
-    ext_atu_deg = 0.0
-
-    if tem_adm_preenchida:
-        flex_inicial = _safe_float(hist[0].get('Flexao', 0)) if hist else adm_base_aval
-        if flex_inicial <= 0 and adm_base_aval > 0:
-            flex_inicial = adm_base_aval
-        flex_atual = _safe_float(hist[-1].get('Flexao', flex_inicial)) if hist else flex_inicial
-        ganho_flex = flex_atual - flex_inicial
-
-        if flex_atual >= 125:
-            significado_flex = "liberando a cinemática necessária para agachamento profundo, corrida e gestos esportivos sem restrição articular"
-        elif flex_atual >= 110:
-            significado_flex = "atingindo o arco biomecânico necessário para descer escadas de forma recíproca, pedalar e agachar até a paralela sem compensações"
-        elif flex_atual >= 95:
-            significado_flex = "permitindo sentar e levantar com conforto e realizar marcha no plano sem compensação em rotação de quadril"
-        else:
-            significado_flex = "em fase de ganho progressivo de mobilidade articular para restabelecer as atividades de vida diária"
-
-        if ganho_flex > 0:
-            cor_kpi_adm = "#16A34A"
-            icone_kpi_adm = "↑"
-            txt_kpi_adm = f"+{ganho_flex:.0f}° ganho"
-            sub_kpi_adm = f"({flex_inicial:.0f}° → {flex_atual:.0f}°)"
-            status_conc_flex = "verde"
-            conc_flex_txt = (
-                f"Ganho de +{ganho_flex:.0f}° na flexão de joelho ao longo das sessões ({flex_inicial:.0f}° → {flex_atual:.0f}°), "
-                f"{significado_flex}."
-            )
-        elif flex_atual >= 125:
-            cor_kpi_adm = "#16A34A"
-            icone_kpi_adm = "✓"
-            txt_kpi_adm = f"{flex_atual:.0f}° plena"
-            sub_kpi_adm = "amplitude funcional"
-            status_conc_flex = "verde"
-            conc_flex_txt = (
-                f"Amplitude de flexão de joelho preservada em nível de excelência ({flex_atual:.0f}° / ref. 135°), "
-                f"{significado_flex}."
-            )
-        else:
-            cor_kpi_adm = "#D97706"
-            icone_kpi_adm = "="
-            txt_kpi_adm = f"{flex_atual:.0f}° atual"
-            sub_kpi_adm = "(Meta: 135°)"
-            status_conc_flex = "amarelo"
-            conc_flex_txt = (
-                f"Flexão de joelho em {flex_atual:.0f}° (referência clínica: 135°), {significado_flex}."
-            )
-
-        exec_pills_list.append(f"""
-            <div class="exec-pill">
-                <div class="exec-icon" style="background:{cor_kpi_adm};">{icone_kpi_adm}</div>
-                <div class="exec-info" contenteditable="true">
-                    <span class="exec-lbl">ADM JOELHO</span>
-                    <span class="exec-main" style="color:{cor_kpi_adm};">{_esc(txt_kpi_adm)}</span>
-                    <span class="exec-sub">{_esc(sub_kpi_adm)}</span>
-                </div>
-            </div>
-        """)
-
-        ext_ini_deg = _extrair_def_extensao_graus(hist[0].get('Extensao', '0')) if hist else 0.0
-        ext_atu_deg = _extrair_def_extensao_graus(hist[-1].get('Extensao', '0')) if hist else 0.0
-        if ext_atu_deg == 0:
-            status_conc_ext = "verde"
-            conc_ext_txt = (
-                f"Extensão terminal completa atingida ({ext_ini_deg:.0f}° → 0°), eliminando o mecanismo de inibição artrogênica "
-                f"do quadríceps e garantindo destravamento eficiente na fase de apoio da marcha."
-            )
-        else:
-            status_conc_ext = "amarelo" if ext_atu_deg <= 5 else "laranja"
-            conc_ext_txt = (
-                f"Extensão de Joelho ({ext_ini_deg:.0f}° → {ext_atu_deg:.0f}°) · déficit residual de {ext_atu_deg:.0f}°. "
-                f"Priorizada mobilização em extensão terminal para otimizar o recrutamento do quadríceps."
-            )
-
-        cards_sessoes_flex_html = ""
-        cards_sessoes_ext_html = ""
-        for _, ev_m, lbl_card in ultimas_10:
-            fl_m = _safe_float(ev_m.get('Flexao', flex_atual))
-            ex_m = _extrair_def_extensao_graus(ev_m.get('Extensao', 0))
-            cards_sessoes_flex_html += f"""
-            <div class="stage-pill">
-                <span class="stage-lbl">{_esc(lbl_card)}</span>
-                <span class="stage-val">{fl_m:.0f}°</span>
-            </div>
-            """
-            cards_sessoes_ext_html += f"""
-            <div class="stage-pill">
-                <span class="stage-lbl">{_esc(lbl_card)}</span>
-                <span class="stage-val">{ex_m:.0f}°</span>
-            </div>
-            """
-
-        svg_gauge_flex = _construir_svg_gauge_flexao(flex_atual, 135.0)
-        svg_donut_ext = _construir_svg_donut_extensao(ext_atu_deg)
-
+    if tem_adm_preenchida or tem_extensao:
+        data_adm = _data_sessao(sessao_atual.get("Data")) if hist else _data_sessao(dados_aval.get("Data_Avaliacao"))
+        origem_adm = data_adm.strftime("%d/%m/%Y") if data_adm else ""
+        grafico_flex = _mostrador_adm(flex_atual if tem_adm_preenchida else float("nan"), 135, "Referência 135°", "#103E55")
+        grafico_ext = _mostrador_adm(ext_atu_deg, 10, "Completa" if ext_atu_deg == 0 else "Déficit de extensão", "#2E8B9A")
         html_secao_adm = f"""
-        <div class="section-card">
-            <div class="section-title">AMPLITUDE DE MOVIMENTO (ADM) AO LONGO DAS SESSÕES</div>
-            <div class="grid-2">
-                <div class="sub-card" style="margin-bottom:0;">
-                    <div class="sub-card-header">
-                        <span class="sub-card-title">Flexão de Joelho</span>
-                        <span class="sub-card-meta">Atual: {flex_atual:.0f}° · Inicial: {flex_inicial:.0f}°</span>
-                    </div>
-                    {svg_gauge_flex}
-                    <div class="stages-grid">
-                        {cards_sessoes_flex_html}
-                    </div>
-                    <div class="ref-banner">
-                        <span>Referência angular funcional</span>
-                        <strong>135°</strong>
-                    </div>
-                    {_box_conclusao_editavel(status_conc_flex, conc_flex_txt)}
-                </div>
-
-                <div class="sub-card" style="margin-bottom:0;">
-                    <div class="sub-card-header">
-                        <span class="sub-card-title">Extensão de Joelho</span>
-                        <span class="sub-card-meta">Déficit atual: {ext_atu_deg:.0f}°</span>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:16px; margin: 14px 0;">
-                        {svg_donut_ext}
-                        <div style="flex:1;">
-                            <div class="ref-banner" style="margin-bottom:8px;">
-                                <span>Meta clínica</span>
-                                <strong>0° (Completa)</strong>
-                            </div>
-                            <p style="font-size:11px; color:#64748B; margin:0; line-height:1.45;">
-                                Para a extensão terminal do joelho, a referência de <strong>0°</strong> é tratada como alvo biomecânico absoluto para destravamento articular e ativação plena do quadríceps.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="stages-grid">
-                        {cards_sessoes_ext_html}
-                    </div>
-                    <div class="ref-banner">
-                        <span>Referência angular terminal</span>
-                        <strong>0°</strong>
-                    </div>
-                    {_box_conclusao_editavel(status_conc_ext, conc_ext_txt)}
-                </div>
-            </div>
+        <div class="section-card"><div class="section-title">Amplitude de movimento</div>
+        <p>{_esc(origem_adm)}</p>
+        <div class="adm-medidas"><div><strong>Flexão</strong>{grafico_flex}</div><div><strong>Extensão</strong>{grafico_ext}</div></div>
         </div>
         """
 
@@ -1014,15 +788,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
 
     # --- 6. OBJETIVOS DO PACIENTE (SANE & GROC -7 A +7 — SEM PSFS) ---
     obj_raw = dados_aval.get('Objetivo_Paciente')
-    tem_sane_historico = any(h.get('SANE_Pct') is not None for h in hist)
-    tem_obj_preenchido = _tem_valor_util(obj_raw) or tem_sane_historico
 
     html_secao_sane = ""
-    sane_base = _safe_float(dados_aval.get('SANE_Baseline_Pct', 30.0), 30.0)
-    sane_atual = _safe_float(hist[-1].get('SANE_Pct', sane_base), sane_base) if hist else sane_base
+    sane_base = _medida(dados_aval.get("SANE_Baseline_Pct"), 0, 100)
+    sane_atual = _medida(sessao_atual.get("SANE_Pct"), 0, 100)
     groc_ult = hist[-1].get('GROC_Score') if hist else None
 
-    if tem_obj_preenchido:
+    if np.isfinite(sane_atual) and np.isfinite(sane_base):
         obj_paciente = obj_raw if _tem_valor_util(obj_raw) else "Retorno à função e esporte sem dor"
         ganho_sane = sane_atual - sane_base
         b64_sane = _gerar_grafico_sane_clean_b64(hist, sane_base)
@@ -1043,7 +815,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
 
         html_secao_sane = f"""
         <div class="section-card">
-            <div class="section-title">OBJETIVO FUNCIONAL DO PACIENTE · SANE & GROC (-7 A +7) — ÚLTIMAS {max(1, len(ultimas_10))} SESSÕES</div>
+            <div class="section-title">OBJETIVO FUNCIONAL DO PACIENTE · EVOLUÇÃO DO SANE (%) — ÚLTIMAS {max(1, len(ultimas_10))} SESSÕES</div>
             <div class="sub-card" style="margin-bottom:0;">
                 <div class="sub-card-header">
                     <div>
@@ -1073,6 +845,8 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     for nome_g, pref_g in grupos_forca:
         vd = _extrair_chave_str(din_d_str, pref_g, 0.0)
         ve = _extrair_chave_str(din_e_str, pref_g, 0.0)
+        vd = vd if np.isfinite(vd) and vd > 0 else 0.0
+        ve = ve if np.isfinite(ve) and ve > 0 else 0.0
         if vd > 0 or ve > 0:
             grupos_din_preenchidos.append((nome_g, pref_g, vd, ve))
 
@@ -1089,9 +863,14 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         flex_e_val = _extrair_chave_str(din_e_str, "Flex", 0.0)
 
         for idx_g, (nome_g, pref_g, vd, ve) in enumerate(grupos_din_preenchidos):
-            max_v = max(vd, ve, 0.1)
-            lsi_tec = (min(vd, ve) / max_v) * 100.0
-            deficit_pct = max(0.0, 100.0 - lsi_tec)
+            if min(vd, ve) <= 0:
+                lado, valor = ("Direito", vd) if vd > 0 else ("Esquerdo", ve)
+                cards_forca_html += f"<p><strong>{nome_g}</strong> · {lado}: {valor:g} kgf · LSI indisponível (medida unilateral).</p>"
+                continue
+            max_v = max(vd, ve)
+            avaliado, referencia = lados_dinamometria(vd, ve, lado_acom)
+            lsi_tec = lsi_dinamometria(avaliado, referencia)
+            deficit_pct = 100.0 * (1 - min(vd, ve) / max_v)
             lado_def = "D" if vd < ve else ("E" if ve < vd else "")
 
             if pref_g == "Ext" or idx_g == 0:
@@ -1099,26 +878,31 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                 if pref_g == "Ext":
                     lsi_quad_din = lsi_tec
 
-            if deficit_pct <= 10.0:
+            if lsi_tec > 100:
+                cor_def = "#2E8B9A"
+                badge_def = "maior força no lado acometido"
+                st_forca = "neutro"
+                conc_f_txt = f"{nome_g}: lado acometido {avaliado:g} kgf, contralateral {referencia:g} kgf (LSI {lsi_tec:g}%)."
+            elif deficit_pct <= 10.0:
                 cor_def = "#16A34A"
                 badge_def = "normal / simétrico"
                 st_forca = "verde"
-                conc_f_txt = f"Simetria isométrica adequada em {nome_g} na dinamometria ({vd:.1f} kgf vs {ve:.1f} kgf · Déficit de {deficit_pct:.0f}% ≤ 10%, LSI de {lsi_tec:.0f}%)."
+                conc_f_txt = f"Simetria isométrica adequada em {nome_g} na dinamometria ({vd:.1f} kgf vs {ve:.1f} kgf · Déficit de {deficit_pct:.0f}% ≤ 10%, LSI de {lsi_tec:g}%)."
             elif deficit_pct <= 20.0:
                 cor_def = "#EAB308"
                 badge_def = "déficit discreto"
                 st_forca = "amarelo"
-                conc_f_txt = f"Déficit discreto de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:.0f}% · meta ≥ 90%)."
+                conc_f_txt = f"Déficit discreto de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:g}% · meta ≥ 90%)."
             elif deficit_pct <= 30.0:
                 cor_def = "#F97316"
                 badge_def = "déficit moderado"
                 st_forca = "laranja"
-                conc_f_txt = f"Déficit moderado de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:.0f}%). Intensificar fortalecimento unilateral."
+                conc_f_txt = f"Déficit moderado de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:g}%). Intensificar fortalecimento unilateral."
             else:
                 cor_def = "#DC2626"
                 badge_def = "déficit importante"
                 st_forca = "vermelho"
-                conc_f_txt = f"Déficit importante de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:.0f}%). Prioridade máxima na reabilitação."
+                conc_f_txt = f"Déficit importante de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:g}%). Prioridade máxima na reabilitação."
 
             w_d = (vd / max_v) * 100.0
             w_e = (ve / max_v) * 100.0
@@ -1133,7 +917,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                 </div>
                 <div class="ref-banner">
                     <span>Referência clínica PBE (Handheld Dynamometer)</span>
-                    <strong>≤ 10% de diferença entre os membros (LSI ≥ 90%)</strong>
+                    <strong>LSI = força do lado avaliado ÷ força de referência × 100</strong>
                 </div>
                 <div style="display:grid; grid-template-columns: 1.35fr 1fr; gap:14px; align-items:center; margin: 12px 0;">
                     <div>
@@ -1156,7 +940,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                         <span class="deficit-lbl">DÉFICIT ENTRE OS MEMBROS</span>
                         <div class="deficit-big" style="color:{cor_def};">{deficit_pct:.0f}% {lado_def}</div>
                         <span class="deficit-pill" style="background:{cor_def};">{_esc(badge_def)}</span>
-                        <span class="deficit-sub">LSI: {lsi_tec:.0f}% · ref. ≥ 90%</span>
+                        <span class="deficit-sub">LSI: {lsi_tec:g}% · ref. ≥ 90%</span>
                     </div>
                 </div>
                 {_box_conclusao_editavel(st_forca, conc_f_txt)}
@@ -1177,20 +961,24 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             </div>
             """
 
-        cor_kpi_forca = "#16A34A" if deficit_ref_resumo <= 10 else ("#D97706" if deficit_ref_resumo <= 20 else "#DC2626")
-        txt_kpi_forca = f"{deficit_ref_resumo:.0f}% déficit" if deficit_ref_resumo > 0 else "Simétrico"
-        sub_kpi_forca = f"LSI Dinamometria: {100.0 - deficit_ref_resumo:.0f}%"
+        if lsi_quad_din is not None:
+            cor_kpi_forca = "#16A34A" if deficit_ref_resumo <= 10 else ("#D97706" if deficit_ref_resumo <= 20 else "#DC2626")
+            txt_kpi_forca = f"{deficit_ref_resumo:.0f}% déficit" if deficit_ref_resumo > 0 else "Simétrico"
+            if lsi_quad_din > 100:
+                cor_kpi_forca = "#2E8B9A"
+                txt_kpi_forca = "Maior força no lado acometido"
+            sub_kpi_forca = f"LSI Dinamometria: {lsi_quad_din:g}%"
 
-        exec_pills_list.append(f"""
-            <div class="exec-pill">
-                <div class="exec-icon" style="background:{cor_kpi_forca};">⚖</div>
-                <div class="exec-info" contenteditable="true">
-                    <span class="exec-lbl">DINAMOMETRIA (LSI)</span>
-                    <span class="exec-main" style="color:{cor_kpi_forca};">{_esc(txt_kpi_forca)}</span>
-                    <span class="exec-sub">{_esc(sub_kpi_forca)}</span>
+            exec_pills_list.append(f"""
+                <div class="exec-pill">
+                    <div class="exec-icon" style="background:{cor_kpi_forca};">⚖</div>
+                    <div class="exec-info" contenteditable="true">
+                        <span class="exec-lbl">DINAMOMETRIA (LSI)</span>
+                        <span class="exec-main" style="color:{cor_kpi_forca};">{_esc(txt_kpi_forca)}</span>
+                        <span class="exec-sub">{_esc(sub_kpi_forca)}</span>
+                    </div>
                 </div>
-            </div>
-        """)
+            """)
 
         grid_class_forca = "grid-2" if len(grupos_din_preenchidos) > 1 else ""
         html_secao_forca = f"""
@@ -1207,7 +995,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     html_secao_gatekeepers = ""
     if n_sessoes >= 1 or tem_dinamometria or tem_adm_preenchida:
         ult_sessao = hist[-1] if hist else {}
-        inchaco_raw = ult_sessao.get('Inchaço', ult_sessao.get('Inchaco', dados_aval.get('Derrame', 'Ausente')))
+        inchaco_raw = ult_sessao.get('Inchaço', ult_sessao.get('Inchaco', None))
         inchaco_grau = _mapear_inchaco_grau(inchaco_raw)
 
         pass_val = ult_sessao.get('PASS_Atingido')
@@ -1217,12 +1005,12 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         else:
             pass_bool = bool(pass_val) if isinstance(pass_val, bool) else str(pass_val).strip().lower() in ["true", "1", "sim"]
 
-        crit_1_ok = (dor_atual <= 2.0) and (tem_dor_preenchida or n_sessoes >= 1)
-        crit_2_ok = (inchaco_grau <= 1)
-        crit_3_ok = (ext_atu_deg == 0.0) and tem_adm_preenchida
-        crit_4_ok = (flex_atual >= 125.0) and tem_adm_preenchida
+        crit_1_ok = (dor_atual <= 2.0) if tem_dor_preenchida else None
+        crit_2_ok = (inchaco_grau <= 1) if _tem_valor_util(inchaco_raw) and str(inchaco_raw).lower() != "nan" else None
+        crit_3_ok = (ext_atu_deg == 0.0) if tem_extensao else None
+        crit_4_ok = (flex_atual >= 125.0) if tem_adm_preenchida else None
         crit_5_ok = (lsi_quad_din is not None and lsi_quad_din >= 90.0)
-        crit_6_ok = (sane_atual >= 85.0 and pass_bool)
+        crit_6_ok = (sane_atual >= 85.0 and pass_bool) if np.isfinite(sane_atual) and (pass_val is not None or ult_sessao.get("PASS_Satisfacao")) else None
 
         criterios_6_pontos = [
             (
@@ -1234,13 +1022,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             (
                 "2. Efusão Articular Controlada (Grau ≤ 1/3)",
                 crit_2_ok,
-                f"Atual: Grau {inchaco_grau}/3 ({inchaco_raw or 'Ausente'})",
+                f"Atual: Grau {inchaco_grau}/3 ({inchaco_raw})" if crit_2_ok is not None else "Não avaliado",
                 "Stroke Test PBE"
             ),
             (
                 "3. Extensão Terminal Completa (0°)",
                 crit_3_ok,
-                f"Atual: {'Completa (0°)' if ext_atu_deg == 0 else f'Déficit de {ext_atu_deg:.0f}°'}" if tem_adm_preenchida else "Não avaliada",
+                f"Atual: {'Completa (0°)' if ext_atu_deg == 0 else f'Déficit de {ext_atu_deg:.0f}°'}" if tem_extensao else "Não avaliada",
                 "Shelbourne et al., 1997"
             ),
             (
@@ -1252,13 +1040,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             (
                 "5. Simetria de Força de Quadríceps (LSI ≥ 90%)",
                 crit_5_ok if lsi_quad_din is not None else None,
-                f"Atual: LSI {lsi_quad_din:.0f}% (Dinamometria kgf)" if lsi_quad_din is not None else "Opcional / Aguardando Dinamometria",
+                f"Atual: LSI {lsi_quad_din:g}% (Dinamometria kgf)" if lsi_quad_din is not None else "Opcional / Aguardando Dinamometria",
                 "Grindem et al., 2016"
             ),
             (
                 "6. Meta Subjetiva Atingida (SANE ≥ 85% + PASS Sim)",
                 crit_6_ok,
-                f"SANE: {sane_atual:.0f}% · PASS: {'Satisfeito (Sim)' if pass_bool else 'Em evolução'}",
+                f"SANE: {sane_atual:.0f}% · PASS: {'Satisfeito (Sim)' if pass_bool else 'Em evolução'}" if crit_6_ok is not None else 'Avaliação incompleta',
                 "Shelbourne 2009 / Tubach 2005"
             ),
         ]
@@ -1342,16 +1130,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             partes_sintese.append(f"dor em {dor_atual:.0f}/10 na EVA")
         if tem_adm_preenchida:
             partes_sintese.append(f"flexão de joelho de {flex_atual:.0f}°")
-        if tem_obj_preenchido:
+        if np.isfinite(sane_atual):
             partes_sintese.append(f"capacidade funcional percebida (SANE) em {sane_atual:.0f}%")
         if lsi_quad_din is not None:
-            partes_sintese.append(f"LSI de quadríceps na dinamometria em {lsi_quad_din:.0f}%")
+            partes_sintese.append(f"LSI de quadríceps na dinamometria em {lsi_quad_din:g}%")
 
-        resumo_metricas = ", ".join(partes_sintese) if partes_sintese else "boa resposta clínica"
-        conclusao_livre = (
-            f"Paciente apresenta evolução clínica e biomecânica consistente no período avaliado ({resumo_metricas}). "
-            f"Recomendamos manutenção da progressão de carga específica até o cumprimento integral das 6 metas funcionais de alta (PBE)."
-        )
+        conclusao_livre = ("Medidas registradas: " + ", ".join(partes_sintese) + "."
+                           if partes_sintese else "Dados insuficientes para resumir a evolução.")
 
     logo_b64 = _carregar_logo_b64()
     if logo_b64:
@@ -1553,6 +1338,8 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     }}
 
     /* SUB-CARDS E GRIDS */
+    .adm-medidas svg {{ width:100%; max-width:160px; display:block; margin:6px auto; fill:#103E55; }}
+    .adm-medidas {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:center; text-align:center; break-inside:avoid; }}
     .grid-2 {{
         display: grid;
         grid-template-columns: 1fr 1fr;

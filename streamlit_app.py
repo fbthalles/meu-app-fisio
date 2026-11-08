@@ -8,21 +8,25 @@ import streamlit as st
 # 1) Configuração visual (set_page_config DEVE ser o 1º comando Streamlit)
 import config  # noqa: F401
 from config import CORES_GENUA
+from streamlit.errors import StreamlitSecretNotFoundError
+import socket
 
-# 2) Conexão Firebase (com cache de 60s)
-from firebase_client import db, conn  # noqa: F401
+try:
+    emulador_ativo = st.secrets.get("GENUA_EMULADOR", False)
+except StreamlitSecretNotFoundError:
+    emulador_ativo = False
 
-# 3) Roteamento (portal cirurgião + session_state inicial)
+if emulador_ativo:
+    st.info("Ambiente de testes local · Use apenas dados fictícios.")
+    try:
+        with socket.create_connection(("127.0.0.1", 8080), timeout=1):
+            pass
+    except OSError:
+        st.error("O emulador do Firestore está desligado. Inicie o emulador e recarregue a página.")
+        st.stop()
+
 from routing import aplicar_roteamento
 paciente_alvo, menu_forcado = aplicar_roteamento()
-
-# 4) Telas
-import ui_login
-import ui_dados_paciente
-import modulo_avaliacao
-import modulo_checkin
-import modulo_painel
-
 
 # ============================================================
 # Helper de Isolamento de Sessão entre Pacientes (Anti-State Bleed)
@@ -49,12 +53,21 @@ st.markdown("""
 # Despacho de telas
 # ============================================================
 if st.session_state.pagina == 'login':
+    import ui_login
+
     ui_login.render()
 
 elif st.session_state.pagina == 'dados_paciente':
+    import ui_dados_paciente
+
     ui_dados_paciente.render()
 
 elif st.session_state.pagina == 'painel_clinico':
+    from firebase_client import conn
+    import modulo_avaliacao
+    import modulo_checkin
+    import modulo_painel
+
     # Guard-rail: se cair em painel_clinico sem paciente definido, redireciona com segurança
     if not st.session_state.get('paciente'):
         st.session_state.pagina = 'dados_paciente'

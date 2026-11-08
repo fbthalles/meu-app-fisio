@@ -1,4 +1,5 @@
 """GENUA | Módulo 3: Painel Analítico (Cérebro Clínico) — Estilo Apple Health."""
+from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -28,33 +29,28 @@ def _mapear_inchaco(val) -> int:
         return 0
 
 
-def _score_funcional_item(texto_resp, dor_num_override=None) -> float:
-    """
-    Converte a resposta do teste funcional para score de Capacidade Funcional (0 a 10),
-    priorizando a nova barra deslizante de dor (0 a 10) onde Função = 10 - Dor.
-    """
-    if dor_num_override is not None and not pd.isna(dor_num_override):
-        try:
-            d_val = float(dor_num_override)
-            return max(0.0, min(10.0, 10.0 - d_val))
-        except Exception:
-            pass
+def _score_funcional_item(texto_resp, dor_num_override=None):
+    if str(texto_resp).startswith("Incapaz"):
+        return 0.0
+    dor = nota_dor_gesto(texto_resp, dor_num_override)
+    return 10 - dor if dor is not None else None
 
-    if texto_resp is None or pd.isna(texto_resp):
-        return None
-    if isinstance(texto_resp, (int, float)):
-        return max(0.0, min(10.0, 10.0 - float(texto_resp)))
 
-    s = str(texto_resp).strip()
-    mapa = {
-        "Sem Dor (0)": 10.0, "Sem Dor": 10.0,
-        "Dor Leve (1 - 3)": 7.5, "Dor Leve": 7.5,
-        "Dor Moderada (4 - 7)": 4.5, "Dor Moderada": 4.5,
-        "Dor Grave (8 - 10)": 1.5, "Dor Grave": 1.5,
-        "Incapaz (Não realiza)": 0.0, "Incapaz": 0.0,
-        "Não testado": None, "Não Aplicável (Fase Pós-Op)": None,
-    }
-    return mapa.get(s)
+def _medidas_gestos(sessao):
+    categorias = sessao.get("Testes_Funcionais")
+    notas = sessao.get("Testes_Funcionais_Dor_Num")
+    categorias = categorias if isinstance(categorias, dict) else {}
+    notas = notas if isinstance(notas, dict) else {}
+    medidas = {}
+    for nome in dict.fromkeys([*categorias, *notas]):
+        resposta = categorias.get(nome)
+        score = _score_funcional_item(resposta, notas.get(nome))
+        if score is not None:
+            descricao = "Incapaz" if str(resposta).startswith("Incapaz") else (
+                f"Dor {10 - score:g}/10" if nome in notas or isinstance(resposta, (float, int)) else resposta
+            )
+            medidas[nome] = (score, descricao)
+    return medidas
 
 
 def _extrair_chave_str(texto_bruto, prefixo: str, default: float = 0.0) -> float:
@@ -83,21 +79,10 @@ def _calcular_lsi_seguro(val_d: float, val_e: float, lado_acometido: str) -> tup
     val_e = pd.to_numeric(val_e, errors="coerce")
     if pd.isna(val_d) or pd.isna(val_e) or not np.isfinite(val_d) or not np.isfinite(val_e) or val_d < 0 or val_e < 0:
         return None, 0.0, 0.0, "⚪"
-    if val_d <= 0 and val_e <= 0:
-        return None, 0.0, 0.0, "⚪"
-
-    lado_str = str(lado_acometido or "").lower()
-    if "direito" in lado_str or "dir > esq" in lado_str:
-        lesado, saudavel = val_d, val_e
-    elif "esquerdo" in lado_str or "esq > dir" in lado_str:
-        lesado, saudavel = val_e, val_d
-    else:
-        lesado, saudavel = min(val_d, val_e), max(val_d, val_e)
-
-    if saudavel <= 0:
-        return None, round(lesado, 1), round(saudavel, 1), "⚪"
-
-    lsi = (lesado / saudavel) * 100.0
+    lesado, saudavel = lados_dinamometria(val_d, val_e, lado_acometido)
+    lsi = lsi_dinamometria(lesado, saudavel)
+    if lsi is None:
+        return None, lesado, saudavel, "⚪"
     cor = "🟢" if lsi >= 90.0 else ("🟡" if lsi >= 85.0 else "🔴")
     return round(lsi, 1), round(lesado, 1), round(saudavel, 1), cor
 
@@ -172,12 +157,14 @@ def _calcular_curva_prognostica_sane(
         tempos_semanas.append(round(t_sem, 1))
         esperado_vals.append(round(float(val_esp), 1))
 
-    sane_real_serie = df_janela['SANE_Pct_Num'].fillna(s0).tolist()
+    sane_real_serie = df_janela['SANE_Pct_Num'].tolist()
     real_atual = float(sane_real_serie[-1]) if sane_real_serie else s0
     esp_atual = float(esperado_vals[-1]) if esperado_vals else s0
     desvio = round(real_atual - esp_atual, 1)
 
-    if desvio >= 5.0:
+    if not np.isfinite(desvio):
+        status, cor, resumo = "incompleto", "⚪", "Falta medida de SANE para comparar a sessão com o marco zero."
+    elif desvio >= 5.0:
         status = "acima"
         cor = "🟢"
         resumo = (
@@ -243,6 +230,42 @@ def render():
     # ============================================================
     # B. RESGATE DA AVALIAÇÃO INICIAL (MARCO ZERO)
     # ============================================================
+    df_p = conn.read_paciente("Evolucao", p_sel)
+    if 'Membro' not in df_p.columns:
+        df_p['Membro'] = "Joelho"
+    else:
+        df_p['Membro'] = df_p['Membro'].fillna("Joelho")
+
+    df_p = df_p[df_p['Membro'] == "Joelho"].copy()
+    df_p['Data_dt'] = pd.to_datetime(df_p.get('Data', pd.Series(index=df_p.index, dtype=str)), format="mixed", dayfirst=True, errors="coerce")
+    df_p = df_p.sort_values('Data_dt').reset_index(drop=True)
+    df_p['Sessão_Num'] = [
+        f"S{i+1} ({d.strftime('%d/%m') if pd.notna(d) else '?'})"
+        for i, d in enumerate(df_p['Data_dt'])
+    ]
+
+    for coluna in ("Dor", "EVA_Semanal", "Flexao", "SANE_Pct"):
+        df_p[coluna] = pd.to_numeric(df_p.get(coluna), errors="coerce")
+        df_p[coluna] = df_p[coluna].replace([np.inf, -np.inf], np.nan)
+    df_p["SANE_Pct_Num"] = df_p["SANE_Pct"]
+    inchaco = df_p.get("Inchaço", df_p.get("Inchaco", pd.Series(index=df_p.index, dtype=str)))
+    df_p["Inchaco_N"] = inchaco.map(_mapear_inchaco, na_action="ignore").astype(float)
+
+    if not df_p.empty:
+        c_titulo_kpi, c_seletor = st.columns([3, 1.2])
+        with c_titulo_kpi:
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            titulo("📈 Indicadores Executivos de Carga, Simetria e Evolução (PBE)")
+        with c_seletor:
+            opcoes_sessoes = df_p['Sessão_Num'].tolist()
+            sessao_escolhida = st.selectbox(
+                "📅 Sessão em Análise:",
+                options=opcoes_sessoes[::-1],
+                index=0
+            )
+
+        idx_sel = df_p[df_p['Sessão_Num'] == sessao_escolhida].index[0]
+        df_p = df_p.iloc[:idx_sel + 1].copy()
     av_p = {}
     tem_av = False
     try:
@@ -251,15 +274,18 @@ def render():
             if "Data_Avaliacao" in df_av.columns:
                 df_av["_dt"] = pd.to_datetime(df_av["Data_Avaliacao"], format="mixed", dayfirst=True, errors="coerce")
                 df_av = df_av.sort_values("_dt")
-            av_p = df_av.iloc[-1].to_dict()
-            tem_av = True
+            if not df_p.empty:
+                df_av = df_av[df_av["_dt"] <= df_p.iloc[-1]["Data_dt"]] if "_dt" in df_av else df_av.iloc[:0]
+            if not df_av.empty:
+                av_p = df_av.iloc[-1].to_dict()
+                tem_av = True
     except Exception:
         tem_av = False
 
     av_data = av_p.get('Data_Avaliacao', 'N/A') if tem_av else 'N/A'
     av_qp = av_p.get('QP', 'Não registrada') if tem_av else 'Não registrada'
     av_hma = av_p.get('HMA', 'Não registrada') if tem_av else 'Não registrada'
-    av_lado = av_p.get('Lado_Acometido', 'Direito') if tem_av else 'Direito'
+    av_lado = av_p.get('Lado_Acometido') or 'Não informado'
     av_objetivo = av_p.get('Objetivo_Paciente', 'Retorno à função sem dor') if tem_av else 'Retorno à função sem dor'
     av_fenotipo_salvo = av_p.get('Fenotipo_Clinico', '') if tem_av else ''
 
@@ -268,9 +294,9 @@ def render():
     label_fenotipo_exib = av_fenotipo_salvo if av_fenotipo_salvo else fen_info['label']
 
     try:
-        sane_base_av = _sane_valido(av_p.get('SANE_Baseline_Pct')) if tem_av else 30.0
+        sane_base_av = _sane_valido(av_p.get('SANE_Baseline_Pct'), np.nan)
     except (ValueError, TypeError):
-        sane_base_av = 30.0
+        sane_base_av = np.nan
 
     red_flags_str = str(av_p.get('Red_Flags', 'Nenhuma') or 'Nenhuma')
     yellow_flags_str = str(av_p.get('Yellow_Cog', av_p.get('Yellow_Flags', 'Nenhum')) or 'Nenhum')
@@ -302,11 +328,11 @@ def render():
         lsi_m, les_m, sau_m, cor_m = _calcular_lsi_seguro(vd, ve, av_lado)
         dados_forca_bilateral.append({
             "Grupo Muscular": label_m,
-            "Direito": f"{vd:.1f} kgf" if (vd > 0 or ve > 0) else "Não medido",
-            "Esquerdo": f"{ve:.1f} kgf" if (vd > 0 or ve > 0) else "Não medido",
+            "Direito": f"{vd:.1f} kgf" if vd > 0 else "Não medido",
+            "Esquerdo": f"{ve:.1f} kgf" if ve > 0 else "Não medido",
             "val_d": vd,
             "val_e": ve,
-            "LSI (%)": f"{cor_m} {lsi_m:.0f}%" if lsi_m is not None else "⚪ N/D",
+            "LSI (%)": f"{cor_m} {lsi_m:g}%" if lsi_m is not None else "⚪ N/D",
             "lsi_num": lsi_m
         })
 
@@ -456,127 +482,45 @@ def render():
     # ============================================================
     # C. MOTOR DE EVOLUÇÃO LONGITUDINAL (CHECK-INS DIÁRIOS)
     # ============================================================
-    df_p = conn.read_paciente("Evolucao", p_sel)
     if df_p.empty:
-        st.warning("⚠️ O paciente ainda não possui sessões de Check-in diário registradas.")
-        st.stop()
+        st.info("Nenhum check-in de joelho registrado.")
+        return
 
-    if 'Membro' not in df_p.columns:
-        df_p['Membro'] = "Joelho"
-    else:
-        df_p['Membro'] = df_p['Membro'].fillna("Joelho")
-
-    df_p = df_p[df_p['Membro'] == "Joelho"].copy()
-    if df_p.empty:
-        st.warning("⚠️ O paciente ainda não possui sessões de Check-in diário para Joelho.")
-        st.stop()
-
-    df_p['Data_dt'] = pd.to_datetime(df_p['Data'], format="mixed", dayfirst=False, errors="coerce")
-    df_p = df_p.sort_values('Data_dt').reset_index(drop=True)
-    df_p['Sessão_Num'] = [
-        f"S{i+1} ({d.strftime('%d/%m') if pd.notna(d) else '?'})"
-        for i, d in enumerate(df_p['Data_dt'])
-    ]
-
-    if 'Dor' not in df_p.columns:
-        df_p['Dor'] = 0
-    df_p['Dor'] = pd.to_numeric(df_p['Dor'], errors='coerce').fillna(0)
-
-    if 'EVA_Semanal' not in df_p.columns:
-        df_p['EVA_Semanal'] = df_p['Dor']
-    df_p['EVA_Semanal'] = pd.to_numeric(df_p['EVA_Semanal'], errors='coerce').fillna(df_p['Dor'])
-
-    col_inc = 'Inchaço' if 'Inchaço' in df_p.columns else 'Inchaco'
-    if col_inc not in df_p.columns:
-        df_p[col_inc] = "Nenhum"
-    df_p['Inchaco_N'] = df_p[col_inc].apply(_mapear_inchaco)
-
-    for col, default in [
-        ('Flexao', 90), ('Extensao', 'Completa (0°)'),
-        ('Sono', 'Bem'), ('Agachamento', 'Sem Dor (0)'),
-        ('Step_Up', 'Sem Dor (0)'), ('Step_Down', 'Sem Dor (0)')
-    ]:
-        if col not in df_p.columns:
-            df_p[col] = default
-
-    df_p['Flexao'] = pd.to_numeric(df_p['Flexao'], errors='coerce').fillna(90)
-
-    if 'SANE_Pct' not in df_p.columns:
-        df_p['SANE_Pct'] = np.nan
-    df_p['SANE_Pct_Num'] = pd.to_numeric(df_p['SANE_Pct'], errors='coerce')
-
-    # Calcula Score de Tolerância Funcional (0-10) usando a barra deslizante de dor quando disponível
-    func_scores = []
-    tol_func_pct = []
-    testes_nomes = set()
-
-    for _, row in df_p.iterrows():
-        testes = row.get('Testes_Funcionais', {})
-        testes_num_row = row.get('Testes_Funcionais_Dor_Num', {})
-        if not isinstance(testes_num_row, dict):
-            testes_num_row = {}
-
-        scores_sessao = []
-        if isinstance(testes, dict) and testes:
-            for t_nome, resultado in testes.items():
-                testes_nomes.add(t_nome)
-                dor_num_item = testes_num_row.get(t_nome)
-                if "Incapaz" in str(resultado):
-                    sc = 0.0
-                else:
-                    sc = _score_funcional_item(resultado, dor_num_override=dor_num_item)
-                if sc is not None:
-                    scores_sessao.append(sc)
-
-        media_10 = (sum(scores_sessao) / len(scores_sessao)) if scores_sessao else None
-        func_scores.append(media_10)
-        tol_func_pct.append(min(max(float(media_10 * 10.0), 0.0), 100.0) if media_10 is not None else 100.0)
-
-    df_p['Func_Score'] = func_scores
-    df_p['LSI'] = tol_func_pct
 
     # ============================================================
     # 3. SELETOR DE SESSÃO, REATIVIDADE 24H E 6 KPIS EXECUTIVOS
     # ============================================================
-    c_titulo_kpi, c_seletor = st.columns([3, 1.2])
-    with c_titulo_kpi:
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        titulo("📈 Indicadores Executivos de Carga, Simetria e Evolução (PBE)")
-    with c_seletor:
-        opcoes_sessoes = df_p['Sessão_Num'].tolist()
-        sessao_escolhida = st.selectbox(
-            "📅 Sessão em Análise:",
-            options=opcoes_sessoes[::-1],
-            index=0
-        )
-
-    idx_sel = df_p[df_p['Sessão_Num'] == sessao_escolhida].index[0]
     ultima = df_p.loc[idx_sel]
     anterior = df_p.loc[idx_sel - 1] if idx_sel > 0 else None
 
+    gestos = [_medidas_gestos(sessao) for sessao in df_p.to_dict("records")]
+    df_p["Tolerancia"] = [
+        10 * sum(score for score, _ in medidas.values()) / len(medidas) if medidas else np.nan
+        for medidas in gestos
+    ]
     inicio_janela = max(0, idx_sel - 9)
     df_janela = df_p.loc[inicio_janela:idx_sel].copy().reset_index(drop=True)
 
-    dor_atual = int(ultima.get('Dor', 0))
-    dor_ant = int(anterior.get('Dor', dor_atual)) if anterior is not None else int(df_p.iloc[0].get('Dor', dor_atual))
-    delta_dor_24h = dor_atual - dor_ant
-
-    inchaco_atual = int(ultima.get('Inchaco_N', 0))
-    inchaco_ant = int(anterior.get('Inchaco_N', inchaco_atual)) if anterior is not None else inchaco_atual
-    sono_atual = str(ultima.get('Sono', 'Bem'))
-    tol_atual = float(ultima.get('LSI', 0))
-    flex_atual = float(ultima.get('Flexao', 90))
-    ext_str = str(ultima.get('Extensao', 'Completa (0°)'))
-
-    if idx_sel > 0 and (delta_dor_24h >= 2 or (inchaco_atual > inchaco_ant and inchaco_atual >= 2)):
-        toast(
-            f"⚠️ Alerta de Reatividade 24h (Silbernagel 2007): Aumento de dor (+{delta_dor_24h} pts na EVA) ou efusão "
-            f"(Grau {inchaco_atual}/3) em relação à sessão anterior. Sugestão: Regredir carga mecânica em 20-30% hoje.",
-            "warning"
-        )
+    dor_atual = ultima["Dor"]
+    flex_atual = ultima["Flexao"]
+    tol_atual = df_p.at[idx_sel, "Tolerancia"]
+    inchaco_atual = ultima["Inchaco_N"]
+    ext_str = str(ultima.get("Extensao") or "Não avaliada")
+    sono_atual = str(ultima.get("Sono") or "Não avaliado")
+    delta_dor = dor_atual - anterior["Dor"] if anterior is not None else np.nan
+    if anterior is not None and pd.notna(ultima["Data_dt"]) and pd.notna(anterior["Data_dt"]):
+        dias = (ultima["Data_dt"].date() - anterior["Data_dt"].date()).days
+        motivos = []
+        if delta_dor >= 2:
+            motivos.append(f"dor aumentou {delta_dor:g} pontos")
+        if inchaco_atual >= 2 and inchaco_atual > anterior["Inchaco_N"]:
+            motivos.append(f"derrame aumentou para grau {inchaco_atual:g}")
+        if motivos:
+            intervalo = "em dias consecutivos" if dias == 1 else f"com intervalo de {dias} dias"
+            st.warning(f"Comparação entre sessões {intervalo}: " + " e ".join(motivos) + ".")
 
     sane_sessao = ultima.get('SANE_Pct_Num')
-    sane_sessao = _sane_valido(sane_sessao, sane_base_av)
+    sane_sessao = _sane_valido(sane_sessao, np.nan)
     dist_meta_sessao = max(0.0, 100.0 - sane_sessao)
     ganho_sane_sessao = sane_sessao - sane_base_av
 
@@ -592,17 +536,20 @@ def render():
         pass_bool = pass_sessao_str.startswith("👍")
 
     testes_ult = ultima.get('Testes_Funcionais', {}) if isinstance(ultima.get('Testes_Funcionais'), dict) else {}
-    agach_str = str(testes_ult.get('Agachamento Bipodal', ultima.get('Agachamento', 'Sem Dor')))
+    agach_str = str(testes_ult.get('Agachamento Bipodal', ''))
     step_down_str = str(
         testes_ult.get('Step Down')
         or testes_ult.get('Step Down (D)')
         or testes_ult.get('Step Down (E)')
-        or ultima.get('Step_Down', 'Sem Dor')
+        or ''
     )
 
-    if "Incapaz" in agach_str and inchaco_atual >= 2 and dor_atual >= 8:
-        fenotipo_sessao = "🚨 Risco Estrutural (Alerta)"
-        diretriz = "Incapacidade de descarga de peso + Edema Agudo. Indicação de avaliação médica/imagem e proteção de carga."
+    if pd.isna(dor_atual) or pd.isna(inchaco_atual) or pd.isna(tol_atual):
+        fenotipo_sessao = "Dados insuficientes"
+        diretriz = "Verifique os registros de dor, derrame e testes funcionais desta sessão."
+    elif "Incapaz" in agach_str and inchaco_atual >= 2 and dor_atual >= 8:
+        fenotipo_sessao = "🚨 Dor e derrame com limitação no agachamento"
+        diretriz = "Agachamento bipodal registrado como incapaz, com EVA ≥ 8 e derrame grau ≥ 2. Conferir a capacidade de apoio no exame."
     elif ("Incapaz" in step_down_str or "Moderada" in step_down_str or "Grave" in step_down_str) and inchaco_atual <= 1:
         fenotipo_sessao = "🟣 Sobrecarga Femoropatelar"
         diretriz = "Dor na desaceleração excêntrica. Foco em fortalecimento póstero-lateral de quadril e controle de vetor em cadeia fechada (0-45°)."
@@ -612,9 +559,6 @@ def render():
     elif ("Incapaz" in agach_str or "Moderada" in agach_str) and "Completa" in ext_str and inchaco_atual == 0:
         fenotipo_sessao = "🟠 Tendinopático Reativo"
         diretriz = "Dor em armazenamento/liberação de energia elástica sem derrame articular. Modular carga excêntrica e aplicar isometria analgésica (Rio et al., 2015)."
-    elif dor_atual <= 3 and inchaco_atual <= 1 and tol_atual >= 80:
-        fenotipo_sessao = "🟢 Remodelamento Funcional"
-        diretriz = "Alta tolerância mecânica. Progressão segura para desaceleração rápida, pliometria e gesto esportivo específico."
     else:
         fenotipo_sessao = "🔵 Acomodação de Carga"
         diretriz = "Sinais reativos mistos. Modular volume e intensidade conforme irritabilidade tecidual (regra das 24h)."
@@ -622,61 +566,61 @@ def render():
     k1, k2, k3, k4, k5, k6 = st.columns(6)
     k1.metric(
         "Dor Hoje (EVA)",
-        f"{dor_atual}/10",
-        f"{delta_dor_24h:+d} pts vs anterior" if idx_sel > 0 else f"Semanal: {int(ultima.get('EVA_Semanal', dor_atual))}/10",
+        f"{dor_atual:g}/10" if pd.notna(dor_atual) else "Não avaliada",
+        f"{delta_dor:+g} pts vs anterior" if pd.notna(delta_dor) else None,
         delta_color="inverse"
     )
     k2.metric(
         "Reatividade / Derrame",
-        f"Grau {inchaco_atual}/3",
+        f"Grau {inchaco_atual:g}/3" if pd.notna(inchaco_atual) else "Não avaliado",
         f"Sono: {sono_atual}",
         delta_color="off"
     )
     k3.metric(
         "ADM (Flex / Ext)",
-        f"{flex_atual:.0f}°",
+        f"{flex_atual:.0f}°" if pd.notna(flex_atual) else "Não avaliada",
         ext_str,
         delta_color="normal" if "Completa" in ext_str and flex_atual >= 120 else "off"
     )
-    k4.metric(
-        "Tolerância Funcional",
-        f"{tol_atual:.0f}%",
-        "Alta Tolerância" if tol_atual >= 85 else ("Moderada" if tol_atual >= 60 else "Baixa"),
-        delta_color="normal" if tol_atual >= 85 else "off"
-    )
+    k4.metric("Tolerância Funcional", f"{tol_atual:.0f}%" if pd.notna(tol_atual) else "Sem testes registrados")
     k5.metric(
         f"{cor_lsi_quad} LSI Dinamometria",
-        f"{lsi_quad_num:.0f}%" if (usa_dinamometria and lsi_quad_num is not None) else "Opcional/Pós-Op",
-        f"Isquios: {lsi_isquio_num:.0f}%" if (usa_dinamometria and lsi_isquio_num is not None) else "Meta Alta: ≥90%",
+        f"{lsi_quad_num:g}%" if (usa_dinamometria and lsi_quad_num is not None) else "Sem medida bilateral",
+        f"Isquios: {lsi_isquio_num:g}%" if (usa_dinamometria and lsi_isquio_num is not None) else "Meta Alta: ≥90%",
         delta_color="normal" if (usa_dinamometria and (lsi_quad_num or 0) >= 90) else "off"
     )
     k6.metric(
         "Meta (SANE / GROC)",
-        f"{sane_sessao:.0f}%",
-        f"GROC: {groc_sessao_int:+d} (-7/+7)" if groc_sessao_int is not None else f"{ganho_sane_sessao:+.0f}% vs Base",
+        f"{sane_sessao:.0f}%" if np.isfinite(sane_sessao) else "Não avaliado",
+        f"GROC: {groc_sessao_int:+d} (-7/+7)" if groc_sessao_int is not None else f"{ganho_sane_sessao:+.0f}% vs Base" if np.isfinite(ganho_sane_sessao) else None,
         delta_color="normal" if pass_bool else "off"
     )
 
-    if bool(ultima.get("Registro_Bilateral")):
+    if ultima.get("Registro_Bilateral") == True:
         with st.container(border=True):
             st.caption("🦵 COMPARATIVO BILATERAL DA SESSÃO SELECIONADA (DIREITO × ESQUERDO)")
             cb1, cb2, cb3, cb4 = st.columns(4)
-            cb1.metric("EVA (Dir | Esq)", f"{ultima.get('Dor_Dir', 0)}/10 | {ultima.get('Dor_Esq', 0)}/10")
-            cb2.metric("Flexão (Dir | Esq)", f"{ultima.get('Flexao_Dir', 90)}° | {ultima.get('Flexao_Esq', 90)}°")
+            cb1.metric("EVA (Dir | Esq)", f"{ultima.get('Dor_Dir') if pd.notna(ultima.get('Dor_Dir')) else '—'}/10 | {ultima.get('Dor_Esq') if pd.notna(ultima.get('Dor_Esq')) else '—'}/10")
+            cb2.metric("Flexão (Dir | Esq)", f"{ultima.get('Flexao_Dir') if pd.notna(ultima.get('Flexao_Dir')) else '—'}° | {ultima.get('Flexao_Esq') if pd.notna(ultima.get('Flexao_Esq')) else '—'}°")
             cb3.metric("Extensão (Dir | Esq)", f"{ultima.get('Extensao_Dir', '-')} | {ultima.get('Extensao_Esq', '-')}")
             cb4.metric("Derrame (Dir | Esq)", f"{ultima.get('Inchaco_Dir', '-')} | {ultima.get('Inchaco_Esq', '-')}")
 
     with st.container(border=True):
         c_prog1, c_prog2 = st.columns(2, gap="large")
         with c_prog1:
-            st.markdown(f"**🎯 Tolerância sem Dor nos Movimentos Alvo: {tol_atual:.0f}%** *(Meta PBE: ≥ 90%)*")
-            st.progress(min(max(tol_atual / 100.0, 0.0), 1.0))
+            if pd.notna(tol_atual):
+                st.markdown(f"**Tolerância nos gestos avaliados: {tol_atual:.0f}%**")
+                st.progress(tol_atual / 100)
+            st.caption("Cada gesto realizado pontua 10 menos a dor. Incapaz pontua zero. A média é apresentada em percentual.")
         with c_prog2:
-            st.markdown(
-                f"**🏆 Progresso rumo ao Objetivo do Paciente (SANE): {sane_sessao:.0f}%** "
-                f"*(Faltam {dist_meta_sessao:.0f}% para a meta · GROC (-7 a +7): {f'{groc_sessao_int:+d}' if groc_sessao_int is not None else 'N/D'})*"
-            )
-            st.progress(min(max(sane_sessao / 100.0, 0.0), 1.0))
+            if np.isfinite(sane_sessao):
+                st.markdown(
+                    f"**🏆 Progresso rumo ao Objetivo do Paciente (SANE): {sane_sessao:.0f}%** "
+                    f"*(Faltam {dist_meta_sessao:.0f}% para a meta · GROC (-7 a +7): {f'{groc_sessao_int:+d}' if groc_sessao_int is not None else 'N/D'})*"
+                )
+                st.progress(min(max(sane_sessao / 100.0, 0.0), 1.0))
+            else:
+                st.caption("SANE não registrado na sessão.")
 
     # ============================================================
     # 4. NAVEGAÇÃO ANALÍTICA EM 3 ABAS
@@ -692,11 +636,11 @@ def render():
         with st.container(border=True):
             secao(
                 f"📊 Curva de Resposta Terapêutica: Dor (EVA) × Tolerância Funcional (Últimas {len(df_janela)} sessões)",
-                "A faixa verde (EVA ≤ 3) delimita a zona de carga segura (Silbernagel et al., 2007). O cruzamento das curvas confirma ganho real de função."
+                "A curva de tolerância resume os gestos avaliados em cada sessão."
             )
 
             fig1, ax1 = plt.subplots(figsize=(10, 4.0), dpi=120)
-            ax1.axhspan(0, 3.0, color=CORES_GENUA['alerta_sucesso'], alpha=0.07, label="Zona de Carga Segura (EVA ≤ 3)")
+            ax1.axhspan(0, 3.0, color=CORES_GENUA['alerta_sucesso'], alpha=0.07, label="EVA ≤ 3")
 
             cor_dor = CORES_GENUA['alerta_erro']
             ax1.plot(
@@ -713,59 +657,28 @@ def render():
             ax1.set_ylabel("Dor (EVA 0-10)", color=cor_dor, fontweight='600')
             ax1.set_ylim(-0.5, 10.5)
 
-            cor_func = CORES_GENUA['alerta_sucesso']
-            ax1b = ax1.twinx()
-            ax1b.grid(False)
-            func_plot = df_janela['Func_Score'].interpolate() if df_janela['Func_Score'].notna().sum() > 1 else df_janela['Func_Score']
-            ax1b.plot(
-                df_janela['Sessão_Num'], func_plot,
-                color=cor_func, marker='s', markersize=6.5, lw=2.6,
-                linestyle='--', label="Tolerância Funcional (0-10)", zorder=3
-            )
-            ax1b.set_ylabel("Função nos Testes (0-10)", color=cor_func, fontweight='600')
-            ax1b.set_ylim(-0.5, 10.5)
-
-            ax1.spines['top'].set_visible(False)
-            ax1b.spines['top'].set_visible(False)
-            plt.setp(ax1.get_xticklabels(), rotation=25, ha='right', fontsize=9)
-
-            lines1, labels1 = ax1.get_legend_handles_labels()
-            lines2, labels2 = ax1b.get_legend_handles_labels()
-            ax1.legend(
-                lines1 + lines2, labels1 + labels2,
-                loc='upper center', bbox_to_anchor=(0.5, 1.16),
-                ncol=3, frameon=False, fontsize=8.8
-            )
-
+            ax_tol = ax1.twinx()
+            ax_tol.grid(False)
+            ax_tol.plot(df_janela["Sessão_Num"], df_janela["Tolerancia"], color=CORES_GENUA["secundaria"],
+                        marker="s", linestyle="--", label="Tolerância nos gestos (%)")
+            ax_tol.set_ylabel("Tolerância nos gestos (%)")
+            ax_tol.set_ylim(-5, 105)
+            linhas, nomes = ax1.get_legend_handles_labels()
+            ax1.legend(linhas + ax_tol.lines[:], nomes + ["Tolerância nos gestos (%)"], fontsize=8)
             fig1.tight_layout()
             st.pyplot(fig1)
             plt.close(fig1)
 
-            if testes_nomes:
-                st.markdown("<hr style='margin: 14px 0;'>", unsafe_allow_html=True)
-                st.markdown("**🎯 Matriz de Evolução por Movimento Alvo (1ª Sessão → Sessão Selecionada)**")
-                cols_t = st.columns(min(len(testes_nomes), 3))
-                for idx_t, teste_nome in enumerate(sorted(testes_nomes)):
-                    valores_teste = []
-                    for _, row in df_p.loc[:idx_sel].iterrows():
-                        testes = row.get('Testes_Funcionais', {})
-                        testes_num_r = row.get('Testes_Funcionais_Dor_Num', {})
-                        if isinstance(testes, dict) and teste_nome in testes:
-                            resp_str = testes.get(teste_nome, "—")
-                            nota_exata = testes_num_r.get(teste_nome) if isinstance(testes_num_r, dict) else None
-                            if nota_exata is not None and "Incapaz" not in str(resp_str):
-                                valores_teste.append((f"Dor {int(float(nota_exata))}/10", _score_funcional_item(resp_str, nota_exata)))
-                            else:
-                                valores_teste.append((resp_str, _score_funcional_item(resp_str)))
-                    if valores_teste:
-                        primeira_txt, sc_ini = valores_teste[0]
-                        ultima_txt, sc_fim = valores_teste[-1]
-                        sc_ini = sc_ini or 0
-                        sc_fim = sc_fim or 0
-                        badge = "🟢 Melhorou" if sc_fim > sc_ini else ("🔴 Piorou" if sc_fim < sc_ini else "⚪ Estável")
-                        with cols_t[idx_t % len(cols_t)]:
-                            st.caption(f"🏃 {teste_nome.upper()} · {badge}")
-                            st.markdown(f"`{primeira_txt}` ➔ **`{ultima_txt}`**")
+            historico_gestos = {}
+            for sessao, medidas in zip(df_p["Sessão_Num"], gestos):
+                for nome, (_, descricao) in medidas.items():
+                    historico_gestos.setdefault(nome, []).append(f"{sessao} · {descricao}")
+            if historico_gestos:
+                st.markdown("**Evolução por movimento alvo**")
+                tabela = [{"Movimento": nome, "Primeiro registro": serie[0],
+                           "Último registro": serie[-1] if len(serie) > 1 else "Registro único"}
+                          for nome, serie in historico_gestos.items()]
+                st.dataframe(tabela, hide_index=True, width="stretch")
 
         with st.container(border=True):
             secao(
@@ -798,7 +711,7 @@ def render():
                     ax_r2.scatter(
                         i_s, row_s['Dor'], color=CORES_GENUA['alerta_aviso'],
                         s=160, zorder=6, edgecolors='#1D1D1F', linewidth=1.5,
-                        label="🌙 Sono Ruim / Acordou c/ Dor" if not legenda_sono_adicionada else "_nolegend_"
+                        label="Sono Ruim / Acordou c/ Dor" if not legenda_sono_adicionada else "_nolegend_"
                     )
                     legenda_sono_adicionada = True
             ax_r2.set_ylabel("Dor (EVA 0-10)", color=CORES_GENUA['alerta_erro'], fontweight='600')
@@ -954,7 +867,8 @@ def render():
             )
 
             ax_s.axhline(y=85, color=CORES_GENUA['alerta_sucesso'], linestyle=':', lw=1.5, alpha=0.85, label="Critério de Alta (85%)")
-            ax_s.axhline(y=sane_base_av, color=CORES_GENUA['texto_suave'], linestyle=':', lw=1.1, alpha=0.6, label=f"Marco Zero ({sane_base_av:.0f}%)")
+            if np.isfinite(sane_base_av):
+                ax_s.axhline(y=sane_base_av, color=CORES_GENUA['texto_suave'], linestyle=':', lw=1.1, alpha=0.6, label=f"Marco Zero ({sane_base_av:.0f}%)")
 
             ax_s.set_xticks(x_prog)
             labels_eixo_x = [
@@ -977,7 +891,9 @@ def render():
             st.pyplot(fig_sane)
             plt.close(fig_sane)
 
-            if prog_data["status"] == "acima":
+            if prog_data["status"] == "incompleto":
+                st.info(prog_data["resumo"])
+            elif prog_data["status"] == "acima":
                 st.success(f"{prog_data['cor']} **PROGNÓSTICO ACIMA DO ESPERADO** — {prog_data['resumo']}")
             elif prog_data["status"] == "dentro":
                 st.info(f"{prog_data['cor']} **DENTRO DA CURVA PROGNÓSTICA PBE** — {prog_data['resumo']}")
@@ -1000,14 +916,14 @@ def render():
             crit_sane_pass = (sane_sessao >= 85.0 and pass_bool)
 
             criterios_lista = [
-                ("1. Controle Álgico (EVA ≤ 2/10)", crit_dor, f"Atual: {dor_atual}/10", "Salaffi 2004"),
-                ("2. Efusão Articular Controlada (Grau ≤ 1/3)", crit_derrame, f"Atual: Grau {inchaco_atual}/3", "Stroke Test PBE"),
+                ("1. Controle Álgico (EVA ≤ 2/10)", crit_dor, f"Atual: {dor_atual}/10" if pd.notna(dor_atual) else "Não avaliado", "Salaffi 2004"),
+                ("2. Efusão Articular Controlada (Grau ≤ 1/3)", crit_derrame, f"Atual: Grau {inchaco_atual}/3" if pd.notna(inchaco_atual) else "Não avaliado", "Stroke Test PBE"),
                 ("3. Extensão Terminal Completa (0°)", crit_ext, f"Atual: {ext_str}", "Shelbourne 1997"),
-                ("4. Amplitude de Flexão Funcional (≥ 125°)", crit_flex, f"Atual: {flex_atual:.0f}°", "Diretriz Pós-Op Joelho"),
+                ("4. Amplitude de Flexão Funcional (≥ 125°)", crit_flex, f"Atual: {flex_atual:.0f}°" if pd.notna(flex_atual) else "Não avaliado", "Diretriz Pós-Op Joelho"),
                 (
                     "5. Simetria de Força de Quadríceps (LSI ≥ 90%)",
                     crit_lsi,
-                    f"Atual: {f'{lsi_quad_num:.0f}% (Dinamometria kgf)' if (usa_dinamometria and lsi_quad_num is not None) else 'Opcional / Aguardando Dinamometria'}",
+                    f"Atual: {f'{lsi_quad_num:g}% (Dinamometria kgf)' if (usa_dinamometria and lsi_quad_num is not None) else 'Opcional / Aguardando Dinamometria'}",
                     "Grindem 2016"
                 ),
                 ("6. Meta Subjetiva Atingida (SANE ≥ 85% + PASS Sim)", crit_sane_pass, f"SANE: {sane_sessao:.0f}% | PASS: {'Sim' if pass_bool else 'Não'}", "Shelbourne 2009 / Tubach 2005"),
@@ -1037,7 +953,7 @@ def render():
         with st.container(border=True):
             try:
                 with st.spinner("🧠 Executando análise clínica baseada em evidência..."):
-                    insights = analisar_paciente(st.session_state.paciente)
+                    insights = analisar_paciente(p_sel, df_p, pd.DataFrame([av_p]) if tem_av else pd.DataFrame())
                 renderizar_insights(insights, CORES_GENUA)
             except Exception as e:
                 toast(f"Erro ao gerar insights: {e}", "error")
@@ -1103,7 +1019,7 @@ def render():
 
                     historico = df_p.loc[:idx_sel].to_dict("records")
 
-                    insights_l = _analisar(st.session_state.paciente)
+                    insights_l = _analisar(p_sel, df_p, pd.DataFrame([av_p]) if tem_av else pd.DataFrame())
                     fenotipo_l = _normalizar(dados_aval.get('Diagnostico_Clinico', '') if dados_aval.get('Diagnostico_Clinico') else texto_fenotipo_busca)
 
                     laudo_html = gerar_laudo_html(

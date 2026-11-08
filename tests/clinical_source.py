@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 import types
+from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto
 import numpy as np
 import pandas as pd
 
@@ -24,7 +25,8 @@ def execute(nodes, namespace, filename):
 
 
 def load(filename):
-    namespace = dict(pd=pd, np=np, re=re, datetime=datetime)
+    namespace = dict(pd=pd, np=np, re=re, datetime=datetime, lados_dinamometria=lados_dinamometria,
+                     lsi_dinamometria=lsi_dinamometria, nota_dor_gesto=nota_dor_gesto)
     nodes = []
     for node in tree(filename).body:
         if isinstance(node, ast.FunctionDef):
@@ -86,5 +88,6 @@ def evaluation_assignment(name, **inputs):
     nodes = [n for n in ast.walk(tree(filename)) if isinstance(n, ast.Assign)
              and any(isinstance(t, ast.Name) and t.id == name for t in n.targets)]
     assert len(nodes) == 1, name
+    inputs["lsi_dinamometria"] = lsi_dinamometria
     execute(nodes, inputs, filename)
     return inputs[name]

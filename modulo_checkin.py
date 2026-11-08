@@ -1,5 +1,5 @@
 """GENUA | Módulo 2: Check-in Diário (O Mutante) — Estilo Apple HIG."""
-from services.patient_context import preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
+from services.patient_context import gravar_documento, preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
 import hashlib
 import json
 from datetime import datetime
@@ -115,7 +115,7 @@ def _categoria_antiga_para_dor_num(valor_salvo) -> tuple:
         return 5, False
     if "Leve" in s:
         return 2, False
-    return 0, False
+    return (0, False) if "Sem Dor" in s else (None, False)
 
 
 @st.fragment(run_every="5s")
@@ -136,17 +136,13 @@ def _fragmento_autosave_checkin():
 
     if hash_atual != ultimo_hash:
         try:
-            doc_id = st.session_state.get("doc_id_checkin")
-            if doc_id:
-                db.collection("Evolucao").document(doc_id).set(payload, merge=True)
-            else:
-                _, doc_ref = db.collection("Evolucao").add(payload)
-                st.session_state.doc_id_checkin = doc_ref.id
+            gravar_documento(db, "Evolucao", st.session_state, "doc_id_checkin", payload)
             invalidar_cache("Evolucao")
             st.session_state["_ultimo_hash_autosave_chk"] = hash_atual
             st.session_state["_horario_autosave_chk"] = datetime.now().strftime("%H:%M:%S")
         except Exception:
-            pass
+            st.caption("Falha ao salvar o check-in. Alterações pendentes.")
+            return
 
     hora = st.session_state.get("_horario_autosave_chk")
     if hora:
@@ -181,7 +177,7 @@ def render():
                 row_dict = row.dropna().to_dict()
                 doc_id = row_dict.pop("_doc_id", None)
                 if doc_id:
-                    sessoes_existentes.append({"id": doc_id, "data": row_dict})
+                    sessoes_existentes.append({"id": doc_id, "versao": row_dict.pop("_versao"), "data": row_dict})
             sessoes_existentes.sort(
                 key=lambda x: _parse_data_segura(x["data"].get("Data", "2000-01-01")),
                 reverse=True,
@@ -193,13 +189,13 @@ def render():
         col_modo1, col_modo2 = st.columns([2.5, 1])
         with col_modo1:
             if sessoes_existentes:
-                opcoes = ["➕ Nova Sessão"] + [
-                    f"✏️ {s['data'].get('Data', '?')} — Dor: {s['data'].get('Dor', '?')}/10 | Flexão: {s['data'].get('Flexao', '?')}°"
-                    for s in sessoes_existentes
-                ]
+                registros = {item["id"]: item for item in sessoes_existentes}
+                rotulos = {s["id"]: f"✏️ {s['data'].get('Data', '?')} — Dor: {s['data'].get('Dor', '?')}/10 | Flexão: {s['data'].get('Flexao', '?')}°" for s in sessoes_existentes}
+                opcoes = ["➕ Nova Sessão", *registros]
                 escolha = st.selectbox(
                     "🎯 Modo de Registro:",
                     opcoes,
+                    format_func=lambda item: rotulos.get(item, item),
                     key="seletor_checkin",
                     help="Crie uma nova sessão para hoje ou selecione uma sessão anterior para corrigir.",
                 )
@@ -212,16 +208,17 @@ def render():
             if sessoes_existentes and escolha != "➕ Nova Sessão":
                 st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
                 if st.button("🗑️ Excluir Sessão", type="secondary", width="stretch"):
-                    st.session_state["confirmar_exclusao_chk"] = True
+                    st.session_state["confirmar_exclusao_chk"] = escolha
 
+        if st.session_state.get("confirmar_exclusao_chk") != escolha:
+            st.session_state.pop("confirmar_exclusao_chk", None)
         if st.session_state.get("confirmar_exclusao_chk"):
             st.warning("⚠️ Tem certeza? Esta sessão será removida do histórico permanentemente.")
             cc1, cc2, _ = st.columns([1, 1, 2])
             with cc1:
                 if st.button("✅ Sim, excluir", type="primary", key="conf_del_chk", width="stretch"):
                     try:
-                        idx = opcoes.index(escolha) - 1
-                        doc_id = sessoes_existentes[idx]["id"]
+                        doc_id = escolha
                         db.collection("Evolucao").document(doc_id).delete()
                         invalidar_cache("Evolucao")
                         st.session_state["confirmar_exclusao_chk"] = False
@@ -242,9 +239,11 @@ def render():
         st.session_state["_ultima_escolha_chk"] = "➕ Nova Sessão"
         dados = {}
     else:
-        idx = opcoes.index(escolha) - 1
-        st.session_state.dados_checkin_antigos = sessoes_existentes[idx]["data"]
-        st.session_state.doc_id_checkin = sessoes_existentes[idx]["id"]
+        registro = registros[escolha]
+        if st.session_state.get("_ultima_escolha_chk") != escolha:
+            st.session_state.setdefault("doc_id_checkin_versoes", {})[escolha] = registro["versao"]
+        st.session_state.dados_checkin_antigos = registro["data"]
+        st.session_state.doc_id_checkin = registro["id"]
         st.session_state["_ultima_escolha_chk"] = escolha
         st.session_state["autosave_checkin_ativo"] = True
         dados = st.session_state.dados_checkin_antigos
@@ -264,10 +263,14 @@ def render():
         df_aval = conn.read_paciente("Avaliacao_Inicial", st.session_state.paciente)
         if not df_aval.empty:
             lista_aval = df_aval.to_dict("records")
-            ultima_aval = sorted(
+            if modo_edicao_chk and dados.get("Data"):
+                data_registro = _parse_data_segura(dados["Data"])
+                lista_aval = [av for av in lista_aval if _parse_data_segura(av.get("Data_Avaliacao")) <= data_registro]
+            ultima_aval = max(
                 lista_aval,
                 key=lambda x: _parse_data_segura(x.get("Data_Avaliacao", "01/01/2000")),
-            )[-1]
+                default={},
+            )
 
             fenotipo_avaliacao = str(ultima_aval.get("Fenotipo_Clinico", "") or "")
             testes_salvos = ultima_aval.get("Testes_Alvo")
@@ -511,7 +514,7 @@ def render():
         testes_antigos_dict = dados.get("Testes_Funcionais", {}) if (modo_edicao_chk and isinstance(dados.get("Testes_Funcionais"), dict)) else {}
         testes_num_antigos = dados.get("Testes_Funcionais_Dor_Num", {}) if (modo_edicao_chk and isinstance(dados.get("Testes_Funcionais_Dor_Num"), dict)) else {}
 
-        default_ativos_hoje = list(testes_antigos_dict.keys()) if modo_edicao_chk and testes_antigos_dict else testes_da_avaliacao
+        default_ativos_hoje = list(dict.fromkeys([*testes_antigos_dict, *testes_num_antigos])) if modo_edicao_chk else testes_da_avaliacao
         for t_custom in default_ativos_hoje:
             if t_custom not in catalogo_testes_chk:
                 catalogo_testes_chk.append(t_custom)
@@ -521,7 +524,7 @@ def render():
             options=catalogo_testes_chk,
             default=default_ativos_hoje,
             help="Em Pós-Operatório imediato, você pode deixar apenas Marcha/Extensão ou deixar vazio se nenhum teste funcional de carga for realizado.",
-            key=chave_widget(st.session_state, 'checkin:testes_ativos_hoje'),
+            key=chave_widget(st.session_state, f'checkin:{escolha}:testes_ativos_hoje'),
         )
         resultados_testes = {}
         resultados_testes_num = {}
@@ -530,35 +533,36 @@ def render():
             st.info("🛡️ Nenhum teste funcional de carga selecionado para hoje (Modo Pós-Operatório / Proteção Tecidual).")
         else:
             st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-            for i, teste in enumerate(testes_ativos_hoje):
-                if teste in testes_num_antigos:
-                    val_dor_init = int(float(testes_num_antigos[teste]))
-                    incapaz_init = "Incapaz" in str(testes_antigos_dict.get(teste, ""))
-                elif teste in testes_antigos_dict:
-                    val_dor_init, incapaz_init = _categoria_antiga_para_dor_num(testes_antigos_dict[teste])
+            for teste in testes_ativos_hoje:
+                chave = chave_widget(st.session_state, f"checkin:{escolha}:{teste}")
+                categoria = testes_antigos_dict.get(teste)
+                valor_antigo = testes_num_antigos.get(teste)
+                inicial, incapaz_init = _categoria_antiga_para_dor_num(categoria)
+                sem_medida = categoria in ("Não testado", "Não Aplicável (Fase Pós-Op)", "Dor não informada")
+                if sem_medida:
+                    if not st.checkbox(f"{teste} · {categoria}. Registrar medida?", key=chave + ":medir"):
+                        resultados_testes[teste] = categoria
+                        continue
+                if valor_antigo is not None:
+                    try:
+                        inicial = min(10, max(0, int(float(valor_antigo))))
+                    except (ValueError, TypeError, OverflowError):
+                        pass
+                col_dor, col_execucao = st.columns([3.2, 1.0], vertical_alignment="center")
+                incapaz = col_execucao.checkbox("Incapaz / Não realiza", value=incapaz_init, key=chave + ":incapaz")
+                dor = col_dor.slider(
+                    f"🏃 **{teste}** — Dor durante o movimento (0 = Sem Dor | 10 = Dor Máxima)",
+                    0, 10, value=inicial or 0, disabled=incapaz, key=chave + ":dor",
+                )
+                if categoria is not None and not sem_medida and incapaz == incapaz_init and dor == (inicial or 0):
+                    # Editar outro campo não deve converter uma faixa antiga em nota exata.
+                    resultados_testes[teste] = categoria
+                    if valor_antigo is not None:
+                        resultados_testes_num[teste] = valor_antigo
                 else:
-                    val_dor_init, incapaz_init = 0, False
-
-                c_sl, c_inc = st.columns([3.2, 1.0], vertical_alignment="center")
-                with c_inc:
-                    nao_realiza = st.checkbox(
-                        "Incapaz / Não realiza",
-                        value=incapaz_init,
-                        key=f"chk_inc_{i}_{teste}",
-                    )
-                with c_sl:
-                    dor_teste = st.slider(
-                        f"🏃 **{teste}** — Dor durante o movimento (0 = Sem Dor | 10 = Dor Máxima)",
-                        min_value=0,
-                        max_value=10,
-                        value=val_dor_init,
-                        disabled=nao_realiza,
-                        key=f"chk_slider_dor_{i}_{teste}",
-                    )
-
-                cat_compat = _dor_num_para_categoria_compat(dor_teste, incapaz=nao_realiza)
-                resultados_testes[teste] = cat_compat
-                resultados_testes_num[teste] = 10 if nao_realiza else dor_teste
+                    resultados_testes[teste] = _dor_num_para_categoria_compat(dor, incapaz=incapaz)
+                    if not incapaz:
+                        resultados_testes_num[teste] = dor
 
     # ============================================================
     # 5. CARD PBE: ESCALA GROC (-7 a +7), SATISFAÇÃO (PASS) E SANE (SEM PSFS)
@@ -661,8 +665,6 @@ def render():
     # ============================================================
     # 6. PAYLOAD DA SESSÃO, AUTO-SAVE E BOTÃO DE REGISTRO
     # ============================================================
-    texto_agachamento = list(resultados_testes.values())[0] if resultados_testes else "Não testado"
-
     dados_sessao = {
         "Data": data_sessao.strftime("%Y-%m-%d"),
         "Paciente": st.session_state.paciente,
@@ -674,7 +676,7 @@ def render():
         "Sono": sono_atual,
         "Testes_Funcionais": resultados_testes,
         "Testes_Funcionais_Dor_Num": resultados_testes_num,
-        "Agachamento": texto_agachamento,
+        "Agachamento": resultados_testes.get("Agachamento Bipodal", "Não testado"),
         "Registro_Bilateral": eh_bilateral_chk,
         "Lado_Referencia": lado_acometido_base,
         "Dor_Dir": dor_d,
@@ -709,16 +711,10 @@ def render():
             return
         with st.spinner("Sincronizando sessão com a nuvem..."):
             try:
-                if st.session_state.get("doc_id_checkin"):
-                    db.collection("Evolucao").document(st.session_state.doc_id_checkin).set(dados_sessao, merge=True)
-                    invalidar_cache("Evolucao")
-                    toast("Sessão atualizada com sucesso!", "success")
-                else:
-                    _, novo_chk_ref = db.collection("Evolucao").add(dados_sessao)
-                    st.session_state.doc_id_checkin = novo_chk_ref.id
-                    st.session_state["autosave_checkin_ativo"] = True
-                    invalidar_cache("Evolucao")
-                    toast("Check-in diário registrado com sucesso! Auto-save ativado para edições.", "success")
+                gravar_documento(db, "Evolucao", st.session_state, "doc_id_checkin", dados_sessao)
+                st.session_state["autosave_checkin_ativo"] = True
+                invalidar_cache("Evolucao")
+                toast("Check-in salvo com sucesso.", "success")
             except Exception as e:
                 toast(f"Erro ao guardar os dados: {e}", "error")
 

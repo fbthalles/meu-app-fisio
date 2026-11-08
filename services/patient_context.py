@@ -41,3 +41,29 @@ def payload_do_paciente_ativo(payload, estado):
 def chave_widget(estado, campo):
     """IDs de widgets sem chave original mudam a cada troca de prontuário."""
     return f"clinico:{estado['_contexto_widgets']}:{campo}"
+
+
+def gravar_documento(db, colecao, estado, chave_id, dados):
+    """Reserva a identidade antes da escrita para uma repetição usar o mesmo documento."""
+    doc_id = estado.get(chave_id) or dados.get("Sessao_ID") or secrets.token_hex(16)
+    estado[chave_id] = doc_id
+    from google.api_core.datetime_helpers import DatetimeWithNanoseconds
+    from google.api_core.exceptions import AlreadyExists, FailedPrecondition
+
+    ref = db.collection(colecao).document(doc_id)
+    versoes = estado.setdefault(chave_id + "_versoes", {})
+    versao = versoes.get(doc_id)
+    try:
+        if versao:
+            instante = DatetimeWithNanoseconds.from_rfc3339(versao)
+            gravacao = ref.update(dados, option=db.write_option(last_update_time=instante))
+        else:
+            gravacao = ref.create(dados)
+        versoes[doc_id] = gravacao.update_time.rfc3339()
+    except (AlreadyExists, FailedPrecondition):
+        atual = ref.get()
+        registro = atual.to_dict() or {}
+        if atual.exists and all(registro.get(k) == v for k, v in dados.items()):
+            versoes[doc_id] = atual.update_time.rfc3339()
+            return
+        raise ValueError("O registro mudou em outra sessão. Reabra a ficha antes de salvar.")

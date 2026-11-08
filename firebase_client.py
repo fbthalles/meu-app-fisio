@@ -3,9 +3,11 @@
 Performance: leituras passam por @st.cache_data com TTL de 60s.
 Após qualquer escrita, o cache da coleção afetada é invalidado.
 """
+import os
 import re
 import json
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -13,13 +15,21 @@ from firebase_admin import credentials, firestore
 # ============================================================
 # INICIALIZAÇÃO DO FIREBASE (com autocura de credenciais)
 # ============================================================
-if not firebase_admin._apps:
+def _cliente_firebase():
+    if firebase_admin._apps:
+        return firestore.client()
+
     try:
-        cred_dict = json.loads(st.secrets["FIREBASE_JSON"])
-    except Exception:
+        raw_text = st.secrets["FIREBASE_JSON"]
+    except (StreamlitSecretNotFoundError, KeyError):
+        st.warning("Para acessar os dados clínicos, configure FIREBASE_JSON em .streamlit/secrets.toml e recarregue o GENUA.")
+        st.stop()
+
+    try:
+        cred_dict = json.loads(raw_text)
+    except json.JSONDecodeError:
         # Autocura: se houver quebras de linha corrompidas no Secrets,
         # reconstrói o dicionário nativamente.
-        raw_text = st.secrets["FIREBASE_JSON"]
         proj_id_match = re.search(r'"project_id":\s*"([^"]+)"', raw_text)
         email_match = re.search(r'"client_email":\s*"([^"]+)"', raw_text)
         pk_match = re.search(r'"private_key":\s*"(.*?)"', raw_text, re.DOTALL)
@@ -42,7 +52,22 @@ if not firebase_admin._apps:
     cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
 
-db = firestore.client()
+    return firestore.client()
+
+
+try:
+    emulador_ativo = st.secrets.get("GENUA_EMULADOR", False)
+except StreamlitSecretNotFoundError:
+    emulador_ativo = False
+
+if emulador_ativo:
+    from google.auth.credentials import AnonymousCredentials
+    from google.cloud.firestore import Client
+
+    os.environ["FIRESTORE_EMULATOR_HOST"] = "127.0.0.1:8080"
+    db = Client(project="demo-genua", credentials=AnonymousCredentials())
+else:
+    db = _cliente_firebase()
 
 
 # ============================================================
@@ -60,7 +85,7 @@ def _ler_colecao_cached(worksheet: str) -> pd.DataFrame:
 def _ler_paciente_cached(worksheet: str, paciente: str) -> pd.DataFrame:
     """Lê documentos de uma coleção filtrados por paciente. Cache de 60s."""
     docs = db.collection(worksheet).where("Paciente", "==", paciente).stream()
-    dados = [{**d.to_dict(), "_doc_id": d.id} for d in docs]
+    dados = [{**d.to_dict(), "_doc_id": d.id, "_versao": d.update_time.rfc3339()} for d in docs]
     return pd.DataFrame(dados) if dados else pd.DataFrame()
 
 
@@ -90,7 +115,12 @@ class FirebaseAdapter:
     def update(self, worksheet: str = "Evolucao", data: pd.DataFrame = None):
         """Insere o último registro do DataFrame e invalida o cache."""
         novo_registro = data.iloc[-1].dropna().to_dict()
-        db.collection(worksheet).add(novo_registro)
+        colecao = db.collection(worksheet)
+        doc_id = novo_registro.pop("_doc_id", None) or novo_registro.get("Sessao_ID")
+        if doc_id:
+            colecao.document(doc_id).set(novo_registro, merge=True)
+        else:
+            colecao.add(novo_registro)
         invalidar_cache(worksheet)
 
 

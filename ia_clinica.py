@@ -338,6 +338,8 @@ def calcular_lsi(
         classificacao = "alta_funcional"
         cor = "🟢"
         acao = f"Simetria de Quadríceps adequada ({lado_lesado:.1f} vs {lado_saudavel:.1f} kgf · LSI {lsi:.0f}%)."
+        if lsi > 100:
+            acao = f"Quadríceps: lado avaliado {lado_lesado:g} kgf, referência {lado_saudavel:g} kgf (LSI {lsi:g}%)."
     elif lsi >= LSI_ATENCAO:
         classificacao = "atencao"
         cor = "🟡"
@@ -385,9 +387,9 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
     if objetivo == "Não relatado":
         objetivo = "Não especificado"
 
-    sane_base = _sane_valido(avaliacao.get("SANE_Baseline_Pct"))
+    sane_base = _sane_valido(avaliacao.get("SANE_Baseline_Pct"), None)
 
-    sane_atual = sane_base
+    sane_atual = None
     groc_score = None
     groc_label = "Não registrado"
     pass_atingido = None
@@ -397,9 +399,9 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
         ultima_sessao = df_evo.iloc[-1]
         if "SANE_Pct" in df_evo.columns and pd.notna(ultima_sessao.get("SANE_Pct")):
             try:
-                sane_atual = _sane_valido(ultima_sessao.get("SANE_Pct"), sane_base)
+                sane_atual = _sane_valido(ultima_sessao.get("SANE_Pct"), None)
             except (ValueError, TypeError):
-                sane_atual = sane_base
+                sane_atual = None
 
         if "GROC_Score" in df_evo.columns and pd.notna(ultima_sessao.get("GROC_Score")):
             try:
@@ -422,10 +424,10 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
             if pass_atingido is None:
                 pass_atingido = pass_label.startswith("👍") or "sim" in pass_label.lower()
 
-    distancia_meta = max(0.0, 100.0 - sane_atual)
-    ganho_sane = sane_atual - sane_base
+    distancia_meta = 100.0 - sane_atual if sane_atual is not None else None
+    ganho_sane = sane_atual - sane_base if None not in (sane_atual, sane_base) else None
 
-    if pass_atingido is True and (groc_score is not None and groc_score >= 3) and sane_atual >= 85:
+    if pass_atingido is True and (groc_score is not None and groc_score >= 3) and sane_atual is not None and sane_atual >= 85:
         status = "meta_atingida"
         cor = "🟢"
         parecer = (
@@ -439,13 +441,15 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
             f"Percepção de piora clínica relatada na escala GROC ({groc_score:+d} em -7/+7). "
             f"Reavaliar carga recente, expectativas e barreiras biopsicossociais."
         )
-    elif pass_atingido is False and ganho_sane >= 15.0:
+    elif pass_atingido is False and ganho_sane is not None and ganho_sane >= 15.0:
         status = "evoluindo_insatisfeito"
         cor = "🟡"
         parecer = (
             f"Ganho funcional relevante de +{ganho_sane:.0f}% no SANE (faltam {distancia_meta:.0f}% para a meta), "
             f"porém paciente ainda reporta PASS negativo (insatisfeito com o estado atual). Manter progressão."
         )
+    elif ganho_sane is None:
+        status, cor, parecer = "incompleto", "⚪", "SANE incompleto para comparar com o marco zero."
     else:
         status = "em_construcao"
         cor = "🔵"
@@ -456,10 +460,10 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
 
     return {
         "objetivo": objetivo,
-        "sane_baseline": round(sane_base, 1),
-        "sane_atual": round(sane_atual, 1),
-        "ganho_sane": round(ganho_sane, 1),
-        "distancia_meta": round(distancia_meta, 1),
+        "sane_baseline": round(sane_base, 1) if sane_base is not None else None,
+        "sane_atual": round(sane_atual, 1) if sane_atual is not None else None,
+        "ganho_sane": round(ganho_sane, 1) if ganho_sane is not None else None,
+        "distancia_meta": round(distancia_meta, 1) if distancia_meta is not None else None,
         "groc_score": groc_score,
         "groc_label": groc_label,
         "pass_atingido": pass_atingido,
@@ -538,7 +542,7 @@ def analisar_bandeiras(avaliacao: dict) -> list:
 # ============================================================
 # FUNÇÃO 5 (ORQUESTRADORA): analisar_paciente
 # ============================================================
-def analisar_paciente(paciente_nome: str) -> dict:
+def analisar_paciente(paciente_nome: str, sessoes=None, avaliacoes=None) -> dict:
     """Busca todos os dados do paciente no Firestore e retorna o diagnóstico analítico auditável."""
     resultado = {
         "paciente": paciente_nome,
@@ -564,13 +568,13 @@ def analisar_paciente(paciente_nome: str) -> dict:
         resultado["fenotipo"] = normalizar_diagnostico("")
 
     try:
-        df_evo = conn.read_paciente("Evolucao", paciente_nome)
+        df_evo = sessoes.copy() if sessoes is not None else conn.read_paciente("Evolucao", paciente_nome)
     except Exception:
         df_evo = pd.DataFrame()
 
     if not df_evo.empty:
-        if "Data" in df_evo.columns:
-            df_evo["_Data_dt"] = pd.to_datetime(df_evo["Data"], format="mixed", errors="coerce")
+        if sessoes is None and "Data" in df_evo.columns:
+            df_evo["_Data_dt"] = pd.to_datetime(df_evo["Data"], format="mixed", dayfirst=True, errors="coerce")
             df_evo = df_evo.sort_values("_Data_dt")
 
         resultado["sessoes_registradas"] = len(df_evo)
@@ -581,7 +585,7 @@ def analisar_paciente(paciente_nome: str) -> dict:
                 resultado["estagnacao"] = analisar_estagnacao(historico_dor, "Dor")
 
     try:
-        df_aval = conn.read_paciente("Avaliacao_Inicial", paciente_nome)
+        df_aval = avaliacoes.copy() if avaliacoes is not None else conn.read_paciente("Avaliacao_Inicial", paciente_nome)
     except Exception:
         df_aval = pd.DataFrame()
 
@@ -606,7 +610,7 @@ def analisar_paciente(paciente_nome: str) -> dict:
         flex_e = _extrair_valor_prefixo(ultima_aval.get("Dinamometria_Esq"), "Flex")
         fonte_lsi = "Dinamometria Isométrica (kgf)"
 
-        if ext_d > 0 or ext_e > 0:
+        if ext_d > 0 and ext_e > 0:
             lado_ref = str(ultima_aval.get("Lado_Acometido", "")).lower()
             if "direito" in lado_ref or "dir > esq" in lado_ref:
                 val_les, val_sau = ext_d, ext_e
@@ -625,7 +629,7 @@ def analisar_paciente(paciente_nome: str) -> dict:
                     fl_les, fl_sau = flex_e, flex_d
 
             if val_sau > 0:
-                resultado["lsi"] = calcular_lsi(val_les, val_sau, fonte=fonte_lsi, flex_lesado=fl_les, flex_saudavel=fl_sau)
+                resultado["lsi"] = calcular_lsi(val_les, val_sau, fonte=fonte_lsi, flex_lesado=fl_les or None, flex_saudavel=fl_sau or None)
 
         for score_func in ["SANE_Pct", "LEFS", "KOOS"]:
             if not df_evo.empty and score_func in df_evo.columns:
@@ -700,8 +704,8 @@ def renderizar_insights(insights: dict, cores: dict):
         c_pm1, c_pm2, c_pm3 = st.columns(3)
         c_pm1.metric(
             "Capacidade Atual (SANE)",
-            f"{pm['sane_atual']:.0f}%",
-            f"{pm['ganho_sane']:+.0f}% vs Marco Zero ({pm['sane_baseline']:.0f}%)"
+            f"{pm['sane_atual']:.0f}%" if pm["sane_atual"] is not None else "Não avaliado",
+            f"{pm['ganho_sane']:+.0f}% vs Marco Zero ({pm['sane_baseline']:.0f}%)" if pm["ganho_sane"] is not None else None
         )
         c_pm2.metric(
             "Mudança Global (GROC -7 a +7)",

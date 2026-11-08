@@ -1,10 +1,11 @@
 """GENUA | Módulo 1: Avaliação Inicial (O Marco Zero) — Estilo Apple HIG."""
-from services.patient_context import preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
+from services.patient_context import gravar_documento, preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
 import hashlib
 import io
 import json
 from datetime import datetime
 from PIL import Image, ImageDraw
+from services.medidas import lados_dinamometria, lsi_dinamometria
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -350,17 +351,13 @@ def _fragmento_autosave_avaliacao():
 
     if hash_atual != ultimo_hash:
         try:
-            doc_id = st.session_state.get("doc_id_avaliacao")
-            if doc_id:
-                db.collection("Avaliacao_Inicial").document(doc_id).set(payload, merge=True)
-            else:
-                _, doc_ref = db.collection("Avaliacao_Inicial").add(payload)
-                st.session_state.doc_id_avaliacao = doc_ref.id
+            gravar_documento(db, "Avaliacao_Inicial", st.session_state, "doc_id_avaliacao", payload)
             invalidar_cache("Avaliacao_Inicial")
             st.session_state["_ultimo_hash_autosave"] = hash_atual
             st.session_state["_horario_ultimo_autosave"] = datetime.now().strftime("%H:%M:%S")
         except Exception as e:
             st.caption(f"⚠️ Reconectando auto-save: {str(e)[:40]}")
+            return
 
     hora_salvo = st.session_state.get("_horario_ultimo_autosave")
     if hora_salvo:
@@ -392,7 +389,7 @@ def render():
     if "paciente" in st.session_state and st.session_state.paciente:
         try:
             docs = db.collection("Avaliacao_Inicial").where("Paciente", "==", st.session_state.paciente).stream()
-            avaliacoes_existentes = [{"id": d.id, "data": d.to_dict()} for d in docs]
+            avaliacoes_existentes = [{"id": d.id, "versao": d.update_time.rfc3339(), "data": d.to_dict()} for d in docs]
             avaliacoes_existentes.sort(
                 key=lambda x: _parse_data_br(x["data"].get("Data_Avaliacao", "01/01/2000")),
                 reverse=True,
@@ -405,13 +402,13 @@ def render():
         col_modo1, col_modo2 = st.columns([2.5, 1])
         with col_modo1:
             if avaliacoes_existentes:
-                opcoes = ["➕ Nova Avaliação"] + [
-                    f"✏️ Editar ({a['data'].get('Data_Avaliacao', '?')}) — QP: {a['data'].get('QP', 'Sem descrição')[:45]}"
-                    for a in avaliacoes_existentes
-                ]
+                registros = {item["id"]: item for item in avaliacoes_existentes}
+                rotulos = {a["id"]: f"✏️ Editar ({a['data'].get('Data_Avaliacao', '?')}) — QP: {a['data'].get('QP', 'Sem descrição')[:45]}" for a in avaliacoes_existentes}
+                opcoes = ["➕ Nova Avaliação", *registros]
                 escolha = st.selectbox(
                     "🎯 Modo de Operação:",
                     opcoes,
+                    format_func=lambda item: rotulos.get(item, item),
                     key="seletor_avaliacao",
                     help="Selecione 'Nova Avaliação' para criar do zero ou escolha uma existente para editar.",
                 )
@@ -423,16 +420,17 @@ def render():
             if avaliacoes_existentes and escolha != "➕ Nova Avaliação":
                 st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
                 if st.button("🗑️ Excluir Avaliação", type="secondary", width="stretch"):
-                    st.session_state["confirmar_exclusao_aval"] = True
+                    st.session_state["confirmar_exclusao_aval"] = escolha
 
+        if st.session_state.get("confirmar_exclusao_aval") != escolha:
+            st.session_state.pop("confirmar_exclusao_aval", None)
         if st.session_state.get("confirmar_exclusao_aval"):
             st.warning("⚠️ Tem certeza? Esta ação removerá a avaliação permanentemente.")
             cc1, cc2, _ = st.columns([1, 1, 2])
             with cc1:
                 if st.button("✅ Sim, excluir", type="primary", width="stretch"):
                     try:
-                        idx = opcoes.index(escolha) - 1
-                        doc_id = avaliacoes_existentes[idx]["id"]
+                        doc_id = escolha
                         db.collection("Avaliacao_Inicial").document(doc_id).delete()
                         invalidar_cache("Avaliacao_Inicial")
                         st.session_state["confirmar_exclusao_aval"] = False
@@ -452,9 +450,11 @@ def render():
             st.session_state.dados_antigos = None
         st.session_state["_ultima_escolha_aval"] = "➕ Nova Avaliação"
     else:
-        idx = opcoes.index(escolha) - 1
-        st.session_state.dados_antigos = avaliacoes_existentes[idx]["data"]
-        st.session_state.doc_id_avaliacao = avaliacoes_existentes[idx]["id"]
+        registro = registros[escolha]
+        if st.session_state.get("_ultima_escolha_aval") != escolha:
+            st.session_state.setdefault("doc_id_avaliacao_versoes", {})[escolha] = registro["versao"]
+        st.session_state.dados_antigos = registro["data"]
+        st.session_state.doc_id_avaliacao = registro["id"]
         st.session_state["_ultima_escolha_aval"] = escolha
 
     dados = st.session_state.get("dados_antigos") or {}
@@ -1057,22 +1057,16 @@ def render():
                     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
                     cols_lsi = st.columns(len(ativos_din))
                     for idx_l, (nome_g, val_d, val_e) in enumerate(ativos_din):
-                        if "Direito" in lado_acometido or "Dir > Esq" in lado_acometido:
-                            lesado, saudavel = val_d, val_e
-                        elif "Esquerdo" in lado_acometido or "Esq > Dir" in lado_acometido:
-                            lesado, saudavel = val_e, val_d
-                        else:
-                            lesado, saudavel = min(val_d, val_e), max(val_d, val_e)
-
-                        lsi_g = (lesado / saudavel * 100.0) if saudavel > 0 else None
+                        lesado, saudavel = lados_dinamometria(val_d, val_e, lado_acometido)
+                        lsi_g = lsi_dinamometria(lesado, saudavel)
                         diff_kg = abs(val_d - val_e)
-                        lsi_texto = f"{lsi_g:.0f}%" if lsi_g is not None else "N/D"
+                        lsi_texto = f"{lsi_g:g}%" if lsi_g is not None else "N/D"
                         partes_resumo_lsi.append(f"LSI {nome_g}: {lsi_texto}")
                         with cols_lsi[idx_l]:
                             st.metric(
                                 label=f"LSI {nome_g}",
                                 value=lsi_texto,
-                                delta=f"Δ {diff_kg:.1f} kgf",
+                                delta=f"Δ {diff_kg:.1f} kgf" if lsi_g is not None else None,
                                 delta_color="off" if lsi_g is None else ("normal" if lsi_g >= 90 else "inverse"),
                             )
 
@@ -1648,11 +1642,7 @@ def render():
                     return
                 with st.spinner("Sincronizando Avaliação Inicial com o Firebase..."):
                     try:
-                        if st.session_state.get("doc_id_avaliacao"):
-                            db.collection("Avaliacao_Inicial").document(st.session_state.doc_id_avaliacao).set(dados_avaliacao, merge=True)
-                        else:
-                            _, novo_ref = db.collection("Avaliacao_Inicial").add(dados_avaliacao)
-                            st.session_state.doc_id_avaliacao = novo_ref.id
+                        gravar_documento(db, "Avaliacao_Inicial", st.session_state, "doc_id_avaliacao", dados_avaliacao)
                         invalidar_cache("Avaliacao_Inicial")
                         st.session_state["_horario_ultimo_autosave"] = datetime.now().strftime("%H:%M:%S")
                         toast("Avaliação Inicial sincronizada com sucesso!", "success")

@@ -65,14 +65,23 @@ class ClinicalTests(unittest.TestCase):
     def test_perception_missing_and_malformed(self):
         for value in [None, float('nan'), 'inválido']:
             r=self.ia.analisar_percepcao_metas({'SANE_Baseline_Pct':40},pd.DataFrame([dict(SANE_Pct=value,GROC_Score=value)]))
-            self.assertEqual(r['sane_atual'],40)
+            self.assertIsNone(r['sane_atual'])
             self.assertIsNone(r['groc_score'])
-        self.assertEqual(self.ia.analisar_percepcao_metas({},pd.DataFrame())['sane_baseline'],30)
+        self.assertIsNone(self.ia.analisar_percepcao_metas({},pd.DataFrame())['sane_baseline'])
 
     def test_functional_item_missing_and_clamping(self):
         for response, override, expected in [(None,None,None),('Não testado',None,None),('Sem Dor',None,10),('Dor Moderada',None,4.5),('Incapaz',None,0),(7,None,3),('Dor Grave',2,8),(None,20,0),(None,-2,10)]:
             with self.subTest(response=response,override=override):
                 self.assertEqual(self.panel._score_funcional_item(response,override),expected)
+
+    def test_gestos_nao_testados_incapazes_e_sem_dor(self):
+        sessao = {
+            "Testes_Funcionais": {"Escada": "Não testado", "Salto": "Incapaz", "Afundo": "Sem Dor"},
+            "Testes_Funcionais_Dor_Num": {"Escada": 0, "Salto": 2, "Afundo": 0},
+        }
+        self.assertEqual(self.panel._medidas_gestos(sessao),
+                         {"Salto": (0, "Incapaz"), "Afundo": (10, "Dor 0/10")})
+        self.assertEqual(self.panel._medidas_gestos({"Testes_Funcionais": {"Escada": "Não testado"}}), {})
 
     def test_proms_explicit_metadata_preserves_zero(self):
         d={'PROMs_Aplicados':['LEFS','KOOS'],'LEFS_Pct':0,'KOOS_Pct':0}
@@ -219,7 +228,8 @@ class ClinicalTests(unittest.TestCase):
         before=df.copy(deep=True)
         r=self.panel._calcular_curva_prognostica_sane(df,df,30,16)
         self.assertEqual(r['esperado'],[30,85])
-        self.assertEqual(r['real'],[30,30])
+        self.assertEqual(r['real'][0],30)
+        self.assertTrue(pd.isna(r['real'][1]))
         pd.testing.assert_frame_equal(df,before)
 
     def test_patient_isolation_with_fake_adapter_and_unsorted_dates(self):
