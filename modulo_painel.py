@@ -3,7 +3,7 @@ from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gest
 import streamlit as st
 import pandas as pd
 import numpy as np
-from config import CORES_GENUA, titulo, secao, toast, aplicar_tema_matplotlib
+from config import cabecalho, CORES_GENUA, titulo, secao, toast, aplicar_tema_matplotlib
 from firebase_client import conn
 from ia_clinica import analisar_paciente, renderizar_insights, normalizar_diagnostico, _sane_valido, _groc_valido
 from modulo_avaliacao import gerar_pdf_somente_avaliacao
@@ -205,6 +205,7 @@ def render():
     import matplotlib.pyplot as plt
     aplicar_tema_matplotlib(plt)
 
+    cabecalho("Painel analítico", "Indicadores e evolução clínica até a sessão selecionada.")
     p_sel = st.session_state.paciente
 
     # ============================================================
@@ -254,8 +255,7 @@ def render():
     if not df_p.empty:
         c_titulo_kpi, c_seletor = st.columns([3, 1.2])
         with c_titulo_kpi:
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-            titulo("📈 Indicadores Executivos de Carga, Simetria e Evolução (PBE)")
+            titulo("Indicadores da sessão")
         with c_seletor:
             opcoes_sessoes = df_p['Sessão_Num'].tolist()
             sessao_escolhida = st.selectbox(
@@ -354,7 +354,7 @@ def render():
     # ============================================================
     # 1. HEADER EXECUTIVO DO PACIENTE (Sem PSFS, Com SANE + Fenótipo)
     # ============================================================
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_resumo"):
         st.markdown(f"""
             <div style='display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;'>
                 <div>
@@ -597,7 +597,7 @@ def render():
     )
 
     if ultima.get("Registro_Bilateral") == True:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_bilateral"):
             st.caption("🦵 COMPARATIVO BILATERAL DA SESSÃO SELECIONADA (DIREITO × ESQUERDO)")
             cb1, cb2, cb3, cb4 = st.columns(4)
             cb1.metric("EVA (Dir | Esq)", f"{ultima.get('Dor_Dir') if pd.notna(ultima.get('Dor_Dir')) else '—'}/10 | {ultima.get('Dor_Esq') if pd.notna(ultima.get('Dor_Esq')) else '—'}/10")
@@ -605,7 +605,7 @@ def render():
             cb3.metric("Extensão (Dir | Esq)", f"{ultima.get('Extensao_Dir', '-')} | {ultima.get('Extensao_Esq', '-')}")
             cb4.metric("Derrame (Dir | Esq)", f"{ultima.get('Inchaco_Dir', '-')} | {ultima.get('Inchaco_Esq', '-')}")
 
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_progresso"):
         c_prog1, c_prog2 = st.columns(2, gap="large")
         with c_prog1:
             if pd.notna(tol_atual):
@@ -633,7 +633,7 @@ def render():
 
     # ABA 1: CARGA, DOR, FUNÇÃO E REATIVIDADE ARTICULAR
     with t1:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_carga"):
             secao(
                 f"📊 Curva de Resposta Terapêutica: Dor (EVA) × Tolerância Funcional (Últimas {len(df_janela)} sessões)",
                 "A curva de tolerância resume os gestos avaliados em cada sessão."
@@ -680,7 +680,7 @@ def render():
                           for nome, serie in historico_gestos.items()]
                 st.dataframe(tabela, hide_index=True, width="stretch")
 
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_reatividade"):
             secao(
                 f"💧 Rastreador de Irritabilidade Tecidual: Derrame × Dor × Sono (Últimas {len(df_janela)} sessões)",
                 "Diferenciação clínica: Picos de dor acompanhados de aumento do derrame indicam sobrecarga mecânica; picos de dor sem derrame após noite de 'Insônia/Acordou com dor' sugerem amplificação central (Finan et al., 2013)."
@@ -728,7 +728,7 @@ def render():
 
     # ABA 2: BIOMECÂNICA, SIMETRIA BILATERAL (LSI + RAZÃO I:Q) & METAS (SANE)
     with t2:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_simetria"):
             secao(
                 f"⚖️ Matriz de Simetria Bilateral (LSI) & Equilíbrio Isquiotibiais:Quadríceps (Razão I:Q — Lado: {av_lado})",
                 "O cálculo do Índice de Simetria (LSI ≥ 90%) e da Razão I:Q (55% a 65%) utiliza exclusivamente a Dinamometria Isométrica (kgf)."
@@ -788,7 +788,7 @@ def render():
                 ]
                 st.dataframe(pd.DataFrame(linhas_mob), hide_index=True, width="stretch")
 
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_adm"):
             secao(
                 f"📉 Evolução Longitudinal de Amplitude Articular (Flexão °) × Dor (Últimas {len(df_janela)} sessões)",
                 f"Fenótipo ativo: {label_fenotipo_exib} · Linha tracejada indica meta funcional de flexão (≥ 125°)."
@@ -827,7 +827,7 @@ def render():
             st.pyplot(fig2)
             plt.close(fig2)
 
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_prognostico"):
             prog_data = _calcular_curva_prognostica_sane(
                 df_completo=df_p,
                 df_janela=df_janela,
@@ -902,7 +902,7 @@ def render():
 
     # ABA 3: INTELIGÊNCIA CLÍNICA & CHECKLIST DE ALTA
     with t_ic:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_alta"):
             secao(
                 "🚦 Checklist de Critérios Objetivos para Alta Funcional (6 Gatekeepers PBE)",
                 "Estes 6 critérios compõem o painel de metas do Laudo PDF. O critério 5 exige medição por Dinamometria (kgf)."
@@ -950,7 +950,7 @@ def render():
                         unsafe_allow_html=True
                     )
 
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_inteligencia"):
             try:
                 with st.spinner("🧠 Executando análise clínica baseada em evidência..."):
                     insights = analisar_paciente(p_sel, df_p, pd.DataFrame([av_p]) if tem_av else pd.DataFrame())
@@ -959,7 +959,7 @@ def render():
                 toast(f"Erro ao gerar insights: {e}", "error")
                 st.caption("Verifique se o paciente possui avaliação inicial e sessões de check-in registradas.")
 
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_conduta"):
             secao(
                 "🔬 Diretriz de Conduta Imediata (Sessão Selecionada)",
                 "Síntese algorítmica cruzando derrame articular, resposta a carga excêntrica/elástica e mobilidade."
@@ -970,7 +970,7 @@ def render():
     # ============================================================
     # 5. CARD DE EXPORTAÇÃO DO LAUDO DE EVOLUÇÃO (CLEAN LIGHT GENUA)
     # ============================================================
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_laudo"):
         secao(
             "📄 Exportação de Laudo de Evolução Clínica (Clean Light GENUA)",
             "Gera o relatório executivo longitudinal com as últimas 10 sessões, Velocímetro de ADM, Força por Dinamometria (kgf), os 6 Critérios de Alta e Conclusões Editáveis."

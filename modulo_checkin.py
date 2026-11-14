@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
-from config import CORES_GENUA, titulo, secao, toast
+from config import cabecalho, CORES_GENUA, titulo, secao, toast
 from firebase_client import conn, db, invalidar_cache
 
 
@@ -153,15 +153,7 @@ def render():
     preparar_contexto_paciente(st.session_state)
     _injetar_wake_lock_checkin()
 
-    # Cabeçalho limpo estilo Apple Health
-    st.markdown(f"""
-        <div style='margin-bottom: 20px;'>
-            <h2 style='margin-bottom: 4px;'>📝 Check-in Diário e Evolução</h2>
-            <p style='color: {CORES_GENUA['texto_suave']}; font-size: 0.94rem; margin: 0;'>
-                Registro rápido de carga de dor, mobilidade articular, relação funcional com dor (0–10) e evolução percebida (GROC -7 a +7 / SANE).
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    cabecalho("Check-in diário", "Dor, mobilidade e resposta aos movimentos na sessão de hoje.")
 
     # ============================================================
     # 1. CARD DE CONTROLE DE SESSÃO (Novo x Editar sessão existente)
@@ -185,7 +177,7 @@ def render():
     except Exception:
         sessoes_existentes = []
 
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_sessao"):
         col_modo1, col_modo2 = st.columns([2.5, 1])
         with col_modo1:
             if sessoes_existentes:
@@ -193,7 +185,7 @@ def render():
                 rotulos = {s["id"]: f"✏️ {s['data'].get('Data', '?')} — Dor: {s['data'].get('Dor', '?')}/10 | Flexão: {s['data'].get('Flexao', '?')}°" for s in sessoes_existentes}
                 opcoes = ["➕ Nova Sessão", *registros]
                 escolha = st.selectbox(
-                    "🎯 Modo de Registro:",
+                    "Sessão",
                     opcoes,
                     format_func=lambda item: rotulos.get(item, item),
                     key="seletor_checkin",
@@ -216,7 +208,7 @@ def render():
             st.warning("⚠️ Tem certeza? Esta sessão será removida do histórico permanentemente.")
             cc1, cc2, _ = st.columns([1, 1, 2])
             with cc1:
-                if st.button("✅ Sim, excluir", type="primary", key="conf_del_chk", width="stretch"):
+                if st.button("Confirmar exclusão", icon=":material/delete:", type="primary", key="conf_del_chk", width="stretch"):
                     try:
                         doc_id = escolha
                         db.collection("Evolucao").document(doc_id).delete()
@@ -298,9 +290,9 @@ def render():
     # ============================================================
     # 3. CARD DE SINAIS E MOBILIDADE DO DIA (Unilateral ou Bilateral)
     # ============================================================
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_sinais"):
         secao(
-            "📊 Sinais Clínicos & Mobilidade da Sessão",
+            "Sinais clínicos e mobilidade",
             "Ajuste a intensidade álgica (EVA), amplitude articular e marcadores de recuperação."
         )
 
@@ -490,9 +482,9 @@ def render():
     # ============================================================
     # 4. CARD DE RELACIONAL FUNCIONAL (OPCIONAL PÓS-OP + BARRA DESLIZANTE DE DOR 0-10)
     # ============================================================
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_gestos"):
         secao(
-            "🎯 Relacional Funcional (Parametrizável & Barra Deslizante de Dor 0–10)",
+            "Relacional funcional",
             "Defina o que entra no check-in de hoje (opcional para Pós-Op) e deslize a barra de dor (0 a 10) para cada movimento realizado."
         )
 
@@ -567,9 +559,9 @@ def render():
     # ============================================================
     # 5. CARD PBE: ESCALA GROC (-7 a +7), SATISFAÇÃO (PASS) E SANE (SEM PSFS)
     # ============================================================
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_percepcao"):
         secao(
-            "🧭 Percepção de Evolução (GROC -7 a +7), Satisfação (PASS) & Meta Funcional (SANE)",
+            "Percepção de evolução e meta funcional",
             "Métricas centradas no paciente: GROC (-7 a +7 | Kamper et al., JOSPT 2009), PASS (Tubach et al., 2005) e SANE (0% a 100% | Shelbourne et al., 2009)."
         )
 

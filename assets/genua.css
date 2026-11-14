@@ -1,0 +1,129 @@
+:root {
+    --genua-ink: #103e55;
+    --genua-teal: #2e8b9a;
+    --genua-text: #223c47;
+    --genua-muted: #516872;
+    --genua-line: #d5e1e4;
+    --genua-paper: #fff;
+    --genua-wash: #eaf3f3;
+}
+.stApp {
+    color: var(--genua-text);
+    background: #f2f6f6;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+header[data-testid="stHeader"] { background: #f2f6f6; }
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none; }
+[data-testid="stMainBlockContainer"] {
+    max-width: 1320px;
+    padding: 4.4rem clamp(1rem, 4vw, 4rem) 4rem;
+}
+.stApp :is(h1,h2,h3,h4) {
+    color: var(--genua-ink);
+    font-family: inherit;
+    letter-spacing: -.035em;
+    line-height: 1.16;
+}
+.stApp h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); }
+.stApp h3 { font-size: 1.25rem; }
+.genua-ambiente {
+    display: flex; align-items: center; gap: .5rem;
+    font-size: .78rem; font-weight: 600; color: var(--genua-muted);
+}
+.genua-ambiente::before {
+    content: ""; width: .5rem; height: .5rem;
+    border-radius: 50%; background: var(--genua-teal);
+}
+.genua-cabecalho {
+    position: relative; isolation: isolate; overflow: hidden;
+    padding: clamp(1.4rem, 3vw, 2.5rem); border-radius: 18px;
+    color: white; background: linear-gradient(110deg,#103e55 20%,#155865 100%);
+}
+.genua-cabecalho::after {
+    content: ""; position: absolute; inset: 0 0 0 auto; width: 35%; z-index: -1;
+    opacity: .5; pointer-events: none;
+    background: repeating-radial-gradient(circle at 105% 150%, transparent 0 22px, #73b9be 23px, transparent 24px 41px);
+    mask-image: linear-gradient(to right, transparent,#000 55%);
+}
+.genua-cabecalho h1 {
+    padding: 0; margin: 0; font-size: clamp(1.85rem, 4vw, 3rem);
+    line-height: 1.08; font-weight: 650; color: white;
+}
+.genua-cabecalho p { padding: 0; margin: .65rem 0 0; color: #dfefef; max-width: 68ch; }
+.stApp .genua-titulo { padding: 0; margin: .1rem 0; font-size: 1.2rem; }
+.genua-descricao { color: var(--genua-muted); margin: 0; line-height: 1.5; }
+:is(.st-key-navegacao_prontuario, [class*="st-key-ficha_"], .st-key-acesso_genua) {
+    background: var(--genua-paper); border: 1px solid var(--genua-line);
+    border-radius: 18px; box-shadow: 0 4px 16px rgba(16,62,85,.04);
+    padding: clamp(1rem,2.1vw,1.75rem);
+}
+.genua-paciente { display: flex; align-items: center; gap: .85rem; }
+.genua-avatar {
+    width: 2.8rem; height: 2.8rem; flex: none; display: grid; place-items: center;
+    background: var(--genua-wash); border: 1px solid #c9dfe0; color: var(--genua-ink);
+    border-radius: 50%; font-size: .95rem; font-weight: 700;
+}
+.genua-paciente strong { display: block; font-size: 1.16rem; color: var(--genua-ink); overflow-wrap: anywhere; }
+.genua-paciente small { display: block; color: var(--genua-muted); font-size: .82rem; }
+.stApp [data-testid="stWidgetLabel"] p { color: var(--genua-text); font-size: .9rem; font-weight: 600; }
+.stApp :is([data-baseweb="input"],[data-baseweb="textarea"],[data-baseweb="select"] > div) {
+    background-color: #fbfdfd; border: 1px solid #aec4c9; border-radius: 9px;
+}
+.stApp :is([data-baseweb="input"],[data-baseweb="textarea"],[data-baseweb="select"] > div):focus-within {
+    border-color: var(--genua-teal); box-shadow: 0 0 0 2px #2e8b9a35;
+}
+.stApp :is(.stButton,.stDownloadButton,.stFormSubmitButton,.stPopover) > button {
+    min-height: 42px; border: 1px solid #b5cacf; border-radius: 9px;
+    background: white; color: var(--genua-ink); padding-inline: 1rem;
+    transition: background-color .14s, border-color .14s;
+}
+.stApp :is(.stButton,.stDownloadButton,.stFormSubmitButton,.stPopover) > button p { font-weight: 600; }
+.stApp :is(.stButton,.stDownloadButton,.stFormSubmitButton,.stPopover) > button:hover:enabled {
+    background: var(--genua-wash); border-color: var(--genua-teal);
+}
+.stApp :is(.stButton,.stFormSubmitButton) > button[kind*="primary" i] {
+    background: var(--genua-ink); border-color: var(--genua-ink); color: white;
+}
+.stApp :is(.stButton,.stFormSubmitButton) > button[kind*="primary" i]:hover:enabled {
+    background: #19596a; border-color: #19596a;
+}
+.stApp :is(.st-key-conf_del_chk,.st-key-conf_del_av) > button[kind] {
+    background: #943e40; border-color: #943e40; color: white;
+}
+.stApp button:disabled { opacity: .55; }
+.stApp :is(button, [role="tab"], summary):focus-visible { outline: 3px solid var(--genua-teal); outline-offset: 2px; }
+.stTabs [data-baseweb="tab-list"] { gap: .2rem; padding: .25rem 0; overflow-x: auto; }
+.stTabs [role="tab"] { padding: .4rem .8rem; border-radius: 8px; color: var(--genua-muted); }
+.stTabs [role="tab"][aria-selected="true"] { color: var(--genua-ink); background: var(--genua-wash); }
+.stTabs [data-baseweb="tab-highlight"] { background: var(--genua-teal); }
+.st-key-navegacao_prontuario [data-testid="stButtonGroup"] button { min-height: 40px; }
+.stApp [data-testid="stMetric"] {
+    padding: .85rem 1rem; border: 1px solid var(--genua-line); border-top: 3px solid var(--genua-teal);
+    background: white; border-radius: 12px; font-variant-numeric: tabular-nums;
+}
+.stApp [data-testid="stMetricValue"] { font-size: clamp(1.25rem,2vw,1.85rem); color: var(--genua-ink); }
+.stApp [data-testid="stMetricValue"] > div { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
+.stApp [data-testid="stExpander"] details { background: white; border-color: var(--genua-line); border-radius: 12px; }
+.stApp [data-testid="stExpander"] summary { color: var(--genua-ink); }
+.stApp .st-key-acesso_genua {
+    max-width: 900px; margin: clamp(1rem,7vh,4rem) auto;
+    padding: 0; overflow: hidden; box-shadow: 0 16px 48px rgba(16,62,85,.09);
+}
+.st-key-acesso_genua [data-testid="stHorizontalBlock"] { gap: 0; }
+.st-key-acesso_genua [data-testid="stColumn"]:first-child img {
+    height: clamp(420px,60vh,600px); width: 100%; object-fit: cover; object-position: center 52%;
+}
+.st-key-formulario_acesso { padding: clamp(1.5rem,3.5vw,3rem); }
+.st-key-formulario_acesso h2 { padding: .3rem 0; }
+.st-key-formulario_acesso [data-testid="stForm"] { padding: 0; }
+@media (max-width: 640px) {
+    [data-testid="stMainBlockContainer"] { padding: 3.8rem .85rem 2rem; }
+    .genua-cabecalho { border-radius: 14px; }
+    .stApp .st-key-acesso_genua { margin: 0 auto; }
+    .st-key-acesso_genua [data-testid="stColumn"]:first-child img { height: 145px; object-position: center 46%; }
+    .st-key-formulario_acesso { padding: 1.3rem; }
+    .st-key-navegacao_prontuario [data-testid="stButtonGroup"] button { padding-inline: .45rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .stApp button { transition: none; }
+}

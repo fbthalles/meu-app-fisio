@@ -6,10 +6,12 @@ from services.patient_context import limpar_contexto_paciente
 import streamlit as st
 
 # 1) Configuração visual (set_page_config DEVE ser o 1º comando Streamlit)
-import config  # noqa: F401
-from config import CORES_GENUA
+from config import aplicar_tema
+from html import escape
 from streamlit.errors import StreamlitSecretNotFoundError
 import socket
+
+aplicar_tema()
 
 try:
     emulador_ativo = st.secrets.get("GENUA_EMULADOR", False)
@@ -17,7 +19,7 @@ except StreamlitSecretNotFoundError:
     emulador_ativo = False
 
 if emulador_ativo:
-    st.info("Ambiente de testes local · Use apenas dados fictícios.")
+    st.html('<div class="genua-ambiente">Emulador local · Dados fictícios</div>')
     try:
         with socket.create_connection(("127.0.0.1", 8080), timeout=1):
             pass
@@ -35,19 +37,6 @@ def _limpar_estado_paciente_ativo():
     """Descarta todo o estado clínico anterior e preserva autenticação/navegação."""
     limpar_contexto_paciente(st.session_state)
 
-
-# ============================================================
-# Oculta a Sidebar globalmente para visual Full-Screen Apple
-# ============================================================
-st.markdown("""
-    <style>
-    [data-testid="stSidebar"],
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"] {
-        display: none !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 # ============================================================
 # Despacho de telas
@@ -82,20 +71,28 @@ elif st.session_state.pagina == 'painel_clinico':
 
     # Top Navigation Bar Unificada (Estilo iPadOS / macOS Sonoma)
     if not paciente_alvo:
-        with st.container(border=True):
-            c_acoes, c_info, c_nav = st.columns([1.35, 2.45, 2.8], vertical_alignment="center")
+        with st.container(key="navegacao_prontuario", border=True):
+            c_info, c_acoes = st.columns([2.4, 1.3], vertical_alignment="center")
+
+            with c_info:
+                nome = str(st.session_state.paciente)
+                partes = nome.split()
+                iniciais = (partes[0][0] if partes else "") + (partes[-1][0] if len(partes) > 1 else "")
+                membro = str(st.session_state.get("membro_ativo", "Joelho"))
+                st.html(f'<div class="genua-paciente"><span class="genua-avatar" aria-hidden="true">{escape(iniciais.upper())}</span>'
+                        f'<div><strong>{escape(nome)}</strong><small>Prontuário · {escape(membro)}</small></div></div>')
 
             with c_acoes:
                 b1, b2 = st.columns([1.15, 1])
                 with b1:
-                    if st.button("⬅️ Pacientes", type="secondary", width="stretch", help="Voltar para a lista de pacientes"):
+                    if st.button("Pacientes", icon=":material/arrow_back:", type="secondary", width="stretch", help="Voltar para a lista de pacientes"):
                         _limpar_estado_paciente_ativo()
                         st.session_state.pagina = 'dados_paciente'
                         st.session_state.paciente = None
                         st.rerun()
                 with b2:
                     # Popover flutuante estilo iOS para trocar de paciente sem precisar de Sidebar
-                    with st.popover("🔄 Trocar", help="Trocar rapidamente de paciente ativo"):
+                    with st.popover("Trocar", icon=":material/swap_horiz:", help="Trocar rapidamente de paciente ativo"):
                         st.caption("SELECIONAR OUTRO PRONTUÁRIO")
                         try:
                             df_cad = conn.read("Cadastro")
@@ -132,45 +129,30 @@ elif st.session_state.pagina == 'painel_clinico':
                         except Exception:
                             st.caption("Erro ao carregar pacientes.")
 
-            with c_info:
-                membro = st.session_state.get('membro_ativo', 'Joelho')
-                st.markdown(f"""
-                    <div style='display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; overflow: hidden;'>
-                        <span style='font-size: 1.18rem; font-weight: 800; color: {CORES_GENUA['texto_escuro']};
-                                     letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>
-                            👤 {st.session_state.paciente}
-                        </span>
-                        <span style='background: rgba(46, 139, 154, 0.12); color: {CORES_GENUA['primaria']};
-                                     padding: 4px 12px; border-radius: 980px; font-size: 0.78rem; font-weight: 700;
-                                     white-space: nowrap; flex-shrink: 0;'>
-                            🦿 {membro}
-                        </span>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with c_nav:
-                if hasattr(st, "segmented_control"):
-                    escolha_topo = st.segmented_control(
-                        "Módulo",
-                        opcoes_modulos,
-                        default=st.session_state.modulo_ativo,
-                        label_visibility="collapsed",
-                        key="nav_topo_segmented"
-                    )
-                    if escolha_topo and escolha_topo != st.session_state.modulo_ativo:
-                        st.session_state.modulo_ativo = escolha_topo
-                        st.rerun()
-                else:
-                    escolha_radio = st.radio(
-                        "Módulo",
-                        opcoes_modulos,
-                        index=opcoes_modulos.index(st.session_state.modulo_ativo),
-                        horizontal=True,
-                        label_visibility="collapsed"
-                    )
-                    if escolha_radio != st.session_state.modulo_ativo:
-                        st.session_state.modulo_ativo = escolha_radio
-                        st.rerun()
+            if hasattr(st, "segmented_control"):
+                escolha_topo = st.segmented_control(
+                    "Módulo",
+                    opcoes_modulos,
+                    format_func=lambda opcao: opcao.rsplit(" ", 1)[0],
+                    default=st.session_state.modulo_ativo,
+                    label_visibility="collapsed",
+                    key="nav_topo_segmented"
+                )
+                if escolha_topo and escolha_topo != st.session_state.modulo_ativo:
+                    st.session_state.modulo_ativo = escolha_topo
+                    st.rerun()
+            else:
+                escolha_radio = st.radio(
+                    "Módulo",
+                    opcoes_modulos,
+                    format_func=lambda opcao: opcao.rsplit(" ", 1)[0],
+                    index=opcoes_modulos.index(st.session_state.modulo_ativo),
+                    horizontal=True,
+                    label_visibility="collapsed"
+                )
+                if escolha_radio != st.session_state.modulo_ativo:
+                    st.session_state.modulo_ativo = escolha_radio
+                    st.rerun()
 
     menu = st.session_state.modulo_ativo if not paciente_alvo else "Painel Analítico 📊"
 

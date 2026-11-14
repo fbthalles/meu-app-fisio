@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, date
-from config import CORES_GENUA, titulo, secao, toast
+from config import cabecalho, CORES_GENUA, titulo, secao, toast
 from firebase_client import db, conn, invalidar_cache
 
 
@@ -60,15 +60,7 @@ def _limpar_contexto_paciente_anterior():
 def render():
     _ativar_wake_lock_mobile()
 
-    # Cabeçalho limpo estilo macOS / iPadOS
-    st.markdown(f"""
-        <div style='margin-bottom: 24px;'>
-            <h1 style='margin-bottom: 4px;'>👤 Gestão de Pacientes</h1>
-            <p style='color: {CORES_GENUA['texto_suave']}; font-size: 0.98rem; margin: 0;'>
-                Selecione um prontuário ativo na nuvem ou registre um novo paciente para iniciar a avaliação.
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    cabecalho("Pacientes", "Abra um prontuário ou cadastre um paciente para iniciar a avaliação.")
 
     # 1. LEITURA OTIMIZADA COM CACHE (via firebase_client) + FALLBACK SEGURO
     df_cad = pd.DataFrame()
@@ -90,27 +82,27 @@ def render():
             st.warning(f"⚠️ Não foi possível carregar a lista de pacientes: {e}")
 
     # 2. CARD DE SELEÇÃO DE PACIENTE (Estilo Spotlight / Busca Apple)
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_busca"):
         c_sel, c_stat = st.columns([3, 1])
         with c_sel:
             opcoes_select = ["+ Novo Paciente"] + lista_nomes
             paciente = st.selectbox(
-                "🔍 Buscar ou Selecionar Paciente",
+                "Buscar paciente",
                 opcoes_select,
                 index=0,
                 help="Digite para filtrar pelo nome do paciente ou escolha '+ Novo Paciente'."
             )
         with c_stat:
-            st.metric("Total na Base", f"{len(lista_nomes)}", "Pacientes")
+            st.metric("Pacientes cadastrados", len(lista_nomes))
 
     # Limite de 100 anos exatos conforme solicitado
     data_minima_100_anos = date(datetime.now().year - 100, 1, 1)
 
     # 3. MODO A: CADASTRO DE NOVO PACIENTE
     if paciente == "+ Novo Paciente":
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_cadastro"):
             secao(
-                "📋 Identificação do Novo Paciente",
+                "Identificação",
                 "Preencha os dados basais, indicação e a hipótese diagnóstica de encaminhamento."
             )
 
@@ -140,7 +132,7 @@ def render():
             st.markdown("<hr style='margin: 20px 0;'>", unsafe_allow_html=True)
 
             secao(
-                "🎯 Diagnóstico Clínico & Indicação (Triagem)",
+                "Diagnóstico e indicação",
                 "O motor de IA Clínica usará o diagnóstico para calibrar o fenótipo (ex: Pós-LCA, Tendinopatia Patelar, Condromalácia, Menisco, Artrose)."
             )
             c_dx1, c_dx2 = st.columns([1.8, 1.2])
@@ -157,7 +149,7 @@ def render():
 
             st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-            if st.button("💾 Salvar e Abrir Prontuário", width="stretch", type="primary"):
+            if st.button("Salvar e abrir prontuário", width="stretch", type="primary"):
                 nome_limpo = nome.strip()
                 if nome_limpo == "":
                     st.error("⚠️ O Nome Completo é obrigatório para abrir o prontuário.")
@@ -217,7 +209,7 @@ def render():
         tel_exib = dados_pac.get("Telefone") or "—"
         med_exib = dados_pac.get("Medico_Indicador") or "—"
 
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_perfil"):
             st.markdown(f"""
                 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;'>
                     <div>

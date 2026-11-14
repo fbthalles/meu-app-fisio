@@ -20,7 +20,7 @@ try:
 except (ImportError, Exception):
     _HAS_IMAGE_COORDS = False
 
-from config import CORES_GENUA, titulo, secao, toast
+from config import cabecalho, CORES_GENUA, titulo, secao, toast
 from firebase_client import db, invalidar_cache
 
 
@@ -371,15 +371,7 @@ def render():
     preparar_contexto_paciente(st.session_state)
     _injetar_wake_lock_avaliacao()
 
-    # Cabeçalho limpo estilo Apple Health
-    st.markdown(f"""
-        <div style='margin-bottom: 14px;'>
-            <h2 style='margin-bottom: 4px;'>🔎 Avaliação Inicial (Marco Zero)</h2>
-            <p style='color: {CORES_GENUA['texto_suave']}; font-size: 0.94rem; margin: 0;'>
-                Primeira Consulta · Baseline Bilateral, Fenótipo Clínico, Perimetria Padronizada, Força (LSI + Razão I:Q), SANE e PROMs.
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    cabecalho("Avaliação inicial", "História clínica, exame físico e metas do paciente.")
 
     # --- MOTOR DE CONSULTA E EDIÇÃO ---
     st.session_state.setdefault("doc_id_avaliacao", None)
@@ -398,7 +390,7 @@ def render():
             avaliacoes_existentes = []
 
     # CARD SELETOR DE MODO (Nova Avaliação x Editar Existente)
-    with st.container(border=True):
+    with st.container(border=True, key="ficha_avaliacoes"):
         col_modo1, col_modo2 = st.columns([2.5, 1])
         with col_modo1:
             if avaliacoes_existentes:
@@ -428,7 +420,7 @@ def render():
             st.warning("⚠️ Tem certeza? Esta ação removerá a avaliação permanentemente.")
             cc1, cc2, _ = st.columns([1, 1, 2])
             with cc1:
-                if st.button("✅ Sim, excluir", type="primary", width="stretch"):
+                if st.button("Confirmar exclusão", icon=":material/delete:", type="primary", key="conf_del_av", width="stretch"):
                     try:
                         doc_id = escolha
                         db.collection("Avaliacao_Inicial").document(doc_id).delete()
@@ -504,7 +496,7 @@ def render():
     # ABA 1: ANAMNESE + OBJETIVO FUNCIONAL DO PACIENTE (SANE)
     # ------------------------------------------------------------
     with t_anamnese:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_historia"):
             secao(
                 "🗣️ Histórico Clínico, Fenótipo e Lateralidade",
                 "Mapeamento do membro acometido, fenótipo clínico (para parametrizar Pós-Op vs Reabilitação Funcional), queixa principal e HMA."
@@ -575,7 +567,7 @@ def render():
                 key=chave_widget(st.session_state, 'avaliacao:trat_previos'),
             )
         # Card de Objetivo Funcional do Paciente na Aba Anamnese (SANE mantido, PSFS removido)
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_objetivo"):
             secao(
                 "🎯 Objetivo Funcional do Paciente & Capacidade Atual (SANE)",
                 "Desfecho centrado no paciente: defina a meta principal e o percentual de capacidade percebida hoje (SANE 0% a 100%)."
@@ -613,7 +605,7 @@ def render():
     # ABA 2: DOR E MAPA ANATÔMICO
     # ------------------------------------------------------------
     with t_dor:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_dor"):
             secao("💥 Classificação Neurofisiológica e Origem", "Defina o mecanismo predominante de dor (IASP) e o início dos sintomas.")
             c_dor1, c_dor2 = st.columns(2)
             op_class = [
@@ -629,7 +621,7 @@ def render():
             with c_dor2:
                 origem_dor = st.selectbox("Origem / Mecanismo *", op_origem, index=get_idx(op_origem, "Origem_Dor"), key=chave_widget(st.session_state, 'avaliacao:origem_dor'))
 
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_mapa"):
             secao("🎯 Mapa Anatômico Interativo da Dor", "Toque ou clique diretamente sobre a imagem do joelho para registrar os pontos álgicos.")
 
             if "pontos_dor" not in st.session_state:
@@ -711,7 +703,7 @@ def render():
     # ABA 3: BANDEIRAS E COMORBIDADES (ATUALIZADAS)
     # ------------------------------------------------------------
     with t_flags:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_bandeiras"):
             secao(
                 "🚩 Sistema de Triagem por Bandeiras e Comorbidades (PBE)",
                 "Rastreio de sinais de alerta clínico (Red Flags), moduladores psicossociais (Yellow/Blue Flags) e comorbidades."
@@ -785,7 +777,7 @@ def render():
     # ABA 4: EXAME FÍSICO, HIPOTROFISMO SEGMENTADO, PERIMETRIA PADRONIZADA E TESTES
     # ------------------------------------------------------------
     with t_fisico:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_inspecao"):
             secao(
                 "👁️ Inspeção, Hipotrofismo Segmentado e Palpação Detalhada (Direito × Esquerdo)",
                 "Hipotrofismo avaliado separadamente para Quadríceps, Isquiotibiais e Tríceps Sural."
@@ -875,7 +867,7 @@ def render():
                     temp_e = st.radio("Temperatura (Esq)", op_temp, index=get_idx(op_temp, "Temperatura_Esq", "Temperatura"), key="tmp_e")
 
         # Card 2 da Aba Físico: Perimetria de Coxa (4 medidas de 5 em 5 cm) e Perna/Panturrilha (3 medidas de 5 em 5 cm)
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_perimetria"):
             secao(
                 "📏 Perimetria Segmentar Padronizada (Coxa e Panturrilha — Direito × Esquerdo)",
                 "Coxa: 4 medidas supra-patelares de 5 em 5 cm (+5, +10, +15 e +20 cm) | Perna/Panturrilha: 3 medidas infra-patelares de 5 em 5 cm (-5, -10 e -15 cm)."
@@ -931,7 +923,7 @@ def render():
                     key=chave_widget(st.session_state, 'avaliacao:perimetria_obs'),
                 )
         # Card 3 da Aba Físico: Testes Especiais (Retirado Decline Squat, Adicionado Compressão Patelar)
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_ortopedia"):
             secao(
                 "🧪 Testes Especiais Ortopédicos (Separados por Joelho: Direito × Esquerdo)",
                 "Clusters diagnósticos ligamentares, meniscais e femoropatelares (incluindo Compressão Patelar)."
@@ -980,7 +972,7 @@ def render():
             return default
 
         # Card 1: Força Muscular Opcional (Pós-Op vs Oxford vs Dinamometria) + LSI + Razão I:Q
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_forca"):
             secao(
                 "💪 Avaliação de Força Muscular (Opcional por Fase Clínica / Fenótipo)",
                 "Escolha se a força será avaliada por Dinamometria (kgf), Escala Manual de Oxford (0-5) ou Omitida (ex: Pós-Operatório imediato)."
@@ -1089,7 +1081,7 @@ def render():
                 resumo_lsi_iq_str = " | ".join(partes_resumo_lsi) if partes_resumo_lsi else "Não medido"
 
         # Card 2: Mobilidade Articular (Goniometria e Lunge Test)
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_mobilidade"):
             secao("📐 Mobilidade Articular (Goniometria e Lunge Test)", "Amplitude de movimento ativa/passiva de joelho e dorsiflexão em cadeia fechada.")
             c_flex1, c_flex2, c_ext1, c_ext2 = st.columns(4)
             adm_flex_d = c_flex1.number_input("Flexão (Dir) °", 0.0, 160.0, get_val_str("ADM_Joelho_Flexao", "Dir", 0.0, float), 1.0, key="adm_flex_d")
@@ -1103,7 +1095,7 @@ def render():
             lunge_e = c_lunge2.number_input("Lunge Test — Tornozelo Esquerdo (cm)", 0.0, 30.0, get_val_str("Lunge_Test", "Esq", 0.0, float), 0.5, key="lunge_e")
 
         # Card 3: Controle Motor Opcional (Foco na Relação Funcionalidade x Dor igual ao Check-in) + Flexibilidade (Glúteo e Adutores)
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_motor"):
             secao(
                 "⚙️ Controle Motor & Relação Funcionalidade × Dor (Opcional para Pós-Op)",
                 "Avalia se o gesto funcional ocorre sem dor ou com dor (igual ao Check-in), sem penalizar pacientes em Pós-Op com 'ruim/incapaz' quando ainda não têm liberação para correr ou saltar."
@@ -1224,7 +1216,7 @@ def render():
     # ABA 6: EXAMES COMPLEMENTARES
     # ------------------------------------------------------------
     with t_exames:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_exames"):
             secao("🩻 Exames Complementares e Imagem", "Registre os exames trazidos pelo paciente e os principais achados radiológicos.")
             op_exames = [
                 "Nenhum", "Raio-X", "Ressonância Magnética (RM)",
@@ -1242,7 +1234,7 @@ def render():
     # ABA 7: QUESTIONÁRIOS (PROMs — VERSÕES QUICK + COMPLETAS POR DOMÍNIO)
     # ------------------------------------------------------------
     with t_quest:
-        with st.container(border=True):
+        with st.container(border=True, key="ficha_questionarios"):
             secao(
                 "📋 Questionários Validados de Joelho (PROMs — Quick & Domínios Completos)",
                 "Selecione quais questionários foram aplicados hoje. Apenas os marcados abaixo entram no cálculo e no PDF."
