@@ -3,7 +3,12 @@ import ast
 import socket
 import unittest
 from unittest.mock import patch
-from services.patient_context import limpar_contexto_paciente, preparar_contexto_paciente, payload_do_paciente_ativo
+from services.patient_context import (
+    limpar_contexto_paciente,
+    preparar_contexto_paciente,
+    payload_do_paciente_ativo,
+    reiniciar_widgets_ficha,
+)
 from audit_support import UI, MemoryDB, isolated
 from clinical_source import tree
 
@@ -124,3 +129,15 @@ st.caption(st.session_state['paciente'])
             for node in calls:
                 with self.subTest(filename=filename,line=node.lineno):
                     self.assertTrue(any(k.arg=='key' for k in node.keywords))
+
+    def test_reiniciar_widgets_ficha_resets_form_keys_and_rotates_token(self):
+        state={'paciente':'Ficticio A','autenticado':True}
+        preparar_contexto_paciente(state)
+        token_before=state['_contexto_widgets']
+        state.update(seletor_avaliacao='aval-1',doc_id_avaliacao_versoes={'aval-1':'v1'},cx5d=0.0,lefs_0='Incapaz')
+        reiniciar_widgets_ficha(state,preservar=('seletor_avaliacao','doc_id_avaliacao_versoes'))
+        self.assertNotIn('cx5d',state)
+        self.assertNotIn('lefs_0',state)
+        self.assertEqual(state['seletor_avaliacao'],'aval-1')
+        self.assertEqual(state['doc_id_avaliacao_versoes'],{'aval-1':'v1'})
+        self.assertNotEqual(state['_contexto_widgets'],token_before)

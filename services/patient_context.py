@@ -17,6 +17,15 @@ def limpar_contexto_paciente(estado):
             del estado[chave]
 
 
+def reiniciar_widgets_ficha(estado, preservar=()):
+    """Descarta o estado de widgets ao alternar entre nova ficha e ficha existente."""
+    manter = set(CHAVES_GLOBAIS) | {"_paciente_contexto"} | set(preservar)
+    for chave in list(estado):
+        if chave not in manter:
+            del estado[chave]
+    estado["_contexto_widgets"] = secrets.token_hex(16)
+
+
 def preparar_contexto_paciente(estado):
     """Protege também trocas por URL/reconexão, antes de montar widgets clínicos."""
     paciente = estado.get('paciente')

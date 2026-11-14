@@ -53,6 +53,9 @@ class ClinicalTests(unittest.TestCase):
                 self.assertEqual((r['status'], r['delta'], r['sessoes_analisadas']), (status, delta, 5))
         self.assertEqual(self.ia.analisar_estagnacao([], 'Dor')['status'], 'insuficiente')
         self.assertEqual(self.ia.analisar_estagnacao([1]*5, 'unknown')['status'], 'indefinido')
+        com_dias = self.ia.analisar_estagnacao([6]*5, 'Dor', dias_janela=18)
+        self.assertEqual(com_dias['dias_janela'], 18)
+        self.assertIn('18 dias corridos', com_dias['racional'])
 
     def test_sane_groc_and_pass(self):
         for groc, sane, satisfied, status in [(3,85,True,'meta_atingida'),(-1,90,True,'alerta_insatisfacao'),(0,50,False,'evoluindo_insatisfeito'),(2,85,True,'em_construcao')]:
@@ -154,9 +157,11 @@ class ClinicalTests(unittest.TestCase):
         self.assertIsNone(self.panel._calcular_lsi_seguro(40,0,'Direito')[0])
 
     def test_characterize_iq_threshold_disagreement(self):
-        label=evaluation_assignment('status_iq_d',iq_dir=69)
-        self.assertIn('Ideal',label)
-        self.assertIn('elevada',self.ia.calcular_lsi(100,100,flex_lesado=69)['acao'])
+        self.assertIn('Ideal (55-68%)', evaluation_assignment('status_iq_d', iq_dir=68))
+        self.assertIn('equilibrada', self.ia.calcular_lsi(100, 100, flex_lesado=68)['acao'])
+        label = evaluation_assignment('status_iq_d', iq_dir=69)
+        self.assertIn('Dominância Isquios (>68%)', label)
+        self.assertIn('elevada', self.ia.calcular_lsi(100, 100, flex_lesado=69)['acao'])
 
     def test_ikdc_intermediate_and_worst(self):
         r=questionnaire('IKDC Subjetivo',dict(ik1=5,ik2='Diária (2 pts)',ik_at='Atividades Leves (3 pts)',ik4=5))

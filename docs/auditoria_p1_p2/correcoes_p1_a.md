@@ -67,3 +67,22 @@ Os testes de paths manuais são estruturais, sem renderização integral dos for
 O pacote deve ser revisado em PR e validado em ambiente de homologação antes de
 merge: o README informa que a main aciona deploy automático. A simples existência
 do commit ou push desta branch não atualiza o aplicativo publicado.
+
+---
+
+# Alinhamento Clínico (P1-16, P1-17, P1-18, P1-19, P1-D) e Proteção de Edição/Auto-save (P1-22)
+
+## Mudanças implementadas
+
+1. **Isolamento de widgets ao alternar ficha nova vs. existente e proteção do Auto-save (`P1-22`)**:
+   - `services/patient_context.py`: adicionado `reiniciar_widgets_ficha(estado, preservar=())` para descartar chaves de widgets anteriores e rotacionar `_contexto_widgets` ao alternar entre `"➕ Nova Avaliação"` / `"➕ Nova Sessão"` e registros existentes no seletor.
+   - `modulo_avaliacao.py` e `modulo_checkin.py`: ao abrir um registro existente para consulta/edição, o hash base (`_ultimo_hash_autosave` / `_ultimo_hash_autosave_chk`) é inicializado com o payload carregado, evitando regravações automáticas redundantes durante simples visualização e garantindo que 100% dos campos salvos sejam carregados na interface.
+2. **Unificação da Razão I:Q em `55% a 68%` (`P1-18`)**:
+   - Padronizado o intervalo ideal de equilíbrio agonista:antagonista (`55% a 68%`) em `modulo_avaliacao.py`, `modulo_painel.py`, `ia_clinica.py` e `pdf_laudo.py`.
+3. **Ponto neutro inicial do GROC no Check-in Diário (`P1-19`)**:
+   - `modulo_checkin.py`: novas sessões iniciam a escala GROC (-7 a +7) em `0 (Igual / Sem Mudança)` em vez de pré-selecionar `+2` ou `+3`.
+4. **Rotulagem explícita das versões dos PROMs (`P1-D`)**:
+   - `modulo_avaliacao.py` e `pdf_laudo.py`: identificadas explicitamente as **Versões Clínicas Adaptadas GENUA** (`KOOS-12`, `LEFS-10`, `IKDC-5`, `WOMAC-15`) e mantidas `VISA-P` e `Lysholm` como escalas de `8 itens oficiais`.
+5. **Janela temporal na análise de estagnação (`P1-16`) e rotulagem da curva SANE (`P1-17`)**:
+   - `ia_clinica.py`: `analisar_estagnacao()` aceita `dias_janela` opcional e informa no parecer o intervalo em dias corridos das últimas 5 sessões quando há datas válidas.
+   - `modulo_painel.py`: curva SANE rotulada como **Trajetória de Referência por Fenótipo**.

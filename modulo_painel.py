@@ -168,22 +168,22 @@ def _calcular_curva_prognostica_sane(
         status = "acima"
         cor = "🟢"
         resumo = (
-            f"Paciente está **{desvio:+.1f}% acima** da curva prognóstica esperada para a semana "
-            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Esperado PBE: **{esp_atual:.0f}%**)."
+            f"Paciente está **{desvio:+.1f}% acima** da Trajetória de Referência por Fenótipo para a semana "
+            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Referência: **{esp_atual:.0f}%**)."
         )
     elif desvio >= -10.0:
         status = "dentro"
         cor = "🔵"
         resumo = (
-            f"Paciente evolui **dentro da janela prognóstica esperada** pela literatura na semana "
-            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Esperado PBE: **{esp_atual:.0f}%** · Δ {desvio:+.1f}%)."
+            f"Paciente evolui **dentro da Trajetória de Referência por Fenótipo** na semana "
+            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Referência: **{esp_atual:.0f}%** · Δ {desvio:+.1f}%)."
         )
     else:
         status = "abaixo"
         cor = "🔴"
         resumo = (
-            f"Paciente encontra-se **{abs(desvio):.1f}% abaixo** da trajetória esperada na semana "
-            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Esperado PBE: **{esp_atual:.0f}%**). "
+            f"Paciente encontra-se **{abs(desvio):.1f}% abaixo** da Trajetória de Referência por Fenótipo na semana "
+            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Referência: **{esp_atual:.0f}%**). "
             f"Revisar barreiras biopsicossociais, adesão ou dosagem de carga."
         )
 
@@ -731,7 +731,7 @@ def render():
         with st.container(border=True, key="ficha_simetria"):
             secao(
                 f"⚖️ Matriz de Simetria Bilateral (LSI) & Equilíbrio Isquiotibiais:Quadríceps (Razão I:Q — Lado: {av_lado})",
-                "O cálculo do Índice de Simetria (LSI ≥ 90%) e da Razão I:Q (55% a 65%) utiliza exclusivamente a Dinamometria Isométrica (kgf)."
+                "O cálculo do Índice de Simetria (LSI ≥ 90%) e da Razão I:Q (55% a 68%) utiliza exclusivamente a Dinamometria Isométrica (kgf)."
             )
 
             c_sim1, c_sim2 = st.columns([1.45, 1.55], gap="large")
@@ -750,7 +750,7 @@ def render():
                             f"**⚖️ Razão Isquiotibiais : Quadríceps (I:Q Ratio):** "
                             f"Direito: **{f'{iq_d:.0f}% ({iq_d/100:.2f})' if iq_d else 'N/D'}** | "
                             f"Esquerdo: **{f'{iq_e:.0f}% ({iq_e/100:.2f})' if iq_e else 'N/D'}** "
-                            f"*(Alvo PBE: 55% a 65% — Kyritsis et al., 2016)*"
+                            f"*(Alvo PBE: 55% a 68% — Croisier et al., 2008 / Kyritsis et al., 2016)*"
                         )
                 else:
                     st.info(
@@ -836,8 +836,8 @@ def render():
             )
 
             secao(
-                f"🏆 Prognóstico por Fenótipo: Trajetória Esperada (PBE) × Evolução Real SANE (Últimas {len(df_janela)} sessões)",
-                f"Fenótipo: {label_fenotipo_exib} (Janela PBE: {prog_data['semanas_janela']} semanas) · "
+                f"🏆 Prognóstico por Fenótipo: Trajetória de Referência por Fenótipo × Evolução Real SANE (Últimas {len(df_janela)} sessões)",
+                f"Fenótipo: {label_fenotipo_exib} (Janela de Referência: {prog_data['semanas_janela']} semanas) · "
                 f"Objetivo: '{av_objetivo}' · Limiar de Alta ≥ 85% (Shelbourne et al., 2009)."
             )
 
@@ -851,13 +851,13 @@ def render():
             ax_s.fill_between(
                 x_prog, faixa_inf, faixa_sup,
                 color=CORES_GENUA['secundaria'], alpha=0.11,
-                label="Janela Fisiológica Esperada (-10% a +5%)"
+                label="Faixa de Referência (-10% a +5%)"
             )
 
             ax_s.plot(
                 x_prog, esp_serie,
                 color=CORES_GENUA['secundaria'], linestyle='--', marker='^', markersize=5.5,
-                lw=2.2, alpha=0.9, label=f"Trajetória Esperada PBE ({prog_data['semanas_janela']} sem)"
+                lw=2.2, alpha=0.9, label=f"Trajetória de Referência por Fenótipo ({prog_data['semanas_janela']} sem)"
             )
 
             ax_s.plot(

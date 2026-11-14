@@ -635,7 +635,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     # --- 5. QUESTIONÁRIOS / PROMs ---
     catalogo_proms = {
         "LEFS": {
-            "sub": "Escala Funcional da Extremidade Inferior",
+            "sub": "Versão Clínica Adaptada GENUA (LEFS-10)",
             "val": _safe_float(dados_aval.get("LEFS_Pts_80") or (float(dados_aval.get("LEFS_Pct", 0) or 0) * 0.8), 0.0),
             "pct": _safe_float(dados_aval.get("LEFS_Pct", 0), 0.0),
             "melhor_ref": "80,0 pts (100%)",
@@ -645,7 +645,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             "default_falso": 0.0,
         },
         "VISA-P": {
-            "sub": "Tendinopatia Patelar (Jumper's Knee)",
+            "sub": "Tendinopatia Patelar (8 itens oficiais)",
             "val": _safe_float(dados_aval.get("VISA_P_Pts", 0), 0.0),
             "pct": _safe_float(dados_aval.get("VISA_P_Pts", 0), 0.0),
             "melhor_ref": "100,0 pts",
@@ -655,7 +655,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             "default_falso": 50.0,
         },
         "Lysholm": {
-            "sub": "Escore Funcional Ligamentar e Meniscal",
+            "sub": "Escore Funcional Ligamentar e Meniscal (8 itens oficiais)",
             "val": _safe_float(dados_aval.get("Lysholm_Pts", 0), 0.0),
             "pct": _safe_float(dados_aval.get("Lysholm_Pts", 0), 0.0),
             "melhor_ref": "100,0 pts",
@@ -665,7 +665,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             "default_falso": 100.0,
         },
         "WOMAC": {
-            "sub": "Índice Funcional de Osteoartrite",
+            "sub": "Versão Clínica Adaptada GENUA (WOMAC-15)",
             "val": _safe_float(dados_aval.get("WOMAC_Pct", 0), 0.0),
             "pct": _safe_float(dados_aval.get("WOMAC_Pct", 0), 0.0),
             "melhor_ref": "100,0%",
@@ -675,7 +675,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             "default_falso": 100.0,
         },
         "KOOS": {
-            "sub": "Knee Injury and Osteoarthritis Outcome Score",
+            "sub": "Versão Clínica Adaptada GENUA (KOOS-12)",
             "val": _safe_float(dados_aval.get("KOOS_Pct", 0), 0.0),
             "pct": _safe_float(dados_aval.get("KOOS_Pct", 0), 0.0),
             "melhor_ref": "100,0%",
@@ -685,7 +685,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             "default_falso": 100.0,
         },
         "IKDC": {
-            "sub": "International Knee Documentation Committee",
+            "sub": "Versão Clínica Adaptada GENUA (IKDC-5)",
             "val": _safe_float(dados_aval.get("IKDC_Pct", 0), 0.0),
             "pct": _safe_float(dados_aval.get("IKDC_Pct", 0), 0.0),
             "melhor_ref": "100,0%",
@@ -957,7 +957,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             banner_iq_html = f"""
             <div class="ref-banner" style="margin-top:14px; margin-bottom:0; background:#F0F9FF; border-color:#BAE6FD;">
                 <span style="color:#103E55; font-weight:700;">⚖️ Equilíbrio Agonista:Antagonista — Razão Isquiotibiais : Quadríceps (I:Q Ratio)</span>
-                <strong style="color:#103E55;" contenteditable="true">{_esc(txt_iq_d)} · {_esc(txt_iq_e)} (Alvo PBE: 55% a 65%)</strong>
+                <strong style="color:#103E55;" contenteditable="true">{_esc(txt_iq_d)} · {_esc(txt_iq_e)} (Alvo PBE: 55% a 68%)</strong>
             </div>
             """
 

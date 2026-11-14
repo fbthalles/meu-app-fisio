@@ -1,5 +1,11 @@
 """GENUA | Módulo 1: Avaliação Inicial (O Marco Zero) — Estilo Apple HIG."""
-from services.patient_context import gravar_documento, preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
+from services.patient_context import (
+    gravar_documento,
+    preparar_contexto_paciente,
+    payload_do_paciente_ativo,
+    chave_widget,
+    reiniciar_widgets_ficha,
+)
 import hashlib
 import io
 import json
@@ -436,14 +442,20 @@ def render():
                     st.session_state["confirmar_exclusao_aval"] = False
                     st.rerun()
 
+    trocou_escolha_aval = st.session_state.get("_ultima_escolha_aval") != escolha
+    if trocou_escolha_aval:
+        reiniciar_widgets_ficha(
+            st.session_state,
+            preservar=("seletor_avaliacao", "doc_id_avaliacao_versoes"),
+        )
+
     if escolha == "➕ Nova Avaliação":
-        if st.session_state.get("_ultima_escolha_aval") != "➕ Nova Avaliação":
-            st.session_state.doc_id_avaliacao = None
-            st.session_state.dados_antigos = None
+        st.session_state.doc_id_avaliacao = None
+        st.session_state.dados_antigos = None
         st.session_state["_ultima_escolha_aval"] = "➕ Nova Avaliação"
     else:
         registro = registros[escolha]
-        if st.session_state.get("_ultima_escolha_aval") != escolha:
+        if trocou_escolha_aval:
             st.session_state.setdefault("doc_id_avaliacao_versoes", {})[escolha] = registro["versao"]
         st.session_state.dados_antigos = registro["data"]
         st.session_state.doc_id_avaliacao = registro["id"]
@@ -1070,12 +1082,12 @@ def render():
                     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
                     ciq1, ciq2 = st.columns(2)
                     if iq_dir is not None:
-                        status_iq_d = "🟢 Equilíbrio Ideal (55-65%)" if 55 <= iq_dir <= 70 else ("🔴 Dominância Quadríceps (<55%)" if iq_dir < 55 else "🟡 Dominância Isquios (>70%)")
-                        ciq1.metric("⚖️ Razão I:Q — Direito (Isquios/Quad)", f"{iq_dir:.0f}% ({iq_dir/100:.2f})", status_iq_d, delta_color="normal" if 55 <= iq_dir <= 70 else "inverse")
+                        status_iq_d = "🟢 Equilíbrio Ideal (55-68%)" if 55 <= iq_dir <= 68 else ("🔴 Dominância Quadríceps (<55%)" if iq_dir < 55 else "🟡 Dominância Isquios (>68%)")
+                        ciq1.metric("⚖️ Razão I:Q — Direito (Isquios/Quad)", f"{iq_dir:.0f}% ({iq_dir/100:.2f})", status_iq_d, delta_color="normal" if 55 <= iq_dir <= 68 else "inverse")
                         partes_resumo_lsi.append(f"Razao I:Q Dir: {iq_dir:.0f}%")
                     if iq_esq is not None:
-                        status_iq_e = "🟢 Equilíbrio Ideal (55-65%)" if 55 <= iq_esq <= 70 else ("🔴 Dominância Quadríceps (<55%)" if iq_esq < 55 else "🟡 Dominância Isquios (>70%)")
-                        ciq2.metric("⚖️ Razão I:Q — Esquerdo (Isquios/Quad)", f"{iq_esq:.0f}% ({iq_esq/100:.2f})", status_iq_e, delta_color="normal" if 55 <= iq_esq <= 70 else "inverse")
+                        status_iq_e = "🟢 Equilíbrio Ideal (55-68%)" if 55 <= iq_esq <= 68 else ("🔴 Dominância Quadríceps (<55%)" if iq_esq < 55 else "🟡 Dominância Isquios (>68%)")
+                        ciq2.metric("⚖️ Razão I:Q — Esquerdo (Isquios/Quad)", f"{iq_esq:.0f}% ({iq_esq/100:.2f})", status_iq_e, delta_color="normal" if 55 <= iq_esq <= 68 else "inverse")
                         partes_resumo_lsi.append(f"Razao I:Q Esq: {iq_esq:.0f}%")
 
                 resumo_lsi_iq_str = " | ".join(partes_resumo_lsi) if partes_resumo_lsi else "Não medido"
@@ -1231,13 +1243,13 @@ def render():
                 key=chave_widget(st.session_state, 'avaliacao:laudo_exames'),
             )
     # ------------------------------------------------------------
-    # ABA 7: QUESTIONÁRIOS (PROMs — VERSÕES QUICK + COMPLETAS POR DOMÍNIO)
+    # ABA 7: QUESTIONÁRIOS (PROMs — VERSÕES CLÍNICAS ADAPTADAS GENUA & ESCALAS OFICIAIS)
     # ------------------------------------------------------------
     with t_quest:
         with st.container(border=True, key="ficha_questionarios"):
             secao(
-                "📋 Questionários Validados de Joelho (PROMs — Quick & Domínios Completos)",
-                "Selecione quais questionários foram aplicados hoje. Apenas os marcados abaixo entram no cálculo e no PDF."
+                "📋 Questionários Validados de Joelho (Versões Clínicas Adaptadas GENUA & Escalas Oficiais)",
+                "Versões Clínicas Adaptadas GENUA (KOOS-12, LEFS-10, IKDC-5, WOMAC-15) e Escalas de 8 itens oficiais (VISA-P e Lysholm). Apenas os marcados entram no cálculo e no PDF."
             )
 
             opcoes_todos_proms = ["KOOS", "IKDC", "LEFS", "VISA-P", "Lysholm", "WOMAC"]
@@ -1263,8 +1275,8 @@ def render():
 
             novas_respostas_proms = dict(respostas_salvas)
 
-            # 1. KOOS-12 Completo (Dor, Sintomas/Rigidez, AVDs/Esporte e Qualidade de Vida)
-            with st.expander("🟢 KOOS-12 / Domínios Completos (Lesões de Joelho, LCA, Menisco, Condropatia e OA)", expanded=("KOOS" in proms_aplicados)):
+            # 1. KOOS-12 (Versão Clínica Adaptada GENUA)
+            with st.expander("🟢 KOOS-12 / Versão Clínica Adaptada GENUA — 12 itens (Lesões de Joelho, LCA, Menisco, Condropatia e OA)", expanded=("KOOS" in proms_aplicados)):
                 koos_op = {"Extremo / Sempre (0)": 0, "Severo / Frequente (1)": 1, "Moderado (2)": 2, "Leve / Raro (3)": 3, "Nenhum / Nunca (4)": 4}
                 lista_k_op = list(koos_op.keys())
                 perguntas_koos12 = [
@@ -1293,8 +1305,8 @@ def render():
                 interp_koos_calc = "🚨 Risco Funcional" if pct_koos_calc < 40 else "🟡 Limitação Moderada" if pct_koos_calc < 80 else "🟢 Alta Performance"
                 st.info(f"📊 **Resultado KOOS-12:** **{pct_koos_calc:.1f}%** — {interp_koos_calc} *(MCID: 8-10 pts | Roos 2003)*")
 
-            # 2. IKDC Subjetivo Ampliado
-            with st.expander("✚ IKDC Subjetivo (Avaliação Ligamentar, Meniscal e Cartilaginosa)", expanded=("IKDC" in proms_aplicados)):
+            # 2. IKDC Subjetivo (Versão Clínica Adaptada GENUA — IKDC-5)
+            with st.expander("✚ IKDC Subjetivo — Versão Clínica Adaptada GENUA (IKDC-5: Dor, Frequência, Nível Esportivo e Função)", expanded=("IKDC" in proms_aplicados)):
                 c_ik1, c_ik2 = st.columns(2)
                 op_ik_freq = ["Constante (0 pts)", "Diária (2 pts)", "Semanal (4 pts)", "Rara (7 pts)", "Nenhuma (10 pts)"]
                 op_ik_at = ["Incapaz (0 pts)", "Atividades Leves (3 pts)", "Moderadas / Corrida leve (6 pts)", "Esporte Intenso / Corte e Giro (10 pts)"]
@@ -1313,10 +1325,10 @@ def render():
 
                 score_ikdc_calc = min(100.0, ((ik_dor + ik_pts_freq + ik_pts_at + (ik_func_atual * 2)) / 50.0) * 100.0)
                 interp_ikdc_calc = "🚨 Baixa Função Subjetiva" if score_ikdc_calc < 60 else "🟡 Desempenho Moderado" if score_ikdc_calc < 85 else "🟢 Excelente Desempenho"
-                st.info(f"📊 **Resultado IKDC:** **{score_ikdc_calc:.1f}%** — {interp_ikdc_calc} *(MCID: 9 pts | Irrgang 2006)*")
+                st.info(f"📊 **Resultado IKDC-5:** **{score_ikdc_calc:.1f}%** — {interp_ikdc_calc} *(MCID: 9 pts | Irrgang 2006)*")
 
-            # 3. LEFS
-            with st.expander("📝 LEFS (Escala Funcional da Extremidade Inferior — 10 Atividades Chave)", expanded=("LEFS" in proms_aplicados)):
+            # 3. LEFS (Versão Clínica Adaptada GENUA — LEFS-10)
+            with st.expander("📝 LEFS (Versão Clínica Adaptada GENUA — LEFS-10: 10 Atividades Chave da Extremidade Inferior)", expanded=("LEFS" in proms_aplicados)):
                 opcoes_lefs = {
                     "Incapaz / Extrema Dificuldade": 0, "Muita Dificuldade": 1,
                     "Dificuldade Moderada": 2, "Um Pouco de Dificuldade": 3, "Nenhuma Dificuldade": 4
@@ -1409,8 +1421,8 @@ def render():
                 interp_lysholm_calc = "🚨 Ruim (<65)" if score_lysholm_calc < 65 else "🟡 Regular (65-83)" if score_lysholm_calc < 84 else "🟢 Bom (84-94)" if score_lysholm_calc < 95 else "⭐ Excelente (95-100)"
                 st.info(f"📊 **Resultado Lysholm:** **{score_lysholm_calc}/100 pontos** — {interp_lysholm_calc} *(MCID: 10 pts | Briggs 2009)*")
 
-            # 6. WOMAC
-            with st.expander("🦴 Índice WOMAC (Osteoartrite — Dor, Rigidez e Função)", expanded=("WOMAC" in proms_aplicados)):
+            # 6. WOMAC (Versão Clínica Adaptada GENUA — WOMAC-15)
+            with st.expander("🦴 Índice WOMAC — Versão Clínica Adaptada GENUA (WOMAC-15: Dor, Rigidez e Função)", expanded=("WOMAC" in proms_aplicados)):
                 w_op = {"Nenhuma": 0, "Leve": 1, "Moderada": 2, "Intensa": 3, "Muito Intensa": 4}
                 lista_w_keys = list(w_op.keys())
                 score_womac_bruto = 0
@@ -1614,6 +1626,9 @@ def render():
 
     # Atualiza o estado para o fragmento de Auto-Save a cada 5s
     st.session_state["_payload_avaliacao_atual"] = dados_avaliacao
+    if trocou_escolha_aval and modo_edicao:
+        serializado_init = json.dumps(dados_avaliacao, sort_keys=True, default=str)
+        st.session_state["_ultimo_hash_autosave"] = hashlib.md5(serializado_init.encode("utf-8")).hexdigest()
     _fragmento_autosave_avaliacao()
 
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)

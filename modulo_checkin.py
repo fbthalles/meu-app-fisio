@@ -1,5 +1,11 @@
 """GENUA | Módulo 2: Check-in Diário (O Mutante) — Estilo Apple HIG."""
-from services.patient_context import gravar_documento, preparar_contexto_paciente, payload_do_paciente_ativo, chave_widget
+from services.patient_context import (
+    gravar_documento,
+    preparar_contexto_paciente,
+    payload_do_paciente_ativo,
+    chave_widget,
+    reiniciar_widgets_ficha,
+)
 import hashlib
 import json
 from datetime import datetime
@@ -223,16 +229,22 @@ def render():
                     st.session_state["confirmar_exclusao_chk"] = False
                     st.rerun()
 
+    trocou_escolha_chk = st.session_state.get("_ultima_escolha_chk") != escolha
+    if trocou_escolha_chk:
+        reiniciar_widgets_ficha(
+            st.session_state,
+            preservar=("seletor_checkin", "doc_id_checkin_versoes"),
+        )
+
     if escolha == "➕ Nova Sessão":
-        if st.session_state.get("_ultima_escolha_chk") != "➕ Nova Sessão":
-            st.session_state.doc_id_checkin = None
-            st.session_state.dados_checkin_antigos = None
-            st.session_state["autosave_checkin_ativo"] = False
+        st.session_state.doc_id_checkin = None
+        st.session_state.dados_checkin_antigos = None
+        st.session_state["autosave_checkin_ativo"] = False
         st.session_state["_ultima_escolha_chk"] = "➕ Nova Sessão"
         dados = {}
     else:
         registro = registros[escolha]
-        if st.session_state.get("_ultima_escolha_chk") != escolha:
+        if trocou_escolha_chk:
             st.session_state.setdefault("doc_id_checkin_versoes", {})[escolha] = registro["versao"]
         st.session_state.dados_checkin_antigos = registro["data"]
         st.session_state.doc_id_checkin = registro["id"]
@@ -583,7 +595,7 @@ def render():
             except Exception:
                 groc_init = 0
         else:
-            groc_init = 3 if len(sessoes_existentes) >= 3 else 2
+            groc_init = 0
 
         groc_score_num = st.select_slider(
             "📈 Escala GROC (-7 a +7) — Em comparação ao início do tratamento, como o paciente sente o joelho hoje?",
@@ -691,6 +703,9 @@ def render():
     }
 
     st.session_state["_payload_checkin_atual"] = dados_sessao
+    if trocou_escolha_chk and modo_edicao_chk:
+        serializado_init = json.dumps(dados_sessao, sort_keys=True, default=str)
+        st.session_state["_ultimo_hash_autosave_chk"] = hashlib.md5(serializado_init.encode("utf-8")).hexdigest()
     _fragmento_autosave_checkin()
 
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)

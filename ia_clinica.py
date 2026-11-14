@@ -241,7 +241,7 @@ def _groc_valido(valor):
     return int(numero) if numero is not None and numero.is_integer() and -7 <= numero <= 7 else None
 
 
-def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
+def analisar_estagnacao(historico: list, score: str = "Dor", dias_janela: int = None) -> dict:
     """Detecta estagnação clínica nas últimas 5 sessões com base no MCID."""
     if score not in MCID:
         return {"status": "indefinido", "racional": f"Score {score} não catalogado"}
@@ -268,27 +268,29 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
     else:
         melhora = janela[-1] - janela[0]
 
+    sufixo_dias = f" (em {dias_janela} dias corridos)" if dias_janela is not None and dias_janela >= 0 else ""
+
     if abs(melhora) < mcid_valor:
         status = "estagnacao"
         racional = (
-            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões: variação de {melhora:+.1f} "
+            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões{sufixo_dias}: variação de {melhora:+.1f} "
             f"< MCID ({mcid_valor} {MCID[score]['unidade']}). "
             f"Sem melhora clinicamente significativa. Considere revisar o plano e progressão de carga."
         )
     elif melhora >= mcid_valor:
         status = "melhora"
         racional = (
-            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões: melhora de {melhora:+.1f} "
+            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões{sufixo_dias}: melhora de {melhora:+.1f} "
             f"≥ MCID ({mcid_valor} {MCID[score]['unidade']}). Evolução clinicamente significativa."
         )
     else:
         status = "piora"
         racional = (
-            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões: piora de {melhora:+.1f} "
+            f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões{sufixo_dias}: piora de {melhora:+.1f} "
             f"({MCID[score]['unidade']}). Investigar causa (adesão, sobrecarga mecânica ou novo trauma)."
         )
 
-    return {
+    retorno = {
         "status": status,
         "score": score,
         "delta": round(melhora, 2),
@@ -297,6 +299,9 @@ def analisar_estagnacao(historico: list, score: str = "Dor") -> dict:
         "racional": racional,
         "referencia": ref
     }
+    if dias_janela is not None and dias_janela >= 0:
+        retorno["dias_janela"] = int(dias_janela)
+    return retorno
 
 
 # ============================================================
@@ -354,7 +359,7 @@ def calcular_lsi(
 
     if razao_iq_les is not None:
         if 55.0 <= razao_iq_les <= 68.0:
-            acao += f" | Razão I:Q do membro acometido equilibrada em {razao_iq_les:.0f}% (Alvo: 55–65%)."
+            acao += f" | Razão I:Q do membro acometido equilibrada em {razao_iq_les:.0f}% (Alvo: 55–68%)."
         elif razao_iq_les < 55.0:
             acao += f" | Alerta de Dominância Quadricipital (Razão I:Q = {razao_iq_les:.0f}% < 55%): reforçar cadeia posterior/isquiotibiais para proteção articular."
         else:
@@ -580,9 +585,20 @@ def analisar_paciente(paciente_nome: str, sessoes=None, avaliacoes=None) -> dict
         resultado["sessoes_registradas"] = len(df_evo)
 
         if "Dor" in df_evo.columns:
-            historico_dor = pd.to_numeric(df_evo["Dor"], errors="coerce").dropna().tolist()
+            dor_series = pd.to_numeric(df_evo["Dor"], errors="coerce")
+            historico_dor = dor_series.dropna().tolist()
+            dias_janela_dor = None
+            if len(historico_dor) >= SESSOES_MINIMAS_ESTAGNACAO and "Data" in df_evo.columns:
+                datas_validas = pd.to_datetime(
+                    df_evo.loc[dor_series.notna(), "Data"],
+                    format="mixed",
+                    dayfirst=True,
+                    errors="coerce",
+                ).iloc[-SESSOES_MINIMAS_ESTAGNACAO:]
+                if pd.notna(datas_validas.iloc[0]) and pd.notna(datas_validas.iloc[-1]):
+                    dias_janela_dor = max(0, int((datas_validas.iloc[-1] - datas_validas.iloc[0]).days))
             if historico_dor:
-                resultado["estagnacao"] = analisar_estagnacao(historico_dor, "Dor")
+                resultado["estagnacao"] = analisar_estagnacao(historico_dor, "Dor", dias_janela=dias_janela_dor)
 
     try:
         df_aval = avaliacoes.copy() if avaliacoes is not None else conn.read_paciente("Avaliacao_Inicial", paciente_nome)
