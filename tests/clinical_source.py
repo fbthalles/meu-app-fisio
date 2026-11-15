@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 import types
-from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto
+from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
 import numpy as np
 import pandas as pd
 
@@ -25,7 +25,7 @@ def execute(nodes, namespace, filename):
 
 
 def load(filename):
-    namespace = dict(pd=pd, np=np, re=re, datetime=datetime, lados_dinamometria=lados_dinamometria,
+    namespace = dict(pass_registrado=pass_registrado, criterios_acompanhamento=criterios_acompanhamento, pd=pd, np=np, re=re, datetime=datetime, lados_dinamometria=lados_dinamometria,
                      lsi_dinamometria=lsi_dinamometria, nota_dor_gesto=nota_dor_gesto)
     nodes = []
     for node in tree(filename).body:

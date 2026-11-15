@@ -193,7 +193,7 @@ class AuditP1P2(unittest.TestCase):
 
     def test_prognostic_real_series_preserves_missing_sane(self):
         df=pd.DataFrame({'Data_dt':pd.to_datetime(['2026-01-01']),'Sessão_Num':['S1'],'SANE_Pct_Num':[float('nan')]})
-        result=load('modulo_painel.py')._calcular_curva_prognostica_sane(df,df,30)
+        result=load('modulo_painel.py')._resumir_evolucao_sane(df,30)
         self.assertTrue(pd.isna(result['real'][0]))
         self.assertEqual(result['status'],'incompleto')
 

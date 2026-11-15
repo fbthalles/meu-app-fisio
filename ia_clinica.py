@@ -2,8 +2,8 @@
 GENUA | Módulo de IA Clínica Baseada em Evidência
 ==================================================
 
-Este módulo é o CÉREBRO CLÍNICO do app. Todas as regras aqui são fundamentadas
-em literatura peer-reviewed, com referências científicas explícitas.
+Este módulo é o CÉREBRO CLÍNICO do app. As regras são auxiliares de acompanhamento e não substituem avaliação clínica.
+Referências publicadas têm aplicação dependente do instrumento e da população.
 
 Estrutura:
     - CONSTANTES CLÍNICAS: MCID, thresholds LSI, Razão I:Q, GROC (-7 a +7), PASS, SANE e bandeiras.
@@ -14,6 +14,7 @@ Estrutura:
     - analisar_paciente(paciente_nome)                → orquestra tudo (função pública)
     - renderizar_insights(insights, cores)            → renderiza no Streamlit
 """
+from services.medidas import pass_registrado
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -275,13 +276,13 @@ def analisar_estagnacao(historico: list, score: str = "Dor", dias_janela: int = 
         racional = (
             f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões{sufixo_dias}: variação de {melhora:+.1f} "
             f"< MCID ({mcid_valor} {MCID[score]['unidade']}). "
-            f"Sem melhora clinicamente significativa. Considere revisar o plano e progressão de carga."
+            f"Variação abaixo da referência usada pelo app. Isso não confirma estagnação; considerar nível inicial, intervalo e contexto clínico."
         )
     elif melhora >= mcid_valor:
         status = "melhora"
         racional = (
             f"Últimas {SESSOES_MINIMAS_ESTAGNACAO} sessões{sufixo_dias}: melhora de {melhora:+.1f} "
-            f"≥ MCID ({mcid_valor} {MCID[score]['unidade']}). Evolução clinicamente significativa."
+            f"≥ MCID ({mcid_valor} {MCID[score]['unidade']}). Variação que alcança a referência usada pelo app; a relevância clínica depende do contexto."
         )
     else:
         status = "piora"
@@ -348,22 +349,18 @@ def calcular_lsi(
     elif lsi >= LSI_ATENCAO:
         classificacao = "atencao"
         cor = "🟡"
-        acao = f"Zona de atenção em Quadríceps ({lado_lesado:.1f} vs {lado_saudavel:.1f} kgf · LSI {lsi:.0f}%). Progredir carga unilateral."
+        acao = f"Zona de atenção em Quadríceps ({lado_lesado:.1f} vs {lado_saudavel:.1f} kgf · LSI {lsi:.0f}%). Correlacionar com a capacidade nas tarefas."
     else:
         classificacao = "risco"
         cor = "🔴"
-        acao = f"Assimetria importante de Quadríceps ({lado_lesado:.1f} vs {lado_saudavel:.1f} kgf · LSI {lsi:.0f}% < 85%). Risco biomecânico aumentado."
+        acao = f"Assimetria importante de Quadríceps ({lado_lesado:.1f} vs {lado_saudavel:.1f} kgf · LSI {lsi:.0f}% < 85%). Correlacionar com o exame e o protocolo de medição."
 
     if lsi_isquios is not None:
         acao += f" | LSI Isquiotibiais: {lsi_isquios:.0f}% ({flex_lesado:.1f} vs {flex_saudavel:.1f} kgf)."
 
     if razao_iq_les is not None:
-        if 55.0 <= razao_iq_les <= 68.0:
-            acao += f" | Razão I:Q do membro acometido equilibrada em {razao_iq_les:.0f}% (Alvo: 55–68%)."
-        elif razao_iq_les < 55.0:
-            acao += f" | Alerta de Dominância Quadricipital (Razão I:Q = {razao_iq_les:.0f}% < 55%): reforçar cadeia posterior/isquiotibiais para proteção articular."
-        else:
-            acao += f" | Razão I:Q elevada ({razao_iq_les:.0f}% > 68%): predomínio flexor por déficit relativo de extensão (quadríceps)."
+        acao += f" | Razão I:Q isométrica: {razao_iq_les:.0f}%. Medida descritiva, sem faixa universal de normalidade neste protocolo."
+    acao += " A simetria isolada não determina alta ou risco de lesão."
 
     return {
         "valor": round(lsi, 1),
@@ -417,17 +414,9 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
         if "GROC_Label" in df_evo.columns and pd.notna(ultima_sessao.get("GROC_Label")):
             groc_label = str(ultima_sessao.get("GROC_Label"))
 
-        if "PASS_Atingido" in df_evo.columns and pd.notna(ultima_sessao.get("PASS_Atingido")):
-            val_pass = ultima_sessao.get("PASS_Atingido")
-            if isinstance(val_pass, bool):
-                pass_atingido = val_pass
-            else:
-                pass_atingido = str(val_pass).strip().lower() in ["true", "1", "sim", "yes"]
-
-        if "PASS_Satisfacao" in df_evo.columns and pd.notna(ultima_sessao.get("PASS_Satisfacao")):
+        pass_atingido = pass_registrado(ultima_sessao.get("PASS_Atingido"), ultima_sessao.get("PASS_Satisfacao"))
+        if pd.notna(ultima_sessao.get("PASS_Satisfacao")):
             pass_label = str(ultima_sessao.get("PASS_Satisfacao"))
-            if pass_atingido is None:
-                pass_atingido = pass_label.startswith("👍") or "sim" in pass_label.lower()
 
     distancia_meta = 100.0 - sane_atual if sane_atual is not None else None
     ganho_sane = sane_atual - sane_base if None not in (sane_atual, sane_base) else None
@@ -436,8 +425,8 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
         status = "meta_atingida"
         cor = "🟢"
         parecer = (
-            f"Paciente atingiu Estado de Sintoma Aceitável (PASS = Sim), mudança global clinicamente "
-            f"significativa na escala GROC ({groc_score:+d} / +7) e está a apenas {distancia_meta:.0f}% do seu objetivo final."
+            f"Paciente atingiu Estado de Sintoma Aceitável (PASS = Sim), melhora relatada "
+            f"na escala GROC ({groc_score:+d} / +7) e está a apenas {distancia_meta:.0f}% do seu objetivo final."
         )
     elif groc_score is not None and groc_score < 0:
         status = "alerta_insatisfacao"
@@ -450,8 +439,8 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
         status = "evoluindo_insatisfeito"
         cor = "🟡"
         parecer = (
-            f"Ganho funcional relevante de +{ganho_sane:.0f}% no SANE (faltam {distancia_meta:.0f}% para a meta), "
-            f"porém paciente ainda reporta PASS negativo (insatisfeito com o estado atual). Manter progressão."
+            f"Aumento de +{ganho_sane:.0f} pontos percentuais no SANE (faltam {distancia_meta:.0f}% para a meta), "
+            f"porém paciente ainda reporta PASS negativo (insatisfeito com o estado atual). Correlacionar com as tarefas e expectativas."
         )
     elif ganho_sane is None:
         status, cor, parecer = "incompleto", "⚪", "SANE incompleto para comparar com o marco zero."
@@ -459,7 +448,7 @@ def analisar_percepcao_metas(avaliacao: dict, df_evo: pd.DataFrame) -> dict:
         status = "em_construcao"
         cor = "🔵"
         parecer = (
-            f"Capacidade atual percebida (SANE) em {sane_atual:.0f}% (Δ {ganho_sane:+.0f}% vs Marco Zero). "
+            f"Capacidade atual percebida (SANE) em {sane_atual:.0f}% (Δ {ganho_sane:+.0f} pontos percentuais vs Marco Zero). "
             f"Faltam {distancia_meta:.0f}% para atingir plenamente o objetivo funcional."
         )
 
@@ -669,9 +658,9 @@ def renderizar_insights(insights: dict, cores: dict):
     st.markdown(f"""
         <div style='background: linear-gradient(135deg, {cores['primaria']} 0%, {cores['secundaria']} 100%);
                     padding: 20px; border-radius: 16px; color: white; margin-bottom: 20px;'>
-            <h3 style='color: white; margin: 0;'>🧠 Insights Clínicos — IA Baseada em Evidência</h3>
+            <h3 style='color: white; margin: 0;'>🧠 Insights clínicos — apoio por regras</h3>
             <p style='color: #E0F7FA; margin: 8px 0 0 0; font-size: 0.95rem;'>
-                Análise determinística de estagnação (MCID), simetria bilateral (LSI) + Razão I:Q, evolução global (GROC -7 a +7 / SANE) e bandeiras clínicas.
+                Resumo das medidas e variações, simetria bilateral (LSI) + Razão I:Q, evolução global (GROC -7 a +7 / SANE) e bandeiras clínicas.
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -721,7 +710,7 @@ def renderizar_insights(insights: dict, cores: dict):
         c_pm1.metric(
             "Capacidade Atual (SANE)",
             f"{pm['sane_atual']:.0f}%" if pm["sane_atual"] is not None else "Não avaliado",
-            f"{pm['ganho_sane']:+.0f}% vs Marco Zero ({pm['sane_baseline']:.0f}%)" if pm["ganho_sane"] is not None else None
+            f"{pm['ganho_sane']:+.0f} pp vs Marco Zero ({pm['sane_baseline']:.0f}%)" if pm["ganho_sane"] is not None else None
         )
         c_pm2.metric(
             "Mudança Global (GROC -7 a +7)",
@@ -731,7 +720,7 @@ def renderizar_insights(insights: dict, cores: dict):
         c_pm3.metric(
             "Satisfação Atual (PASS)",
             "Satisfeito (Sim)" if pm.get("pass_atingido") is True else ("Insatisfeito (Não)" if pm.get("pass_atingido") is False else "N/D"),
-            f"Meta Alta SANE: ≥ 85%"
+            f"Meta de acompanhamento GENUA: ≥ 85%"
         )
 
         if pm["status"] == "meta_atingida":
@@ -746,7 +735,7 @@ def renderizar_insights(insights: dict, cores: dict):
         st.markdown("---")
 
     # 2. ESTAGNAÇÃO — DOR
-    titulo("📉 Análise de Estagnação — Dor (EVA)")
+    titulo("📉 Variação da dor (EVA)")
     est = insights.get("estagnacao")
 
     if insights["sessoes_registradas"] == 0:
@@ -755,7 +744,7 @@ def renderizar_insights(insights: dict, cores: dict):
         n_atual = est["sessoes_analisadas"] if est else insights["sessoes_registradas"]
         st.info(f"⏳ Aguardando dados: análise de estagnação requer ≥ {SESSOES_MINIMAS_ESTAGNACAO} sessões (há {n_atual}).")
     elif est["status"] == "estagnacao":
-        st.warning(f"🟡 **ESTAGNAÇÃO DETECTADA**\n\n{est['racional']}")
+        st.warning(f"🟡 **VARIAÇÃO ABAIXO DA REFERÊNCIA**\n\n{est['racional']}")
         st.caption(f"📚 Referência: {est['referencia']}")
     elif est["status"] == "melhora":
         st.success(f"🟢 **EVOLUÇÃO POSITIVA**\n\n{est['racional']}")
@@ -784,7 +773,7 @@ def renderizar_insights(insights: dict, cores: dict):
     titulo("🚩 Bandeiras Clínicas Ativas (Triagem Biopsicossocial)")
 
     if not insights["bandeiras"]:
-        st.success("✅ Nenhuma bandeira clínica ativa detectada. Perfil de baixo risco biopsicossocial.")
+        st.success("✅ Nenhuma bandeira ativa nos dados disponíveis. Conferir se a triagem foi preenchida.")
     else:
         for b in insights["bandeiras"]:
             if b["tipo"] == "vermelha":

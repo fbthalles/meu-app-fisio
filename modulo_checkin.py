@@ -237,9 +237,10 @@ def render():
         )
 
     if escolha == "➕ Nova Sessão":
-        st.session_state.doc_id_checkin = None
-        st.session_state.dados_checkin_antigos = None
-        st.session_state["autosave_checkin_ativo"] = False
+        if trocou_escolha_chk:
+            st.session_state.doc_id_checkin = None
+            st.session_state.dados_checkin_antigos = None
+            st.session_state["autosave_checkin_ativo"] = False
         st.session_state["_ultima_escolha_chk"] = "➕ Nova Sessão"
         dados = {}
     else:

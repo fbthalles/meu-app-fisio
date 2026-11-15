@@ -12,7 +12,7 @@ Exporta:
 
 Dependências: fpdf2, matplotlib, numpy, io, os, base64, datetime
 """
-from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto
+from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
 import io
 import os
 import base64
@@ -137,7 +137,7 @@ def _extrair_def_extensao_graus(val_ext) -> float:
 def _mapear_inchaco_grau(val) -> int:
     """Converte o texto de inchaço/derrame ('Nenhum', 'Leve (+)', etc.) para escala numérica 0 a 3."""
     if val is None or val == "":
-        return 0
+        return np.nan
     s = str(val).strip().lower()
     if "+++" in s or "intenso" in s or "grave" in s or "3+" in s or s == "3":
         return 3
@@ -145,10 +145,13 @@ def _mapear_inchaco_grau(val) -> int:
         return 2
     if "+" in s or "leve" in s or "vestígio" in s or "onda" in s or s == "1":
         return 1
-    try:
-        return int(float(s))
-    except Exception:
+    if s in ("nenhum", "nenhuma", "ausente", "sem derrame"):
         return 0
+    try:
+        numero = float(s)
+        return int(numero) if np.isfinite(numero) and numero.is_integer() and 0 <= numero <= 3 else np.nan
+    except Exception:
+        return np.nan
 
 
 def _normalizar_entradas(dados_aval, historico):
@@ -383,7 +386,7 @@ def _gerar_grafico_sane_clean_b64(hist, sane_base: float):
     fig.patch.set_facecolor('#FFFFFF')
     ax.set_facecolor('#FFFFFF')
 
-    ax.axhline(y=85, color='#16A34A', linestyle='--', lw=1.2, alpha=0.7, label='Meta Alta Subjetiva (85%)')
+    ax.axhline(y=85, color='#16A34A', linestyle='--', lw=1.2, alpha=0.7, label='Referência GENUA (85%)')
     ax.fill_between(x_idx, valores, color='#2E8B9A', alpha=0.12)
     ax.plot(x_idx, valores, color='#103E55', lw=2.5, marker='o', markersize=6.5, zorder=4, label='Capacidade Percebida (SANE %)')
     for i, v in enumerate(valores):
@@ -781,7 +784,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
 
         html_secao_prom = f"""
         <div class="section-card">
-            <div class="section-title">QUESTIONÁRIO VALIDADO / PROM APLICADO</div>
+            <div class="section-title">QUESTIONÁRIO APLICADO · VERSÃO IDENTIFICADA</div>
             {cards_prom_inner}
         </div>
         """
@@ -822,7 +825,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                         <span class="sub-card-title">🎯 {_esc(obj_paciente)}</span>
                         <span class="sub-card-caption"> · Escala SANE (0–100% · Marco Zero: {sane_base:.0f}%){_esc(groc_str_sub)}</span>
                     </div>
-                    <span class="sub-card-meta">Meta Final: 100% (Alta Subjetiva ≥ 85%)</span>
+                    <span class="sub-card-meta">Meta Final: 100% (Referência GENUA ≥ 85%)</span>
                 </div>
                 <img class="chart-img" style="max-height:210px; object-fit:contain;" src="data:image/png;base64,{b64_sane}" alt="Evolução do Objetivo" />
                 {_box_conclusao_editavel(status_sane, conc_sane_txt)}
@@ -897,7 +900,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
                 cor_def = "#F97316"
                 badge_def = "déficit moderado"
                 st_forca = "laranja"
-                conc_f_txt = f"Déficit moderado de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:g}%). Intensificar fortalecimento unilateral."
+                conc_f_txt = f"Déficit moderado de {deficit_pct:.0f}% do lado {lado_def} em {nome_g} ({vd:.1f} kgf vs {ve:.1f} kgf · LSI: {lsi_tec:g}%). Correlacionar com o exame e as demandas funcionais."
             else:
                 cor_def = "#DC2626"
                 badge_def = "déficit importante"
@@ -957,7 +960,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
             banner_iq_html = f"""
             <div class="ref-banner" style="margin-top:14px; margin-bottom:0; background:#F0F9FF; border-color:#BAE6FD;">
                 <span style="color:#103E55; font-weight:700;">⚖️ Equilíbrio Agonista:Antagonista — Razão Isquiotibiais : Quadríceps (I:Q Ratio)</span>
-                <strong style="color:#103E55;" contenteditable="true">{_esc(txt_iq_d)} · {_esc(txt_iq_e)} (Alvo PBE: 55% a 68%)</strong>
+                <strong style="color:#103E55;" contenteditable="true">{_esc(txt_iq_d)} · {_esc(txt_iq_e)} (Razão isométrica descritiva; interpretar conforme o protocolo)</strong>
             </div>
             """
 
@@ -998,19 +1001,13 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
         inchaco_raw = ult_sessao.get('Inchaço', ult_sessao.get('Inchaco', None))
         inchaco_grau = _mapear_inchaco_grau(inchaco_raw)
 
-        pass_val = ult_sessao.get('PASS_Atingido')
-        if pass_val is None:
-            pass_str = str(ult_sessao.get('PASS_Satisfacao', '') or '')
-            pass_bool = pass_str.startswith("👍") or "sim" in pass_str.lower()
-        else:
-            pass_bool = bool(pass_val) if isinstance(pass_val, bool) else str(pass_val).strip().lower() in ["true", "1", "sim"]
-
-        crit_1_ok = (dor_atual <= 2.0) if tem_dor_preenchida else None
-        crit_2_ok = (inchaco_grau <= 1) if _tem_valor_util(inchaco_raw) and str(inchaco_raw).lower() != "nan" else None
-        crit_3_ok = (ext_atu_deg == 0.0) if tem_extensao else None
-        crit_4_ok = (flex_atual >= 125.0) if tem_adm_preenchida else None
-        crit_5_ok = (lsi_quad_din is not None and lsi_quad_din >= 90.0)
-        crit_6_ok = (sane_atual >= 85.0 and pass_bool) if np.isfinite(sane_atual) and (pass_val is not None or ult_sessao.get("PASS_Satisfacao")) else None
+        pass_bool = pass_registrado(ult_sessao.get('PASS_Atingido'), ult_sessao.get('PASS_Satisfacao'))
+        crit_1_ok, crit_2_ok, crit_3_ok, crit_4_ok, crit_5_ok, crit_6_ok = criterios_acompanhamento(
+            dor_atual if tem_dor_preenchida else None,
+            inchaco_grau,
+            (ext_atu_deg == 0.0) if tem_extensao else None,
+            flex_atual if tem_adm_preenchida else None, lsi_quad_din, sane_atual, pass_bool
+        )
 
         criterios_6_pontos = [
             (
@@ -1091,12 +1088,12 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
 
         html_secao_gatekeepers = f"""
         <div class="section-card">
-            <div class="section-title">METAS CLÍNICAS PARA ALTA FUNCIONAL · 6 CRITÉRIOS PBE (GATEKEEPERS)</div>
+            <div class="section-title">METAS DE ACOMPANHAMENTO · 6 REFERÊNCIAS DO GENUA</div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <span style="font-size:12.5px; font-weight:800; color:#103E55;" contenteditable="true">
-                    Progresso Global nos Critérios de Alta: {total_atingidos} de 6 metas atingidas ({pct_6_pontos:.0f}%)
+                    Metas de acompanhamento: {total_atingidos} de 6 metas atingidas ({pct_6_pontos:.0f}%)
                 </span>
-                <span style="font-size:11px; font-weight:700; color:#64748B;">Meta para liberação plena: 6/6 (100%)</span>
+                <span style="font-size:11px; font-weight:700; color:#64748B;">Atingir 6/6 não determina alta clínica</span>
             </div>
             <div class="bar-track" style="height:12px; margin-bottom:14px;">
                 <div class="bar-fill" style="width:{pct_6_pontos:.1f}%; background:{cor_barra_6};"></div>

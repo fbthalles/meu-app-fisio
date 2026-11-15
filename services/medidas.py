@@ -37,3 +37,32 @@ def nota_dor_gesto(resposta, nota=None):
         "Dor Moderada": 5.5, "Dor Moderada (4 - 7)": 5.5,
         "Dor Grave": 8.5, "Dor Grave (8 - 10)": 8.5,
     }.get(categoria)
+
+
+def pass_registrado(valor, descricao=None):
+    """Mantém ausências/desconhecidos distintos de uma resposta negativa."""
+    for item in (valor, descricao):
+        texto = str(item).strip().lower()
+        if texto in ('true', '1', '1.0', 'sim', 'yes') or texto.startswith(('👍', 'sim —')):
+            return True
+        if texto in ('false', '0', '0.0', 'não', 'nao', 'no') or texto.startswith(('👎', 'não —')):
+            return False
+    return None
+
+
+def criterios_acompanhamento(dor, derrame, extensao_completa, flexao, lsi, sane, satisfacao):
+    """Metas operacionais do MVP; None indica medida ausente, não falha clínica."""
+    def limite(valor, minimo, maximo, alvo, maior=False):
+        try:
+            n = float(valor)
+        except (TypeError, ValueError):
+            return None
+        if not isfinite(n) or not minimo <= n <= maximo:
+            return None
+        return bool(n >= alvo if maior else n <= alvo)
+    sane_ok = limite(sane, 0, 100, 85, True)
+    return (
+        limite(dor, 0, 10, 2), limite(derrame, 0, 3, 1), extensao_completa,
+        limite(flexao, 0, 180, 125, True), limite(lsi, 0, float('inf'), 90, True),
+        bool(sane_ok and satisfacao) if sane_ok is not None and satisfacao is not None else None,
+    )

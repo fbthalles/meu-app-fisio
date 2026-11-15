@@ -156,12 +156,12 @@ class ClinicalTests(unittest.TestCase):
         self.assertIsNone(evaluation_assignment('lsi_g',lesado=40,saudavel=0))
         self.assertIsNone(self.panel._calcular_lsi_seguro(40,0,'Direito')[0])
 
-    def test_characterize_iq_threshold_disagreement(self):
-        self.assertIn('Ideal (55-68%)', evaluation_assignment('status_iq_d', iq_dir=68))
-        self.assertIn('equilibrada', self.ia.calcular_lsi(100, 100, flex_lesado=68)['acao'])
-        label = evaluation_assignment('status_iq_d', iq_dir=69)
-        self.assertIn('Dominância Isquios (>68%)', label)
-        self.assertIn('elevada', self.ia.calcular_lsi(100, 100, flex_lesado=69)['acao'])
+    def test_iq_is_descriptive_without_isokinetic_thresholds(self):
+        for ratio in (40, 55, 68, 69, 90):
+            self.assertEqual(evaluation_assignment('status_iq_d', iq_dir=ratio), 'Razão isométrica descritiva')
+            action = self.ia.calcular_lsi(100, 100, flex_lesado=ratio)['acao']
+            self.assertIn('Medida descritiva', action)
+            self.assertNotIn('Dominância', action)
 
     def test_ikdc_intermediate_and_worst(self):
         r=questionnaire('IKDC Subjetivo',dict(ik1=5,ik2='Diária (2 pts)',ik_at='Atividades Leves (3 pts)',ik4=5))
@@ -231,8 +231,8 @@ class ClinicalTests(unittest.TestCase):
     def test_prognosis_endpoints_and_missing_fallback(self):
         df=pd.DataFrame({'Data_dt':pd.to_datetime(['2026-01-01','2026-04-23']),'Sessão_Num':[1,2],'SANE_Pct_Num':[30,float('nan')]})
         before=df.copy(deep=True)
-        r=self.panel._calcular_curva_prognostica_sane(df,df,30,16)
-        self.assertEqual(r['esperado'],[30,85])
+        r=self.panel._resumir_evolucao_sane(df,30)
+        self.assertNotIn('esperado', r)
         self.assertEqual(r['real'][0],30)
         self.assertTrue(pd.isna(r['real'][1]))
         pd.testing.assert_frame_equal(df,before)

@@ -1,5 +1,5 @@
 """GENUA | Módulo 3: Painel Analítico (Cérebro Clínico) — Estilo Apple Health."""
-from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto
+from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -15,7 +15,7 @@ from modulo_avaliacao import gerar_pdf_somente_avaliacao
 def _mapear_inchaco(val) -> int:
     """Converte o texto de inchaço do Check-in ('Leve (+)', etc.) ou número para escala 0 a 3."""
     if pd.isna(val):
-        return 0
+        return np.nan
     s = str(val).strip().lower()
     if "+++" in s or "intenso" in s or "grave" in s or "3+" in s or s == "3":
         return 3
@@ -23,10 +23,13 @@ def _mapear_inchaco(val) -> int:
         return 2
     if "+" in s or "leve" in s or "vestígio" in s or "onda" in s or s == "1":
         return 1
-    try:
-        return int(float(s))
-    except Exception:
+    if s in ("nenhum", "nenhuma", "ausente", "sem derrame"):
         return 0
+    try:
+        numero = float(s)
+        return int(numero) if np.isfinite(numero) and numero.is_integer() and 0 <= numero <= 3 else np.nan
+    except Exception:
+        return np.nan
 
 
 def _score_funcional_item(texto_resp, dor_num_override=None):
@@ -119,86 +122,20 @@ def _detectar_proms_preenchidos(av_p: dict, prom_fenotipo: str = "KOOS") -> list
     return candidatos[:2] if candidatos else []
 
 
-def _calcular_curva_prognostica_sane(
-    df_completo: pd.DataFrame,
-    df_janela: pd.DataFrame,
-    sane_base: float,
-    semanas_esperadas: int = None
-) -> dict:
-    """Calcula a trajetória prognóstica esperada (PBE) vs. evolução real do paciente na escala SANE (0-100%)."""
-    w_esp = float(semanas_esperadas) if (semanas_esperadas and semanas_esperadas > 0) else 16.0
-    s0 = float(np.clip(sane_base, 0.0, 100.0))
-    meta_alta = max(85.0, s0)
-
-    dt_inicio = df_completo['Data_dt'].iloc[0] if (not df_completo.empty and 'Data_dt' in df_completo.columns) else pd.NaT
-
-    tempos_semanas = []
-    esperado_vals = []
-
-    for idx_row, row in df_janela.iterrows():
-        dt_atual = row.get('Data_dt', pd.NaT)
-        try:
-            matches = df_completo.index[df_completo['Sessão_Num'] == row['Sessão_Num']].tolist()
-            pos_global = matches[0] if matches else idx_row
-        except Exception:
-            pos_global = idx_row
-
-        if pd.notna(dt_inicio) and pd.notna(dt_atual):
-            dias = max(0.0, float((dt_atual - dt_inicio).days))
-            t_sem = dias / 7.0
-            if t_sem == 0.0 and pos_global > 0:
-                t_sem = pos_global * 0.5
-        else:
-            t_sem = pos_global * 0.5
-
-        tau = min(1.0, max(0.0, t_sem / w_esp))
-        val_esp = s0 + (meta_alta - s0) * (tau ** 0.75)
-
-        tempos_semanas.append(round(t_sem, 1))
-        esperado_vals.append(round(float(val_esp), 1))
-
-    sane_real_serie = df_janela['SANE_Pct_Num'].tolist()
-    real_atual = float(sane_real_serie[-1]) if sane_real_serie else s0
-    esp_atual = float(esperado_vals[-1]) if esperado_vals else s0
-    desvio = round(real_atual - esp_atual, 1)
-
-    if not np.isfinite(desvio):
-        status, cor, resumo = "incompleto", "⚪", "Falta medida de SANE para comparar a sessão com o marco zero."
-    elif desvio >= 5.0:
-        status = "acima"
-        cor = "🟢"
-        resumo = (
-            f"Paciente está **{desvio:+.1f}% acima** da Trajetória de Referência por Fenótipo para a semana "
-            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Referência: **{esp_atual:.0f}%**)."
-        )
-    elif desvio >= -10.0:
-        status = "dentro"
-        cor = "🔵"
-        resumo = (
-            f"Paciente evolui **dentro da Trajetória de Referência por Fenótipo** na semana "
-            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Referência: **{esp_atual:.0f}%** · Δ {desvio:+.1f}%)."
-        )
-    else:
-        status = "abaixo"
-        cor = "🔴"
-        resumo = (
-            f"Paciente encontra-se **{abs(desvio):.1f}% abaixo** da Trajetória de Referência por Fenótipo na semana "
-            f"{tempos_semanas[-1] if tempos_semanas else 0:.1f} (Real: **{real_atual:.0f}%** vs. Referência: **{esp_atual:.0f}%**). "
-            f"Revisar barreiras biopsicossociais, adesão ou dosagem de carga."
-        )
-
-    return {
-        "semanas_janela": int(w_esp),
-        "tempos_semanas": tempos_semanas,
-        "esperado": esperado_vals,
-        "real": sane_real_serie,
-        "real_atual": round(real_atual, 1),
-        "esp_atual": round(esp_atual, 1),
-        "desvio": desvio,
-        "status": status,
-        "cor": cor,
-        "resumo": resumo,
-    }
+def _resumir_evolucao_sane(df_janela, sane_base):
+    """Resume somente medidas observadas; não estima recuperação ou datas."""
+    valores = pd.to_numeric(df_janela['SANE_Pct_Num'], errors='coerce')
+    valores = valores.where(valores.between(0, 100))
+    atual = float(valores.iloc[-1]) if len(valores) else np.nan
+    base = pd.to_numeric(sane_base, errors="coerce")
+    base = float(base) if pd.notna(base) and 0 <= base <= 100 else np.nan
+    delta = atual - base
+    resumo = (
+        f"SANE registrado: **{atual:g}%** · variação de **{delta:+g} pontos percentuais** desde a avaliação."
+        if np.isfinite(delta) else "SANE incompleto para comparar a sessão com a avaliação."
+    )
+    return {"real": valores.tolist(), "delta": delta, "resumo": resumo,
+            "status": "observado" if np.isfinite(delta) else "incompleto"}
 
 
 def render():
@@ -531,9 +468,7 @@ def render():
         groc_sessao_int = None
 
     pass_sessao_str = str(ultima.get('PASS_Satisfacao', 'Não registrado') or 'Não registrado')
-    pass_bool = ultima.get('PASS_Atingido')
-    if pd.isna(pass_bool) or pass_bool is None:
-        pass_bool = pass_sessao_str.startswith("👍")
+    pass_bool = pass_registrado(ultima.get('PASS_Atingido'), pass_sessao_str)
 
     testes_ult = ultima.get('Testes_Funcionais', {}) if isinstance(ultima.get('Testes_Funcionais'), dict) else {}
     agach_str = str(testes_ult.get('Agachamento Bipodal', ''))
@@ -551,17 +486,17 @@ def render():
         fenotipo_sessao = "🚨 Dor e derrame com limitação no agachamento"
         diretriz = "Agachamento bipodal registrado como incapaz, com EVA ≥ 8 e derrame grau ≥ 2. Conferir a capacidade de apoio no exame."
     elif ("Incapaz" in step_down_str or "Moderada" in step_down_str or "Grave" in step_down_str) and inchaco_atual <= 1:
-        fenotipo_sessao = "🟣 Sobrecarga Femoropatelar"
-        diretriz = "Dor na desaceleração excêntrica. Foco em fortalecimento póstero-lateral de quadril e controle de vetor em cadeia fechada (0-45°)."
+        fenotipo_sessao = "🟣 Dor ou limitação no step-down"
+        diretriz = "O registro indica dificuldade no step-down. Correlacionar com o exame; o gesto isolado não define diagnóstico."
     elif ("Déficit" in ext_str) and inchaco_atual >= 2:
-        fenotipo_sessao = "🟤 Bloqueio / Artrogênico"
-        diretriz = "Déficit de extensão terminal associado a derrame articular (inibição artrogênica do quadríceps). Priorizar ganho de extensão 0° e controle de efusão."
+        fenotipo_sessao = "🟤 Déficit de extensão e derrame"
+        diretriz = "Extensão limitada com derrame registrado. Investigar a causa no exame clínico."
     elif ("Incapaz" in agach_str or "Moderada" in agach_str) and "Completa" in ext_str and inchaco_atual == 0:
-        fenotipo_sessao = "🟠 Tendinopático Reativo"
-        diretriz = "Dor em armazenamento/liberação de energia elástica sem derrame articular. Modular carga excêntrica e aplicar isometria analgésica (Rio et al., 2015)."
+        fenotipo_sessao = "🟠 Dor ou limitação no agachamento"
+        diretriz = "Dificuldade no agachamento, sem derrame registrado. Este conjunto não confirma tendinopatia."
     else:
-        fenotipo_sessao = "🔵 Acomodação de Carga"
-        diretriz = "Sinais reativos mistos. Modular volume e intensidade conforme irritabilidade tecidual (regra das 24h)."
+        fenotipo_sessao = "🔵 Acompanhamento dos sinais registrados"
+        diretriz = "Comparar os sinais com as sessões anteriores e com o exame clínico antes de ajustar a conduta."
 
     k1, k2, k3, k4, k5, k6 = st.columns(6)
     k1.metric(
@@ -731,7 +666,7 @@ def render():
         with st.container(border=True, key="ficha_simetria"):
             secao(
                 f"⚖️ Matriz de Simetria Bilateral (LSI) & Equilíbrio Isquiotibiais:Quadríceps (Razão I:Q — Lado: {av_lado})",
-                "O cálculo do Índice de Simetria (LSI ≥ 90%) e da Razão I:Q (55% a 68%) utiliza exclusivamente a Dinamometria Isométrica (kgf)."
+                "LSI e razão I:Q calculados com dinamometria isométrica (kgf). Interpretar conforme o protocolo de medição e a condição clínica."
             )
 
             c_sim1, c_sim2 = st.columns([1.45, 1.55], gap="large")
@@ -750,7 +685,7 @@ def render():
                             f"**⚖️ Razão Isquiotibiais : Quadríceps (I:Q Ratio):** "
                             f"Direito: **{f'{iq_d:.0f}% ({iq_d/100:.2f})' if iq_d else 'N/D'}** | "
                             f"Esquerdo: **{f'{iq_e:.0f}% ({iq_e/100:.2f})' if iq_e else 'N/D'}** "
-                            f"*(Alvo PBE: 55% a 68% — Croisier et al., 2008 / Kyritsis et al., 2016)*"
+                            f"*(Razão descritiva; limites isocinéticos não são aplicados a estas medidas isométricas.)*"
                         )
                 else:
                     st.info(
@@ -828,53 +763,26 @@ def render():
             plt.close(fig2)
 
         with st.container(border=True, key="ficha_prognostico"):
-            prog_data = _calcular_curva_prognostica_sane(
-                df_completo=df_p,
-                df_janela=df_janela,
-                sane_base=sane_base_av,
-                semanas_esperadas=fen_info.get("tempo_esperado_semanas")
-            )
-
+            prog_data = _resumir_evolucao_sane(df_janela, sane_base_av)
             secao(
-                f"🏆 Prognóstico por Fenótipo: Trajetória de Referência por Fenótipo × Evolução Real SANE (Últimas {len(df_janela)} sessões)",
-                f"Fenótipo: {label_fenotipo_exib} (Janela de Referência: {prog_data['semanas_janela']} semanas) · "
-                f"Objetivo: '{av_objetivo}' · Limiar de Alta ≥ 85% (Shelbourne et al., 2009)."
+                f"🏆 Evolução registrada do SANE (Últimas {len(df_janela)} sessões)",
+                f"Objetivo: '{av_objetivo}'. GROC e PASS são respostas separadas; não entram no cálculo desta linha."
             )
 
             fig_sane, ax_s = plt.subplots(figsize=(10, 3.8), dpi=120)
             x_prog = np.arange(len(df_janela))
             sane_serie = np.array(prog_data["real"], dtype=float)
-            esp_serie = np.array(prog_data["esperado"], dtype=float)
-
-            faixa_inf = np.clip(esp_serie - 10.0, 0.0, 100.0)
-            faixa_sup = np.clip(esp_serie + 5.0, 0.0, 100.0)
-            ax_s.fill_between(
-                x_prog, faixa_inf, faixa_sup,
-                color=CORES_GENUA['secundaria'], alpha=0.11,
-                label="Faixa de Referência (-10% a +5%)"
-            )
-
-            ax_s.plot(
-                x_prog, esp_serie,
-                color=CORES_GENUA['secundaria'], linestyle='--', marker='^', markersize=5.5,
-                lw=2.2, alpha=0.9, label=f"Trajetória de Referência por Fenótipo ({prog_data['semanas_janela']} sem)"
-            )
-
             ax_s.plot(
                 x_prog, sane_serie,
                 color=CORES_GENUA['primaria'], linestyle='-', marker='o', markersize=7.5,
                 lw=3.0, zorder=5, label="Paciente — SANE Real (%)"
             )
 
-            ax_s.axhline(y=85, color=CORES_GENUA['alerta_sucesso'], linestyle=':', lw=1.5, alpha=0.85, label="Critério de Alta (85%)")
             if np.isfinite(sane_base_av):
                 ax_s.axhline(y=sane_base_av, color=CORES_GENUA['texto_suave'], linestyle=':', lw=1.1, alpha=0.6, label=f"Marco Zero ({sane_base_av:.0f}%)")
 
             ax_s.set_xticks(x_prog)
-            labels_eixo_x = [
-                f"{sess}\n(Sem {sem:.1f})"
-                for sess, sem in zip(df_janela['Sessão_Num'], prog_data['tempos_semanas'])
-            ]
+            labels_eixo_x = df_janela['Sessão_Num'].tolist()
             ax_s.set_xticklabels(labels_eixo_x, rotation=20, ha='right', fontsize=8.5)
             ax_s.set_ylabel("Capacidade Funcional — SANE (%)", fontweight='600', color=CORES_GENUA['primaria'])
             ax_s.set_ylim(-5, 108)
@@ -891,29 +799,22 @@ def render():
             st.pyplot(fig_sane)
             plt.close(fig_sane)
 
-            if prog_data["status"] == "incompleto":
-                st.info(prog_data["resumo"])
-            elif prog_data["status"] == "acima":
-                st.success(f"{prog_data['cor']} **PROGNÓSTICO ACIMA DO ESPERADO** — {prog_data['resumo']}")
-            elif prog_data["status"] == "dentro":
-                st.info(f"{prog_data['cor']} **DENTRO DA CURVA PROGNÓSTICA PBE** — {prog_data['resumo']}")
-            else:
-                st.warning(f"{prog_data['cor']} **ABAIXO DA CURVA ESPERADA PELA LITERATURA** — {prog_data['resumo']}")
+            st.info(prog_data["resumo"])
+            st.caption("A linha descreve as respostas registradas; não é uma previsão de recuperação ou de alta.")
 
     # ABA 3: INTELIGÊNCIA CLÍNICA & CHECKLIST DE ALTA
     with t_ic:
         with st.container(border=True, key="ficha_alta"):
             secao(
-                "🚦 Checklist de Critérios Objetivos para Alta Funcional (6 Gatekeepers PBE)",
-                "Estes 6 critérios compõem o painel de metas do Laudo PDF. O critério 5 exige medição por Dinamometria (kgf)."
+                "🚦 Checklist de acompanhamento — 6 metas do GENUA",
+                "Referências de acompanhamento do MVP, não uma bateria validada de alta. A decisão depende do caso e da avaliação profissional."
             )
 
-            crit_dor = dor_atual <= 2
-            crit_derrame = inchaco_atual <= 1
-            crit_ext = "Completa" in ext_str
-            crit_flex = flex_atual >= 125
-            crit_lsi = (usa_dinamometria and lsi_quad_num is not None and lsi_quad_num >= 90.0)
-            crit_sane_pass = (sane_sessao >= 85.0 and pass_bool)
+            ext_completa = True if "Completa" in ext_str else (False if "Déficit" in ext_str else None)
+            crit_dor, crit_derrame, crit_ext, crit_flex, crit_lsi, crit_sane_pass = criterios_acompanhamento(
+                dor_atual, inchaco_atual, ext_completa, flex_atual,
+                lsi_quad_num if usa_dinamometria else None, sane_sessao, pass_bool
+            )
 
             criterios_lista = [
                 ("1. Controle Álgico (EVA ≤ 2/10)", crit_dor, f"Atual: {dor_atual}/10" if pd.notna(dor_atual) else "Não avaliado", "Salaffi 2004"),
@@ -926,18 +827,19 @@ def render():
                     f"Atual: {f'{lsi_quad_num:g}% (Dinamometria kgf)' if (usa_dinamometria and lsi_quad_num is not None) else 'Opcional / Aguardando Dinamometria'}",
                     "Grindem 2016"
                 ),
-                ("6. Meta Subjetiva Atingida (SANE ≥ 85% + PASS Sim)", crit_sane_pass, f"SANE: {sane_sessao:.0f}% | PASS: {'Sim' if pass_bool else 'Não'}", "Shelbourne 2009 / Tubach 2005"),
+                ("6. Meta Subjetiva Atingida (SANE ≥ 85% + PASS Sim)", crit_sane_pass, f"SANE: {sane_sessao:g}% | PASS: {'Sim' if pass_bool is True else 'Não' if pass_bool is False else 'Não registrado'}" if pd.notna(sane_sessao) else 'SANE não avaliado', "Shelbourne 2009 / Tubach 2005"),
             ]
 
             total_cumpridos = sum(1 for _, ok, _, _ in criterios_lista if ok)
             pct_gatekeeper = (total_cumpridos / len(criterios_lista)) * 100.0
 
-            st.markdown(f"**📊 Score de Critérios de Alta Cumpridos: {total_cumpridos}/{len(criterios_lista)} ({pct_gatekeeper:.0f}%)**")
+            st.markdown(f"**📊 Metas de acompanhamento atingidas: {total_cumpridos}/{len(criterios_lista)} ({pct_gatekeeper:.0f}%)**")
             st.progress(pct_gatekeeper / 100.0)
+            st.caption(f"{sum(ok is None for _, ok, _, _ in criterios_lista)} metas pendentes por falta de medidas.")
 
             cg1, cg2 = st.columns(2)
             for idx_c, (nome_c, ok_c, valor_c, ref_c) in enumerate(criterios_lista):
-                icone_c = "✅" if ok_c else ("⏳" if "Aguardando" in valor_c or "Opcional" in valor_c else "❌")
+                icone_c = "✅" if ok_c else ("⏳" if ok_c is None else "❌")
                 cor_borda = CORES_GENUA['alerta_sucesso'] if ok_c else CORES_GENUA['alerta_aviso']
                 with (cg1 if idx_c < 3 else cg2):
                     st.markdown(
@@ -961,11 +863,11 @@ def render():
 
         with st.container(border=True, key="ficha_conduta"):
             secao(
-                "🔬 Diretriz de Conduta Imediata (Sessão Selecionada)",
+                "🔬 Sinais para revisão clínica (sessão selecionada)",
                 "Síntese algorítmica cruzando derrame articular, resposta a carga excêntrica/elástica e mobilidade."
             )
             st.markdown(f"- **Classificação Funcional da Sessão ({sessao_escolhida}):** {fenotipo_sessao}")
-            st.markdown(f"- **Conduta Recomendada (PBE):** {diretriz}")
+            st.markdown(f"- **Observação para o fisioterapeuta:** {diretriz}")
 
     # ============================================================
     # 5. CARD DE EXPORTAÇÃO DO LAUDO DE EVOLUÇÃO (CLEAN LIGHT GENUA)

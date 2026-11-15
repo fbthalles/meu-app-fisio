@@ -47,3 +47,7 @@ class LaudoTest(unittest.TestCase):
             "Testes_Funcionais": {"Afundo": "Incapaz", "Salto": "Não testado"},
             "Testes_Funcionais_Dor_Num": {"Afundo": 10, "Salto": 0}}])
         self.assertFalse('alt="Testes Funcionais"' in html)
+
+    def test_no_effusion_is_a_measured_normal_value(self):
+        html = gerar_laudo_html('Fictício', {}, [{'Data':'2026-11-14','Dor':0,'Inchaço':'Nenhum'}])
+        self.assertIn('Atual: Grau 0/3 (Nenhum)', html)

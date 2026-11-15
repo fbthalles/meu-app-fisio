@@ -450,8 +450,9 @@ def render():
         )
 
     if escolha == "➕ Nova Avaliação":
-        st.session_state.doc_id_avaliacao = None
-        st.session_state.dados_antigos = None
+        if trocou_escolha_aval:
+            st.session_state.doc_id_avaliacao = None
+            st.session_state.dados_antigos = None
         st.session_state["_ultima_escolha_aval"] = "➕ Nova Avaliação"
     else:
         registro = registros[escolha]
@@ -1082,12 +1083,12 @@ def render():
                     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
                     ciq1, ciq2 = st.columns(2)
                     if iq_dir is not None:
-                        status_iq_d = "🟢 Equilíbrio Ideal (55-68%)" if 55 <= iq_dir <= 68 else ("🔴 Dominância Quadríceps (<55%)" if iq_dir < 55 else "🟡 Dominância Isquios (>68%)")
-                        ciq1.metric("⚖️ Razão I:Q — Direito (Isquios/Quad)", f"{iq_dir:.0f}% ({iq_dir/100:.2f})", status_iq_d, delta_color="normal" if 55 <= iq_dir <= 68 else "inverse")
+                        status_iq_d = "Razão isométrica descritiva"
+                        ciq1.metric("⚖️ Razão I:Q — Direito (Isquios/Quad)", f"{iq_dir:.0f}% ({iq_dir/100:.2f})", status_iq_d, delta_color="off")
                         partes_resumo_lsi.append(f"Razao I:Q Dir: {iq_dir:.0f}%")
                     if iq_esq is not None:
-                        status_iq_e = "🟢 Equilíbrio Ideal (55-68%)" if 55 <= iq_esq <= 68 else ("🔴 Dominância Quadríceps (<55%)" if iq_esq < 55 else "🟡 Dominância Isquios (>68%)")
-                        ciq2.metric("⚖️ Razão I:Q — Esquerdo (Isquios/Quad)", f"{iq_esq:.0f}% ({iq_esq/100:.2f})", status_iq_e, delta_color="normal" if 55 <= iq_esq <= 68 else "inverse")
+                        status_iq_e = "Razão isométrica descritiva"
+                        ciq2.metric("⚖️ Razão I:Q — Esquerdo (Isquios/Quad)", f"{iq_esq:.0f}% ({iq_esq/100:.2f})", status_iq_e, delta_color="off")
                         partes_resumo_lsi.append(f"Razao I:Q Esq: {iq_esq:.0f}%")
 
                 resumo_lsi_iq_str = " | ".join(partes_resumo_lsi) if partes_resumo_lsi else "Não medido"
@@ -1248,7 +1249,7 @@ def render():
     with t_quest:
         with st.container(border=True, key="ficha_questionarios"):
             secao(
-                "📋 Questionários Validados de Joelho (Versões Clínicas Adaptadas GENUA & Escalas Oficiais)",
+                "📋 Questionários de joelho — versões e instrumentos",
                 "Versões Clínicas Adaptadas GENUA (KOOS-12, LEFS-10, IKDC-5, WOMAC-15) e Escalas de 8 itens oficiais (VISA-P e Lysholm). Apenas os marcados entram no cálculo e no PDF."
             )
 
@@ -1303,7 +1304,7 @@ def render():
 
                 pct_koos_calc = (score_koos_bruto / (len(perguntas_koos12) * 4)) * 100.0
                 interp_koos_calc = "🚨 Risco Funcional" if pct_koos_calc < 40 else "🟡 Limitação Moderada" if pct_koos_calc < 80 else "🟢 Alta Performance"
-                st.info(f"📊 **Resultado KOOS-12:** **{pct_koos_calc:.1f}%** — {interp_koos_calc} *(MCID: 8-10 pts | Roos 2003)*")
+                st.info(f"📊 **Resultado KOOS-12:** **{pct_koos_calc:.1f}%** — {interp_koos_calc} *(Versão adaptada: sem MCID validado para este conjunto de itens)*")
 
             # 2. IKDC Subjetivo (Versão Clínica Adaptada GENUA — IKDC-5)
             with st.expander("✚ IKDC Subjetivo — Versão Clínica Adaptada GENUA (IKDC-5: Dor, Frequência, Nível Esportivo e Função)", expanded=("IKDC" in proms_aplicados)):
@@ -1325,7 +1326,7 @@ def render():
 
                 score_ikdc_calc = min(100.0, ((ik_dor + ik_pts_freq + ik_pts_at + (ik_func_atual * 2)) / 50.0) * 100.0)
                 interp_ikdc_calc = "🚨 Baixa Função Subjetiva" if score_ikdc_calc < 60 else "🟡 Desempenho Moderado" if score_ikdc_calc < 85 else "🟢 Excelente Desempenho"
-                st.info(f"📊 **Resultado IKDC-5:** **{score_ikdc_calc:.1f}%** — {interp_ikdc_calc} *(MCID: 9 pts | Irrgang 2006)*")
+                st.info(f"📊 **Resultado IKDC-5:** **{score_ikdc_calc:.1f}%** — {interp_ikdc_calc} *(Versão adaptada: sem MCID validado para este conjunto de itens)*")
 
             # 3. LEFS (Versão Clínica Adaptada GENUA — LEFS-10)
             with st.expander("📝 LEFS (Versão Clínica Adaptada GENUA — LEFS-10: 10 Atividades Chave da Extremidade Inferior)", expanded=("LEFS" in proms_aplicados)):
@@ -1362,7 +1363,7 @@ def render():
                     "🟢 Função Boa" if pct_lefs_calc < 85 else
                     "⭐ Função Excelente"
                 )
-                st.info(f"📊 **Resultado LEFS:** {pts_lefs_80_calc}/80 pts equivalentes (**{pct_lefs_calc:.1f}%**) — {interp_lefs_calc} *(MCID: 9 pts | Binkley 1999)*")
+                st.info(f"📊 **Resultado LEFS:** {pts_lefs_80_calc}/80 pts equivalentes (**{pct_lefs_calc:.1f}%**) — {interp_lefs_calc} *(Versão adaptada: sem MCID validado para este conjunto de itens)*")
 
             # 4. VISA-P (8 itens oficiais completos)
             with st.expander("🎯 VISA-P Completo (Tendinopatia Patelar — 8 itens oficiais)", expanded=("VISA-P" in proms_aplicados)):
