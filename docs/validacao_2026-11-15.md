@@ -13,7 +13,7 @@ Base revisada: `825a931` (Antigravity). Etapas autorizadas: 1, 2, 3 e 5. A etapa
 
 ## Evidências
 
-- Suite: 85 testes via `.venv/bin/python -m unittest discover -s tests`.
+- Suite: 86 testes via `.venv/bin/python -m unittest discover -s tests`.
 - Antes da correção, o novo teste de ciclo de gravação falhava nas duas fichas por criar IDs diferentes. Depois, passou. AppTest dos formulários completos com banco em memória também preservou um documento após duas gravações.
 - AppTest do painel com fixture sintética de 12 sessões: LSI 75%, SANE 85%, tolerância funcional 97%; seleção da primeira sessão sem exceção. Laudo gerado com LSI 75%.
 - Medição pontual local em 14/11: painel 1,65 s, geração do laudo 0,42 s. Não é benchmark do Streamlit Cloud ou teste de carga.
@@ -28,3 +28,7 @@ A jornada completa de criação, edição e recarga das sessões após este depl
 
 - [Kyritsis et al., 2016](https://pubmed.ncbi.nlm.nih.gov/27215935/): razão I:Q avaliada em teste isocinético a 60°/s; não sustenta aplicar automaticamente o mesmo corte às forças isométricas em kgf do GENUA.
 - [Consenso de Berna, 2016](https://bjsm.bmj.com/content/50/14/853): retorno ao esporte como decisão multifatorial. A lista de metas locais não substitui essa avaliação.
+
+## Verificação após publicação
+
+Publicados `795be1c` e `aa171d1`. No aplicativo oficial, uma sessão sintética foi gravada, reaberta no painel e editada, permanecendo S1. O teste encontrou perda do valor inicial de flexão ao voltar do painel para uma ficha recém-salva; `aa171d1` recupera o payload salvo e adiciona regressão específica. A verificação completa dessa última correção no Cloud permanece pendente; o teste local passou.
