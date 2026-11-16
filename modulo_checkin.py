@@ -242,7 +242,7 @@ def render():
             st.session_state.dados_checkin_antigos = None
             st.session_state["autosave_checkin_ativo"] = False
         st.session_state["_ultima_escolha_chk"] = "➕ Nova Sessão"
-        dados = {}
+        dados = (st.session_state.get("_payload_checkin_atual") or {}) if st.session_state.doc_id_checkin else {}
     else:
         registro = registros[escolha]
         if trocou_escolha_chk:

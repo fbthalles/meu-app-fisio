@@ -462,7 +462,9 @@ def render():
         st.session_state.doc_id_avaliacao = registro["id"]
         st.session_state["_ultima_escolha_aval"] = escolha
 
-    dados = st.session_state.get("dados_antigos") or {}
+    dados = st.session_state.get("dados_antigos") or (
+        st.session_state.get("_payload_avaliacao_atual") if st.session_state.get("doc_id_avaliacao") else {}
+    ) or {}
     modo_edicao = st.session_state.get("doc_id_avaliacao") is not None
 
     def get_idx(opcoes_lista, chave, fallback_chave=None):

@@ -10,7 +10,9 @@ class FormLifecycleTests(unittest.TestCase):
     def lifecycle(self, filename, state, choice, records=None):
         render=next(n for n in tree(filename).body if isinstance(n,ast.FunctionDef) and n.name=='render')
         start=next(i for i,n in enumerate(render.body) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id.startswith('trocou_escolha_') for t in n.targets))
-        execute(render.body[start:start+3], dict(st=SimpleNamespace(session_state=state),escolha=choice,registros=records or {},reiniciar_widgets_ficha=reiniciar_widgets_ficha),filename)
+        ns=dict(st=SimpleNamespace(session_state=state),escolha=choice,registros=records or {},reiniciar_widgets_ficha=reiniciar_widgets_ficha)
+        execute(render.body[start:start+4], ns,filename)
+        return ns
 
     def test_repeated_new_form_save_updates_same_document(self):
         for file,new,key,collection in [('modulo_avaliacao.py','➕ Nova Avaliação','doc_id_avaliacao','Avaliacao_Inicial'),('modulo_checkin.py','➕ Nova Sessão','doc_id_checkin','Evolucao')]:
@@ -29,6 +31,17 @@ class FormLifecycleTests(unittest.TestCase):
                 self.lifecycle(file,state,first,{first:record})
                 self.lifecycle(file,state,new)
                 self.assertIsNone(state[key])
+
+    def test_newly_saved_form_restores_payload_after_widget_cleanup(self):
+        for file,new,key,payload_key in [('modulo_avaliacao.py','➕ Nova Avaliação','doc_id_avaliacao','_payload_avaliacao_atual'),('modulo_checkin.py','➕ Nova Sessão','doc_id_checkin','_payload_checkin_atual')]:
+            state=State(paciente='Ficticio QA',_paciente_contexto='Ficticio QA')
+            self.lifecycle(file,state,new)
+            state[key]='saved-id'
+            state[payload_key]={'Paciente':'Ficticio QA','Flexao':120,'Dor':4}
+            ns=self.lifecycle(file,state,new)
+            self.assertEqual(ns['dados']['Flexao'],120)
+            self.assertEqual(ns['dados']['Dor'],4)
+
 
 class ClinicalValidationTests(unittest.TestCase):
     def test_missing_measures_pending_and_zero_pain_is_valid(self):
