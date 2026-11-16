@@ -1,5 +1,7 @@
 # Validação do MVP — 15/11/2026
 
+Continuação e fechamento da jornada oficial: [validação de 16/11](validacao_2026-11-16.md).
+
 Base revisada: `825a931` (Antigravity). Etapas autorizadas: 1, 2, 3 e 5. A etapa 4, preparação para uso real, permanece adiada.
 
 ## Correções
