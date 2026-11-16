@@ -42,6 +42,30 @@ class FormLifecycleTests(unittest.TestCase):
             self.assertEqual(ns['dados']['Flexao'],120)
             self.assertEqual(ns['dados']['Dor'],4)
 
+    def test_manual_save_selects_saved_record_before_starting_another(self):
+        for filename, noun in [('modulo_avaliacao.py', 'avaliacao'), ('modulo_checkin.py', 'checkin')]:
+            render = next(n for n in tree(filename).body if isinstance(n, ast.FunctionDef) and n.name == 'render')
+            block = next(n for n in ast.walk(render) if isinstance(n, ast.If) and isinstance(n.test, ast.Name) and n.test.id in ('avaliacoes_existentes', 'sessoes_existentes'))
+            start = next(i for i, n in enumerate(block.body) if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'salvo' for t in n.targets))
+            state = State({f'_selecionar_{noun}_salvo': 'saved-id'})
+            ns = dict(st=SimpleNamespace(session_state=state), registros={'saved-id': {}})
+            execute(block.body[start:start+2], ns, filename)
+            self.assertEqual(state[f'seletor_{noun}'], 'saved-id')
+            self.assertNotIn(f'_selecionar_{noun}_salvo', state)
+
+    def test_clinical_controls_have_record_scoped_keys(self):
+        widgets = {'selectbox', 'multiselect', 'slider', 'select_slider', 'number_input', 'date_input', 'text_input', 'text_area', 'radio', 'checkbox', 'pills', '_seletor_ios'}
+        for filename in ['modulo_avaliacao.py', 'modulo_checkin.py']:
+            for node in ast.walk(tree(filename)):
+                if not isinstance(node, ast.Call) or node.lineno < 300:
+                    continue
+                name = node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id if isinstance(node.func, ast.Name) else ''
+                if name not in widgets:
+                    continue
+                for kw in node.keywords:
+                    if kw.arg == 'key' and isinstance(kw.value, ast.Constant):
+                        self.assertIn(kw.value.value, ('seletor_avaliacao', 'seletor_checkin'), f'{filename}:{node.lineno} reuses a clinical widget across records')
+
 
 class ClinicalValidationTests(unittest.TestCase):
     def test_missing_measures_pending_and_zero_pain_is_valid(self):

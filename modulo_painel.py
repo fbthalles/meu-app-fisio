@@ -1,5 +1,5 @@
 """GENUA | Módulo 3: Painel Analítico (Cérebro Clínico) — Estilo Apple Health."""
-from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
+from services.medidas import grau_derrame, lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,24 +12,8 @@ from modulo_avaliacao import gerar_pdf_somente_avaliacao
 # ============================================================
 # HELPERS MATEMÁTICOS E PARSERS BLINDADOS (RETROCOMPATÍVEIS)
 # ============================================================
-def _mapear_inchaco(val) -> int:
-    """Converte o texto de inchaço do Check-in ('Leve (+)', etc.) ou número para escala 0 a 3."""
-    if pd.isna(val):
-        return np.nan
-    s = str(val).strip().lower()
-    if "+++" in s or "intenso" in s or "grave" in s or "3+" in s or s == "3":
-        return 3
-    if "++" in s or "moderado" in s or "2+" in s or s == "2":
-        return 2
-    if "+" in s or "leve" in s or "vestígio" in s or "onda" in s or s == "1":
-        return 1
-    if s in ("nenhum", "nenhuma", "ausente", "sem derrame"):
-        return 0
-    try:
-        numero = float(s)
-        return int(numero) if np.isfinite(numero) and numero.is_integer() and 0 <= numero <= 3 else np.nan
-    except Exception:
-        return np.nan
+def _mapear_inchaco(val):
+    return grau_derrame(val)
 
 
 def _score_funcional_item(texto_resp, dor_num_override=None):
@@ -291,6 +275,7 @@ def render():
     # ============================================================
     # 1. HEADER EXECUTIVO DO PACIENTE (Sem PSFS, Com SANE + Fenótipo)
     # ============================================================
+    sane_base_rotulo = f"{sane_base_av:.0f}%" if pd.notna(sane_base_av) else "não informado"
     with st.container(border=True, key="ficha_resumo"):
         st.markdown(f"""
             <div style='display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;'>
@@ -304,7 +289,7 @@ def render():
                     </h2>
                     <p style='margin: 0; color: {CORES_GENUA['texto_suave']}; font-size: 0.92rem;'>
                         <b>Dx / HMA:</b> {dx_clinico_base if dx_clinico_base != 'Não especificado' else av_hma[:90]} &nbsp;|&nbsp;
-                        <b>Objetivo Funcional (SANE Base {sane_base_av:.0f}%):</b> {av_objetivo}
+                        <b>Objetivo Funcional (SANE Base {sane_base_rotulo}):</b> {av_objetivo}
                     </p>
                 </div>
                 <div style='display: flex; gap: 8px; align-items: center; flex-wrap: wrap;'>
@@ -563,7 +548,7 @@ def render():
     t1, t2, t_ic = st.tabs([
         "📊 1. Carga, Dor & Reatividade (24h)",
         "📐 2. Biomecânica, Simetria (LSI / I:Q) & Metas",
-        "🧠 3. Inteligência Clínica & Critérios de Alta"
+        "🧠 3. Inteligência Clínica & Metas de Acompanhamento"
     ])
 
     # ABA 1: CARGA, DOR, FUNÇÃO E REATIVIDADE ARTICULAR
@@ -618,7 +603,7 @@ def render():
         with st.container(border=True, key="ficha_reatividade"):
             secao(
                 f"💧 Rastreador de Irritabilidade Tecidual: Derrame × Dor × Sono (Últimas {len(df_janela)} sessões)",
-                "Diferenciação clínica: Picos de dor acompanhados de aumento do derrame indicam sobrecarga mecânica; picos de dor sem derrame após noite de 'Insônia/Acordou com dor' sugerem amplificação central (Finan et al., 2013)."
+                "Compare dor, derrame e sono ao longo das sessões. A coincidência entre mudanças não identifica, por si só, a causa da dor; interprete com a história e o exame clínico."
             )
             fig_reat, ax_r1 = plt.subplots(figsize=(10, 3.3), dpi=120)
             x_idx = np.arange(len(df_janela))
@@ -875,7 +860,7 @@ def render():
     with st.container(border=True, key="ficha_laudo"):
         secao(
             "📄 Exportação de Laudo de Evolução Clínica (Clean Light GENUA)",
-            "Gera o relatório executivo longitudinal com as últimas 10 sessões, Velocímetro de ADM, Força por Dinamometria (kgf), os 6 Critérios de Alta e Conclusões Editáveis."
+            "Gera o relatório executivo longitudinal com as últimas 10 sessões, Velocímetro de ADM, Força por Dinamometria (kgf), as 6 Metas de Acompanhamento e Conclusões Editáveis."
         )
 
         opcoes_prom_laudo = ["KOOS", "IKDC", "LEFS", "VISA-P", "Lysholm", "WOMAC"]

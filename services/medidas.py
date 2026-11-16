@@ -66,3 +66,20 @@ def criterios_acompanhamento(dor, derrame, extensao_completa, flexao, lsi, sane,
         limite(flexao, 0, 180, 125, True), limite(lsi, 0, float('inf'), 90, True),
         bool(sane_ok and satisfacao) if sane_ok is not None and satisfacao is not None else None,
     )
+
+
+def grau_derrame(valor):
+    """Converte respostas reconhecidas para 0–3; desconhecidos ficam ausentes."""
+    texto = str(valor).strip().lower()
+    if texto in ("nenhum", "nenhuma", "ausente", "sem derrame"):
+        return 0
+    for grau, termos in [(3, ("+++", "intenso", "grave", "3+")), (2, ("++", "moderado", "2+")), (1, ("+", "leve", "vestígio", "onda"))]:
+        if any(termo in texto for termo in termos):
+            return grau
+    try:
+        numero = float(texto)
+        if isfinite(numero) and numero.is_integer() and 0 <= numero <= 3:
+            return int(numero)
+    except (ValueError, TypeError):
+        pass
+    return float("nan")

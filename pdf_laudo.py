@@ -12,7 +12,7 @@ Exporta:
 
 Dependências: fpdf2, matplotlib, numpy, io, os, base64, datetime
 """
-from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
+from services.medidas import grau_derrame, lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
 import io
 import os
 import base64
@@ -134,24 +134,8 @@ def _extrair_def_extensao_graus(val_ext) -> float:
     return abs(_safe_float(numero.group())) if numero else float("nan")
 
 
-def _mapear_inchaco_grau(val) -> int:
-    """Converte o texto de inchaço/derrame ('Nenhum', 'Leve (+)', etc.) para escala numérica 0 a 3."""
-    if val is None or val == "":
-        return np.nan
-    s = str(val).strip().lower()
-    if "+++" in s or "intenso" in s or "grave" in s or "3+" in s or s == "3":
-        return 3
-    if "++" in s or "moderado" in s or "2+" in s or s == "2":
-        return 2
-    if "+" in s or "leve" in s or "vestígio" in s or "onda" in s or s == "1":
-        return 1
-    if s in ("nenhum", "nenhuma", "ausente", "sem derrame"):
-        return 0
-    try:
-        numero = float(s)
-        return int(numero) if np.isfinite(numero) and numero.is_integer() and 0 <= numero <= 3 else np.nan
-    except Exception:
-        return np.nan
+def _mapear_inchaco_grau(val):
+    return grau_derrame(val)
 
 
 def _normalizar_entradas(dados_aval, historico):
@@ -465,7 +449,7 @@ def gerar_laudo_html(paciente_nome, dados_aval=None, historico=None, insights=No
     - Gráficos com até 10 sessões rotuladas com S# e Data (DD/MM).
     - Força Muscular vinculada EXCLUSIVAMENTE à Dinamometria (kgf) com LSI e Razão I:Q.
     - Objetivos centrados em SANE (0-100%) e GROC (-7 a +7), sem PSFS.
-    - Checklist dos 6 Pontos de Objetivo para Atingir (Gatekeepers PBE de Alta Funcional).
+    - Checklist de seis metas operacionais de acompanhamento (não determina alta).
     """
     dados_aval, hist = _normalizar_entradas(dados_aval, historico)
     n_sessoes = len(hist)

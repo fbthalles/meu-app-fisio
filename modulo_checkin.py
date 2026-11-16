@@ -190,6 +190,9 @@ def render():
                 registros = {item["id"]: item for item in sessoes_existentes}
                 rotulos = {s["id"]: f"✏️ {s['data'].get('Data', '?')} — Dor: {s['data'].get('Dor', '?')}/10 | Flexão: {s['data'].get('Flexao', '?')}°" for s in sessoes_existentes}
                 opcoes = ["➕ Nova Sessão", *registros]
+                salvo = st.session_state.pop("_selecionar_checkin_salvo", None)
+                if salvo in registros:
+                    st.session_state["seletor_checkin"] = salvo
                 escolha = st.selectbox(
                     "Sessão",
                     opcoes,
@@ -289,7 +292,7 @@ def render():
 
             lado_acometido_base = str(ultima_aval.get("Lado_Acometido", "Direito") or "Direito")
             objetivo_paciente_base = str(ultima_aval.get("Objetivo_Paciente", "Retorno à função sem dor") or "Retorno à função sem dor")
-            sane_baseline = int(float(ultima_aval.get("SANE_Baseline_Pct", 30) or 30))
+            sane_baseline = int(float(ultima_aval["SANE_Baseline_Pct"])) if ultima_aval.get("SANE_Baseline_Pct") is not None else 30
     except Exception:
         testes_da_avaliacao = ["Agachamento Bipodal"]
 
@@ -332,7 +335,7 @@ def render():
                 "🦵 Escopo de Registro Articular da Sessão",
                 op_modo_lado,
                 default_modo_lado,
-                key="pill_modo_lado_chk",
+                key=chave_widget(st.session_state, "pill_modo_lado_chk"),
             )
 
         eh_bilateral_chk = modo_lado_sessao == op_modo_lado[1]
@@ -366,7 +369,7 @@ def render():
                     "💧 Inchaço / Derrame Articular",
                     opts_inchaco,
                     inchaco_default,
-                    key="pill_inchaco",
+                    key=chave_widget(st.session_state, "pill_inchaco"),
                 )
 
             with c_chk2:
@@ -383,7 +386,7 @@ def render():
                     "📏 Extensão Terminal",
                     opts_ext,
                     ext_default,
-                    key="pill_extensao",
+                    key=chave_widget(st.session_state, "pill_extensao"),
                 )
 
                 sono_default = dados.get("Sono", "Bem") if modo_edicao_chk else "Bem"
@@ -391,7 +394,7 @@ def render():
                     "🌙 Qualidade do Sono (Última Noite)",
                     opts_sono,
                     sono_default,
-                    key="pill_sono",
+                    key=chave_widget(st.session_state, "pill_sono"),
                 )
 
             if "Esquerdo" in lado_acometido_base:
@@ -415,7 +418,7 @@ def render():
                     0,
                     10,
                     int(float(dados.get("Dor_Dir", dados.get("Dor", 0)))) if modo_edicao_chk else 0,
-                    key="sl_dor_d",
+                    key=chave_widget(st.session_state, "sl_dor_d"),
                 )
                 flex_d = st.number_input(
                     "📐 Flexão Máxima — Direito (°)",
@@ -423,19 +426,19 @@ def render():
                     max_value=160,
                     step=5,
                     value=int(float(dados.get("Flexao_Dir", dados.get("Flexao", 90)))) if modo_edicao_chk else 90,
-                    key="num_flex_d",
+                    key=chave_widget(st.session_state, "num_flex_d"),
                 )
                 ext_d = _seletor_ios(
                     "📏 Extensão Terminal — Direito",
                     opts_ext,
                     dados.get("Extensao_Dir", dados.get("Extensao", "Completa (0°)")) if modo_edicao_chk else "Completa (0°)",
-                    key="pill_ext_d",
+                    key=chave_widget(st.session_state, "pill_ext_d"),
                 )
                 inc_d = _seletor_ios(
                     "💧 Inchaço / Derrame — Direito",
                     opts_inchaco,
                     dados.get("Inchaco_Dir", dados.get("Inchaço", "Nenhum")) if modo_edicao_chk else "Nenhum",
-                    key="pill_inc_d",
+                    key=chave_widget(st.session_state, "pill_inc_d"),
                 )
 
             with col_e:
@@ -445,7 +448,7 @@ def render():
                     0,
                     10,
                     int(float(dados.get("Dor_Esq", dados.get("Dor", 0)))) if modo_edicao_chk else 0,
-                    key="sl_dor_e",
+                    key=chave_widget(st.session_state, "sl_dor_e"),
                 )
                 flex_e = st.number_input(
                     "📐 Flexão Máxima — Esquerdo (°)",
@@ -453,19 +456,19 @@ def render():
                     max_value=160,
                     step=5,
                     value=int(float(dados.get("Flexao_Esq", dados.get("Flexao", 90)))) if modo_edicao_chk else 90,
-                    key="num_flex_e",
+                    key=chave_widget(st.session_state, "num_flex_e"),
                 )
                 ext_e = _seletor_ios(
                     "📏 Extensão Terminal — Esquerdo",
                     opts_ext,
                     dados.get("Extensao_Esq", dados.get("Extensao", "Completa (0°)")) if modo_edicao_chk else "Completa (0°)",
-                    key="pill_ext_e",
+                    key=chave_widget(st.session_state, "pill_ext_e"),
                 )
                 inc_e = _seletor_ios(
                     "💧 Inchaço / Derrame — Esquerdo",
                     opts_inchaco,
                     dados.get("Inchaco_Esq", dados.get("Inchaço", "Nenhum")) if modo_edicao_chk else "Nenhum",
-                    key="pill_inc_e",
+                    key=chave_widget(st.session_state, "pill_inc_e"),
                 )
 
             st.markdown("<hr style='margin: 14px 0;'>", unsafe_allow_html=True)
@@ -484,7 +487,7 @@ def render():
                     "🌙 Qualidade do Sono (Última Noite)",
                     opts_sono,
                     sono_default,
-                    key="pill_sono_bi",
+                    key=chave_widget(st.session_state, "pill_sono_bi"),
                 )
 
             eva_diaria = max(dor_d, dor_e)
@@ -603,7 +606,7 @@ def render():
             options=list(range(-7, 8)),
             value=groc_init,
             format_func=lambda x: f"{x:+d}" if x != 0 else "0",
-            key="slider_groc_7",
+            key=chave_widget(st.session_state, "slider_groc_7"),
         )
         groc_escolhido = MAPA_GROC_LABELS.get(groc_score_num, "⚪ Igual / Sem Mudança (0)")
         st.caption(f"Classificação GROC selecionada: **{groc_escolhido}**")
@@ -626,7 +629,7 @@ def render():
                 "🤝 PASS — Se o joelho permanecesse como está hoje, o paciente estaria satisfeito?",
                 opcoes_pass,
                 pass_default,
-                key="pill_pass",
+                key=chave_widget(st.session_state, "pill_pass"),
             )
             pass_atingido_bool = pass_escolhido.startswith("👍")
 
@@ -652,19 +655,19 @@ def render():
         k1.metric(
             "Progresso rumo ao Objetivo (SANE)",
             f"{sane_hoje}%",
-            f"{ganho_sane:+d}% vs Marco Zero",
+            f"{ganho_sane:+d} pontos percentuais vs avaliação",
         )
         k2.metric(
             "Distância Restante da Meta",
             f"{distancia_meta_hoje}%",
-            "Meta Atingida!" if distancia_meta_hoje <= 10 else "Em construção",
-            delta_color="normal" if distancia_meta_hoje <= 10 else "off",
+            "Meta relatada como alcançada" if distancia_meta_hoje == 0 else "Em construção",
+            delta_color="normal" if distancia_meta_hoje == 0 else "off",
         )
         k3.metric(
             "Mudança Global (GROC -7 a +7)",
             f"{groc_score_num:+d} pts",
-            "MCID Atingido (≥ +3)" if groc_score_num >= 3 else ("Alerta de Piora" if groc_score_num < 0 else "Sub-limiar"),
-            delta_color="normal" if groc_score_num >= 3 else ("inverse" if groc_score_num < 0 else "off"),
+            "Melhora percebida" if groc_score_num > 0 else ("Piora percebida" if groc_score_num < 0 else "Sem mudança percebida"),
+            delta_color="normal" if groc_score_num > 0 else ("inverse" if groc_score_num < 0 else "off"),
         )
 
     # ============================================================
@@ -723,6 +726,8 @@ def render():
                 st.session_state["autosave_checkin_ativo"] = True
                 invalidar_cache("Evolucao")
                 toast("Check-in salvo com sucesso.", "success")
+                st.session_state["_selecionar_checkin_salvo"] = st.session_state["doc_id_checkin"]
+                st.rerun()
             except Exception as e:
                 toast(f"Erro ao guardar os dados: {e}", "error")
 

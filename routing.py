@@ -81,11 +81,17 @@ def aplicar_roteamento():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
+    # A lista também é um destino persistente: uma reconexão não deve reabrir
+    # o prontuário anterior depois de o profissional ter voltado aos pacientes.
+    if st.session_state.get("pagina") == "dados_paciente" and not st.session_state.get("paciente") and not paciente_alvo:
+        st.query_params.pop("pac", None)
+        st.query_params.pop("mod", None)
+
     # Sincroniza o paciente ativo na URL para proteção contínua
     if st.session_state.get("paciente") and not paciente_alvo:
         if query_params.get("pac") != st.session_state.paciente:
             st.query_params["pac"] = st.session_state.paciente
-    if st.session_state.get("modulo_ativo") and not paciente_alvo:
+    if st.session_state.get("paciente") and st.session_state.get("modulo_ativo") and not paciente_alvo:
         if query_params.get("mod") != st.session_state.modulo_ativo:
             st.query_params["mod"] = st.session_state.modulo_ativo
 

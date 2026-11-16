@@ -8,7 +8,8 @@ from datetime import datetime
 from pathlib import Path
 import re
 import types
-from services.medidas import lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
+from services.medidas import grau_derrame, lados_dinamometria, lsi_dinamometria, nota_dor_gesto, pass_registrado, criterios_acompanhamento
+from services.patient_context import chave_widget
 import numpy as np
 import pandas as pd
 
@@ -25,7 +26,7 @@ def execute(nodes, namespace, filename):
 
 
 def load(filename):
-    namespace = dict(pass_registrado=pass_registrado, criterios_acompanhamento=criterios_acompanhamento, pd=pd, np=np, re=re, datetime=datetime, lados_dinamometria=lados_dinamometria,
+    namespace = dict(grau_derrame=grau_derrame, pass_registrado=pass_registrado, criterios_acompanhamento=criterios_acompanhamento, pd=pd, np=np, re=re, datetime=datetime, lados_dinamometria=lados_dinamometria,
                      lsi_dinamometria=lsi_dinamometria, nota_dor_gesto=nota_dor_gesto)
     nodes = []
     for node in tree(filename).body:
@@ -44,7 +45,8 @@ def load(filename):
 
 class Widgets:
     def __init__(self, responses):
-        self.responses = responses
+        self.session_state = {"_contexto_widgets": "test"}
+        self.responses = {chave_widget(self.session_state, k): v for k, v in responses.items()}
     def __enter__(self):
         return self
     def __exit__(self, *args):
@@ -75,7 +77,7 @@ def questionnaire(label, responses):
                    and label in str(item.context_expr.args[0].value)
                    for item in node.items)]
     assert len(matches) == 1, f'Expected exactly one questionnaire block: {label}'
-    ns = dict(st=Widgets(responses), proms_aplicados=[], novas_respostas_proms={},
+    ns = dict(chave_widget=chave_widget, st=Widgets(responses), proms_aplicados=[], novas_respostas_proms={},
               _idx_prom=lambda options, key, default: default,
               _val_prom=lambda key, default: default)
     execute(matches, ns, filename)

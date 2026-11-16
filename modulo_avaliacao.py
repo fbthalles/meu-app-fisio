@@ -403,6 +403,9 @@ def render():
                 registros = {item["id"]: item for item in avaliacoes_existentes}
                 rotulos = {a["id"]: f"✏️ Editar ({a['data'].get('Data_Avaliacao', '?')}) — QP: {a['data'].get('QP', 'Sem descrição')[:45]}" for a in avaliacoes_existentes}
                 opcoes = ["➕ Nova Avaliação", *registros]
+                salvo = st.session_state.pop("_selecionar_avaliacao_salvo", None)
+                if salvo in registros:
+                    st.session_state["seletor_avaliacao"] = salvo
                 escolha = st.selectbox(
                     "🎯 Modo de Operação:",
                     opcoes,
@@ -836,50 +839,50 @@ def render():
             # --- COLUNA MEMBRO DIREITO ---
             with col_fis_d:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['primaria']}; margin-bottom: 8px;'>🦵 Membro Inferior DIREITO</h4>", unsafe_allow_html=True)
-                derrame_d = st.selectbox("Derrame Articular — Direito", op_der, index=get_idx(op_der, "Derrame_Dir", "Derrame"), key="der_d")
-                alinhamento_d = st.selectbox("Alinhamento Estático — Direito", op_ali, index=get_idx(op_ali, "Alinhamento_Dir", "Alinhamento"), key="ali_d")
+                derrame_d = st.selectbox("Derrame Articular — Direito", op_der, index=get_idx(op_der, "Derrame_Dir", "Derrame"), key=chave_widget(st.session_state, "der_d"))
+                alinhamento_d = st.selectbox("Alinhamento Estático — Direito", op_ali, index=get_idx(op_ali, "Alinhamento_Dir", "Alinhamento"), key=chave_widget(st.session_state, "ali_d"))
 
                 st.caption("🔍 Sinais de Hipotrofismo Muscular — Direito")
                 ch_d1, ch_d2, ch_d3 = st.columns(3)
-                hipo_quad_d = ch_d1.selectbox("Quadríceps (D)", op_hipo, index=get_idx(op_hipo, "Hipo_Quad_Dir", "Trofismo_Dir"), key="hq_d")
-                hipo_isq_d = ch_d2.selectbox("Isquiotibiais (D)", op_hipo, index=get_idx(op_hipo, "Hipo_Isq_Dir"), key="hi_d")
-                hipo_tri_d = ch_d3.selectbox("Tríceps Sural (D)", op_hipo, index=get_idx(op_hipo, "Hipo_Tri_Dir"), key="ht_d")
+                hipo_quad_d = ch_d1.selectbox("Quadríceps (D)", op_hipo, index=get_idx(op_hipo, "Hipo_Quad_Dir", "Trofismo_Dir"), key=chave_widget(st.session_state, "hq_d"))
+                hipo_isq_d = ch_d2.selectbox("Isquiotibiais (D)", op_hipo, index=get_idx(op_hipo, "Hipo_Isq_Dir"), key=chave_widget(st.session_state, "hi_d"))
+                hipo_tri_d = ch_d3.selectbox("Tríceps Sural (D)", op_hipo, index=get_idx(op_hipo, "Hipo_Tri_Dir"), key=chave_widget(st.session_state, "ht_d"))
 
                 palpacao_d = st.multiselect(
                     "Estruturas Dolorosas à Palpação — Direito",
                     op_palp,
                     default=get_list(op_palp, "Palpacao_Dir") or get_list(op_palp, "Palpacao"),
-                    key="palp_d",
+                    key=chave_widget(st.session_state, "palp_d"),
                 )
                 c_gd1, c_gd2 = st.columns(2)
                 with c_gd1:
-                    godet_d = st.radio("Sinal de Godet (Dir)", op_godet, index=get_idx(op_godet, "Godet_Dir", "Godet"), key="god_d")
+                    godet_d = st.radio("Sinal de Godet (Dir)", op_godet, index=get_idx(op_godet, "Godet_Dir", "Godet"), key=chave_widget(st.session_state, "god_d"))
                 with c_gd2:
-                    temp_d = st.radio("Temperatura (Dir)", op_temp, index=get_idx(op_temp, "Temperatura_Dir", "Temperatura"), key="tmp_d")
+                    temp_d = st.radio("Temperatura (Dir)", op_temp, index=get_idx(op_temp, "Temperatura_Dir", "Temperatura"), key=chave_widget(st.session_state, "tmp_d"))
 
             # --- COLUNA MEMBRO ESQUERDO ---
             with col_fis_e:
                 st.markdown(f"<h4 style='color: {CORES_GENUA['secundaria']}; margin-bottom: 8px;'>🦵 Membro Inferior ESQUERDO</h4>", unsafe_allow_html=True)
-                derrame_e = st.selectbox("Derrame Articular — Esquerdo", op_der, index=get_idx(op_der, "Derrame_Esq", "Derrame"), key="der_e")
-                alinhamento_e = st.selectbox("Alinhamento Estático — Esquerdo", op_ali, index=get_idx(op_ali, "Alinhamento_Esq", "Alinhamento"), key="ali_e")
+                derrame_e = st.selectbox("Derrame Articular — Esquerdo", op_der, index=get_idx(op_der, "Derrame_Esq", "Derrame"), key=chave_widget(st.session_state, "der_e"))
+                alinhamento_e = st.selectbox("Alinhamento Estático — Esquerdo", op_ali, index=get_idx(op_ali, "Alinhamento_Esq", "Alinhamento"), key=chave_widget(st.session_state, "ali_e"))
 
                 st.caption("🔍 Sinais de Hipotrofismo Muscular — Esquerdo")
                 ch_e1, ch_e2, ch_e3 = st.columns(3)
-                hipo_quad_e = ch_e1.selectbox("Quadríceps (E)", op_hipo, index=get_idx(op_hipo, "Hipo_Quad_Esq", "Trofismo_Esq"), key="hq_e")
-                hipo_isq_e = ch_e2.selectbox("Isquiotibiais (E)", op_hipo, index=get_idx(op_hipo, "Hipo_Isq_Esq"), key="hi_e")
-                hipo_tri_e = ch_e3.selectbox("Tríceps Sural (E)", op_hipo, index=get_idx(op_hipo, "Hipo_Tri_Esq"), key="ht_e")
+                hipo_quad_e = ch_e1.selectbox("Quadríceps (E)", op_hipo, index=get_idx(op_hipo, "Hipo_Quad_Esq", "Trofismo_Esq"), key=chave_widget(st.session_state, "hq_e"))
+                hipo_isq_e = ch_e2.selectbox("Isquiotibiais (E)", op_hipo, index=get_idx(op_hipo, "Hipo_Isq_Esq"), key=chave_widget(st.session_state, "hi_e"))
+                hipo_tri_e = ch_e3.selectbox("Tríceps Sural (E)", op_hipo, index=get_idx(op_hipo, "Hipo_Tri_Esq"), key=chave_widget(st.session_state, "ht_e"))
 
                 palpacao_e = st.multiselect(
                     "Estruturas Dolorosas à Palpação — Esquerdo",
                     op_palp,
                     default=get_list(op_palp, "Palpacao_Esq") or get_list(op_palp, "Palpacao"),
-                    key="palp_e",
+                    key=chave_widget(st.session_state, "palp_e"),
                 )
                 c_ge1, c_ge2 = st.columns(2)
                 with c_ge1:
-                    godet_e = st.radio("Sinal de Godet (Esq)", op_godet, index=get_idx(op_godet, "Godet_Esq", "Godet"), key="god_e")
+                    godet_e = st.radio("Sinal de Godet (Esq)", op_godet, index=get_idx(op_godet, "Godet_Esq", "Godet"), key=chave_widget(st.session_state, "god_e"))
                 with c_ge2:
-                    temp_e = st.radio("Temperatura (Esq)", op_temp, index=get_idx(op_temp, "Temperatura_Esq", "Temperatura"), key="tmp_e")
+                    temp_e = st.radio("Temperatura (Esq)", op_temp, index=get_idx(op_temp, "Temperatura_Esq", "Temperatura"), key=chave_widget(st.session_state, "tmp_e"))
 
         # Card 2 da Aba Físico: Perimetria de Coxa (4 medidas de 5 em 5 cm) e Perna/Panturrilha (3 medidas de 5 em 5 cm)
         with st.container(border=True, key="ficha_perimetria"):
@@ -897,28 +900,28 @@ def render():
 
             st.markdown("**1. Perimetria de Coxa (cm — Acima do pólo superior da patela)**")
             ccx1, ccx2, ccx3, ccx4 = st.columns(4)
-            coxa_5_d = ccx1.number_input("Coxa +5 cm (Dir)", 0.0, 100.0, _get_perim("coxa_5_d"), 0.5, key="cx5d")
-            coxa_10_d = ccx2.number_input("Coxa +10 cm (Dir)", 0.0, 100.0, _get_perim("coxa_10_d", float(dados.get("Perimetria_Dir_cm", 0.0) or 0.0)), 0.5, key="cx10d")
-            coxa_15_d = ccx3.number_input("Coxa +15 cm (Dir)", 0.0, 100.0, _get_perim("coxa_15_d"), 0.5, key="cx15d")
-            coxa_20_d = ccx4.number_input("Coxa +20 cm (Dir)", 0.0, 100.0, _get_perim("coxa_20_d"), 0.5, key="cx20d")
+            coxa_5_d = ccx1.number_input("Coxa +5 cm (Dir)", 0.0, 100.0, _get_perim("coxa_5_d"), 0.5, key=chave_widget(st.session_state, "cx5d"))
+            coxa_10_d = ccx2.number_input("Coxa +10 cm (Dir)", 0.0, 100.0, _get_perim("coxa_10_d", float(dados.get("Perimetria_Dir_cm", 0.0) or 0.0)), 0.5, key=chave_widget(st.session_state, "cx10d"))
+            coxa_15_d = ccx3.number_input("Coxa +15 cm (Dir)", 0.0, 100.0, _get_perim("coxa_15_d"), 0.5, key=chave_widget(st.session_state, "cx15d"))
+            coxa_20_d = ccx4.number_input("Coxa +20 cm (Dir)", 0.0, 100.0, _get_perim("coxa_20_d"), 0.5, key=chave_widget(st.session_state, "cx20d"))
 
             ccx5, ccx6, ccx7, ccx8 = st.columns(4)
-            coxa_5_e = ccx5.number_input("Coxa +5 cm (Esq)", 0.0, 100.0, _get_perim("coxa_5_e"), 0.5, key="cx5e")
-            coxa_10_e = ccx6.number_input("Coxa +10 cm (Esq)", 0.0, 100.0, _get_perim("coxa_10_e", float(dados.get("Perimetria_Esq_cm", 0.0) or 0.0)), 0.5, key="cx10e")
-            coxa_15_e = ccx7.number_input("Coxa +15 cm (Esq)", 0.0, 100.0, _get_perim("coxa_15_e"), 0.5, key="cx15e")
-            coxa_20_e = ccx8.number_input("Coxa +20 cm (Esq)", 0.0, 100.0, _get_perim("coxa_20_e"), 0.5, key="cx20e")
+            coxa_5_e = ccx5.number_input("Coxa +5 cm (Esq)", 0.0, 100.0, _get_perim("coxa_5_e"), 0.5, key=chave_widget(st.session_state, "cx5e"))
+            coxa_10_e = ccx6.number_input("Coxa +10 cm (Esq)", 0.0, 100.0, _get_perim("coxa_10_e", float(dados.get("Perimetria_Esq_cm", 0.0) or 0.0)), 0.5, key=chave_widget(st.session_state, "cx10e"))
+            coxa_15_e = ccx7.number_input("Coxa +15 cm (Esq)", 0.0, 100.0, _get_perim("coxa_15_e"), 0.5, key=chave_widget(st.session_state, "cx15e"))
+            coxa_20_e = ccx8.number_input("Coxa +20 cm (Esq)", 0.0, 100.0, _get_perim("coxa_20_e"), 0.5, key=chave_widget(st.session_state, "cx20e"))
 
             st.markdown("<hr style='margin: 12px 0;'>", unsafe_allow_html=True)
             st.markdown("**2. Perimetria de Perna / Panturrilha (cm — Abaixo da interlinha/TAT)**")
             cpn1, cpn2, cpn3 = st.columns(3)
-            perna_5_d = cpn1.number_input("Perna -5 cm (Dir)", 0.0, 100.0, _get_perim("perna_5_d"), 0.5, key="pn5d")
-            perna_10_d = cpn2.number_input("Perna -10 cm (Dir)", 0.0, 100.0, _get_perim("perna_10_d"), 0.5, key="pn10d")
-            perna_15_d = cpn3.number_input("Perna -15 cm (Dir)", 0.0, 100.0, _get_perim("perna_15_d"), 0.5, key="pn15d")
+            perna_5_d = cpn1.number_input("Perna -5 cm (Dir)", 0.0, 100.0, _get_perim("perna_5_d"), 0.5, key=chave_widget(st.session_state, "pn5d"))
+            perna_10_d = cpn2.number_input("Perna -10 cm (Dir)", 0.0, 100.0, _get_perim("perna_10_d"), 0.5, key=chave_widget(st.session_state, "pn10d"))
+            perna_15_d = cpn3.number_input("Perna -15 cm (Dir)", 0.0, 100.0, _get_perim("perna_15_d"), 0.5, key=chave_widget(st.session_state, "pn15d"))
 
             cpn4, cpn5, cpn6 = st.columns(3)
-            perna_5_e = cpn4.number_input("Perna -5 cm (Esq)", 0.0, 100.0, _get_perim("perna_5_e"), 0.5, key="pn5e")
-            perna_10_e = cpn5.number_input("Perna -10 cm (Esq)", 0.0, 100.0, _get_perim("perna_10_e"), 0.5, key="pn10e")
-            perna_15_e = cpn6.number_input("Perna -15 cm (Esq)", 0.0, 100.0, _get_perim("perna_15_e"), 0.5, key="pn15e")
+            perna_5_e = cpn4.number_input("Perna -5 cm (Esq)", 0.0, 100.0, _get_perim("perna_5_e"), 0.5, key=chave_widget(st.session_state, "pn5e"))
+            perna_10_e = cpn5.number_input("Perna -10 cm (Esq)", 0.0, 100.0, _get_perim("perna_10_e"), 0.5, key=chave_widget(st.session_state, "pn10e"))
+            perna_15_e = cpn6.number_input("Perna -15 cm (Esq)", 0.0, 100.0, _get_perim("perna_15_e"), 0.5, key=chave_widget(st.session_state, "pn15e"))
 
             if coxa_10_d > 0 and coxa_10_e > 0:
                 diff_perim = coxa_10_d - coxa_10_e
@@ -959,15 +962,15 @@ def render():
             c_te_d, c_te_e = st.columns(2, gap="large")
             with c_te_d:
                 st.markdown("**🦵 Joelho DIREITO (Marcar Positivos)**")
-                t_lig_d = st.multiselect("🔗 Ligamentares (Direito)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Dir") or get_list(op_lig, "Testes_Ligamentares"), key="t_lig_d")
-                t_men_d = st.multiselect("🌙 Meniscais (Direito)", op_men, default=get_list(op_men, "Testes_Meniscais_Dir") or get_list(op_men, "Testes_Meniscais"), key="t_men_d")
-                t_pat_d = st.multiselect("🎯 Femoropatelares / Tendíneos (Direito)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Dir") or get_list(op_pat, "Testes_Femoropatelar"), key="t_pat_d")
+                t_lig_d = st.multiselect("🔗 Ligamentares (Direito)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Dir") or get_list(op_lig, "Testes_Ligamentares"), key=chave_widget(st.session_state, "t_lig_d"))
+                t_men_d = st.multiselect("🌙 Meniscais (Direito)", op_men, default=get_list(op_men, "Testes_Meniscais_Dir") or get_list(op_men, "Testes_Meniscais"), key=chave_widget(st.session_state, "t_men_d"))
+                t_pat_d = st.multiselect("🎯 Femoropatelares / Tendíneos (Direito)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Dir") or get_list(op_pat, "Testes_Femoropatelar"), key=chave_widget(st.session_state, "t_pat_d"))
 
             with c_te_e:
                 st.markdown("**🦵 Joelho ESQUERDO (Marcar Positivos)**")
-                t_lig_e = st.multiselect("🔗 Ligamentares (Esquerdo)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Esq"), key="t_lig_e")
-                t_men_e = st.multiselect("🌙 Meniscais (Esquerdo)", op_men, default=get_list(op_men, "Testes_Meniscais_Esq"), key="t_men_e")
-                t_pat_e = st.multiselect("🎯 Femoropatelares / Tendíneos (Esquerdo)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Esq"), key="t_pat_e")
+                t_lig_e = st.multiselect("🔗 Ligamentares (Esquerdo)", op_lig, default=get_list(op_lig, "Testes_Ligamentares_Esq"), key=chave_widget(st.session_state, "t_lig_e"))
+                t_men_e = st.multiselect("🌙 Meniscais (Esquerdo)", op_men, default=get_list(op_men, "Testes_Meniscais_Esq"), key=chave_widget(st.session_state, "t_men_e"))
+                t_pat_e = st.multiselect("🎯 Femoropatelares / Tendíneos (Esquerdo)", op_pat, default=get_list(op_pat, "Testes_Femoropatelar_Esq"), key=chave_widget(st.session_state, "t_pat_e"))
 
     # ------------------------------------------------------------
     # ABA 5: AVALIAÇÃO FUNCIONAL, FORÇA OPCIONAL (LSI + I:Q), CONTROLE MOTOR (DOR) E FLEXIBILIDADE
@@ -1099,15 +1102,15 @@ def render():
         with st.container(border=True, key="ficha_mobilidade"):
             secao("📐 Mobilidade Articular (Goniometria e Lunge Test)", "Amplitude de movimento ativa/passiva de joelho e dorsiflexão em cadeia fechada.")
             c_flex1, c_flex2, c_ext1, c_ext2 = st.columns(4)
-            adm_flex_d = c_flex1.number_input("Flexão (Dir) °", 0.0, 160.0, get_val_str("ADM_Joelho_Flexao", "Dir", 0.0, float), 1.0, key="adm_flex_d")
-            adm_flex_e = c_flex2.number_input("Flexão (Esq) °", 0.0, 160.0, get_val_str("ADM_Joelho_Flexao", "Esq", 0.0, float), 1.0, key="adm_flex_e")
-            adm_ext_d = c_ext1.number_input("Extensão (Dir) °", -15.0, 30.0, get_val_str("ADM_Joelho_Extensao", "Dir", 0.0, float), 1.0, key="adm_ext_d")
-            adm_ext_e = c_ext2.number_input("Extensão (Esq) °", -15.0, 30.0, get_val_str("ADM_Joelho_Extensao", "Esq", 0.0, float), 1.0, key="adm_ext_e")
+            adm_flex_d = c_flex1.number_input("Flexão (Dir) °", 0.0, 160.0, get_val_str("ADM_Joelho_Flexao", "Dir", 0.0, float), 1.0, key=chave_widget(st.session_state, "adm_flex_d"))
+            adm_flex_e = c_flex2.number_input("Flexão (Esq) °", 0.0, 160.0, get_val_str("ADM_Joelho_Flexao", "Esq", 0.0, float), 1.0, key=chave_widget(st.session_state, "adm_flex_e"))
+            adm_ext_d = c_ext1.number_input("Extensão (Dir) °", -15.0, 30.0, get_val_str("ADM_Joelho_Extensao", "Dir", 0.0, float), 1.0, key=chave_widget(st.session_state, "adm_ext_d"))
+            adm_ext_e = c_ext2.number_input("Extensão (Esq) °", -15.0, 30.0, get_val_str("ADM_Joelho_Extensao", "Esq", 0.0, float), 1.0, key=chave_widget(st.session_state, "adm_ext_e"))
 
             st.markdown("<hr style='margin: 14px 0;'>", unsafe_allow_html=True)
             c_lunge1, c_lunge2 = st.columns(2)
-            lunge_d = c_lunge1.number_input("Lunge Test — Tornozelo Direito (cm)", 0.0, 30.0, get_val_str("Lunge_Test", "Dir", 0.0, float), 0.5, key="lunge_d")
-            lunge_e = c_lunge2.number_input("Lunge Test — Tornozelo Esquerdo (cm)", 0.0, 30.0, get_val_str("Lunge_Test", "Esq", 0.0, float), 0.5, key="lunge_e")
+            lunge_d = c_lunge1.number_input("Lunge Test — Tornozelo Direito (cm)", 0.0, 30.0, get_val_str("Lunge_Test", "Dir", 0.0, float), 0.5, key=chave_widget(st.session_state, "lunge_d"))
+            lunge_e = c_lunge2.number_input("Lunge Test — Tornozelo Esquerdo (cm)", 0.0, 30.0, get_val_str("Lunge_Test", "Esq", 0.0, float), 0.5, key=chave_widget(st.session_state, "lunge_e"))
 
         # Card 3: Controle Motor Opcional (Foco na Relação Funcionalidade x Dor igual ao Check-in) + Flexibilidade (Glúteo e Adutores)
         with st.container(border=True, key="ficha_motor"):
@@ -1190,14 +1193,14 @@ def render():
                     "🧘 Flexibilidade / Encurtamentos — Membro DIREITO",
                     op_flex,
                     default=get_list(op_flex, "Flexibilidade_Dir") or get_list(op_flex, "Flexibilidade"),
-                    key="flx_d",
+                    key=chave_widget(st.session_state, "flx_d"),
                 )
             with c_flx_e:
                 flexibilidade_e = st.multiselect(
                     "🧘 Flexibilidade / Encurtamentos — Membro ESQUERDO",
                     op_flex,
                     default=get_list(op_flex, "Flexibilidade_Esq") or get_list(op_flex, "Flexibilidade"),
-                    key="flx_e",
+                    key=chave_widget(st.session_state, "flx_e"),
                 )
 
             st.markdown("<hr style='margin: 18px 0;'>", unsafe_allow_html=True)
@@ -1300,7 +1303,7 @@ def render():
                 score_koos_bruto = 0
                 for idx_k, (ch_k, label_k) in enumerate(perguntas_koos12):
                     with (ck1 if idx_k < 6 else ck2):
-                        esc_k = st.selectbox(label_k, lista_k_op, index=_idx_prom(lista_k_op, ch_k, 4), key=ch_k)
+                        esc_k = st.selectbox(label_k, lista_k_op, index=_idx_prom(lista_k_op, ch_k, 4), key=chave_widget(st.session_state, ch_k))
                         novas_respostas_proms[ch_k] = esc_k
                         score_koos_bruto += koos_op[esc_k]
 
@@ -1314,12 +1317,12 @@ def render():
                 op_ik_freq = ["Constante (0 pts)", "Diária (2 pts)", "Semanal (4 pts)", "Rara (7 pts)", "Nenhuma (10 pts)"]
                 op_ik_at = ["Incapaz (0 pts)", "Atividades Leves (3 pts)", "Moderadas / Corrida leve (6 pts)", "Esporte Intenso / Corte e Giro (10 pts)"]
                 with c_ik1:
-                    ik_dor = st.slider("1. Nível de Alívio de Dor (0=Dor insuportável, 10=Sem dor)", 0, 10, _val_prom("ik1", 10), key="ik1")
-                    ik_freq = st.selectbox("2. Frequência da Dor", op_ik_freq, index=_idx_prom(op_ik_freq, "ik2", 4), key="ik2")
-                    ik_at_nivel = st.selectbox("3. Nível de atividade que consegue realizar sem dor/falseio", op_ik_at, index=_idx_prom(op_ik_at, "ik_at", 3), key="ik_at")
+                    ik_dor = st.slider("1. Nível de Alívio de Dor (0=Dor insuportável, 10=Sem dor)", 0, 10, _val_prom("ik1", 10), key=chave_widget(st.session_state, "ik1"))
+                    ik_freq = st.selectbox("2. Frequência da Dor", op_ik_freq, index=_idx_prom(op_ik_freq, "ik2", 4), key=chave_widget(st.session_state, "ik2"))
+                    ik_at_nivel = st.selectbox("3. Nível de atividade que consegue realizar sem dor/falseio", op_ik_at, index=_idx_prom(op_ik_at, "ik_at", 3), key=chave_widget(st.session_state, "ik_at"))
                 with c_ik2:
-                    ik_func = st.slider("4. Função do Joelho Antes da Lesão (0-10)", 0, 10, _val_prom("ik3", 10), key="ik3")
-                    ik_func_atual = st.slider("5. Função Global do Joelho Hoje (0-10)", 0, 10, _val_prom("ik4", 5), key="ik4")
+                    ik_func = st.slider("4. Função do Joelho Antes da Lesão (0-10)", 0, 10, _val_prom("ik3", 10), key=chave_widget(st.session_state, "ik3"))
+                    ik_func_atual = st.slider("5. Função Global do Joelho Hoje (0-10)", 0, 10, _val_prom("ik4", 5), key=chave_widget(st.session_state, "ik4"))
 
                 ik_pts_freq = 0 if "(0 pts)" in ik_freq else 2 if "(2 pts)" in ik_freq else 4 if "(4 pts)" in ik_freq else 7 if "(7 pts)" in ik_freq else 10
                 ik_pts_at = 0 if "(0 pts)" in ik_at_nivel else 3 if "(3 pts)" in ik_at_nivel else 6 if "(6 pts)" in ik_at_nivel else 10
@@ -1353,7 +1356,7 @@ def render():
                 c_l1, c_l2 = st.columns(2)
                 for i, p in enumerate(perguntas_lefs):
                     with (c_l1 if i < 5 else c_l2):
-                        esc_l = st.selectbox(p, lista_k_lefs, index=_idx_prom(lista_k_lefs, f"lefs_{i}", 0), key=f"lefs_{i}")
+                        esc_l = st.selectbox(p, lista_k_lefs, index=_idx_prom(lista_k_lefs, f"lefs_{i}", 0), key=chave_widget(st.session_state, f"lefs_{i}"))
                         novas_respostas_proms[f"lefs_{i}"] = esc_l
                         score_lefs += opcoes_lefs[esc_l]
 
@@ -1371,17 +1374,17 @@ def render():
             with st.expander("🎯 VISA-P Completo (Tendinopatia Patelar — 8 itens oficiais)", expanded=("VISA-P" in proms_aplicados)):
                 c_v1, c_v2 = st.columns(2)
                 with c_v1:
-                    vp1 = st.slider("1. Minutos sentado sem dor (0-10)", 0, 10, _val_prom("vp1", 10), key="vp1")
-                    vp2 = st.slider("2. Dor ao descer escadas em ritmo normal", 0, 10, _val_prom("vp2", 10), key="vp2")
-                    vp3 = st.slider("3. Dor ao estender ativamente o joelho sem peso", 0, 10, _val_prom("vp3", 10), key="vp3")
-                    vp4 = st.slider("4. Dor ao fazer afundo (lunge) com descarga de peso", 0, 10, _val_prom("vp4", 10), key="vp4")
+                    vp1 = st.slider("1. Minutos sentado sem dor (0-10)", 0, 10, _val_prom("vp1", 10), key=chave_widget(st.session_state, "vp1"))
+                    vp2 = st.slider("2. Dor ao descer escadas em ritmo normal", 0, 10, _val_prom("vp2", 10), key=chave_widget(st.session_state, "vp2"))
+                    vp3 = st.slider("3. Dor ao estender ativamente o joelho sem peso", 0, 10, _val_prom("vp3", 10), key=chave_widget(st.session_state, "vp3"))
+                    vp4 = st.slider("4. Dor ao fazer afundo (lunge) com descarga de peso", 0, 10, _val_prom("vp4", 10), key=chave_widget(st.session_state, "vp4"))
                 with c_v2:
-                    vp5 = st.slider("5. Problemas para agachar totalmente", 0, 10, _val_prom("vp5", 10), key="vp5")
-                    vp6 = st.slider("6. Dor durante/após 10 saltos unipodais", 0, 10, _val_prom("vp6", 10), key="vp6")
+                    vp5 = st.slider("5. Problemas para agachar totalmente", 0, 10, _val_prom("vp5", 10), key=chave_widget(st.session_state, "vp5"))
+                    vp6 = st.slider("6. Dor durante/após 10 saltos unipodais", 0, 10, _val_prom("vp6", 10), key=chave_widget(st.session_state, "vp6"))
                     op_vp7 = ["Não consegue (0 pts)", "Treino modificado (4 pts)", "Treino completo mas nível reduzido (7 pts)", "Competindo no mesmo nível ou maior (10 pts)"]
-                    p7 = st.selectbox("7. Prática Esportiva Atual", op_vp7, index=_idx_prom(op_vp7, "vp7", 0), key="vp7")
+                    p7 = st.selectbox("7. Prática Esportiva Atual", op_vp7, index=_idx_prom(op_vp7, "vp7", 0), key=chave_widget(st.session_state, "vp7"))
                     op_vp8 = ["Dor impede o treino (0 pts)", "Treina até 15 min antes de parar (7 pts)", "Treina com dor suportável (15 pts)", "Treina sem nenhuma dor (30 pts)"]
-                    p8 = st.selectbox("8. Tempo de tolerância ao treino/esporte", op_vp8, index=_idx_prom(op_vp8, "vp8", 0), key="vp8")
+                    p8 = st.selectbox("8. Tempo de tolerância ao treino/esporte", op_vp8, index=_idx_prom(op_vp8, "vp8", 0), key=chave_widget(st.session_state, "vp8"))
 
                 for k_vp, v_vp in [("vp1", vp1), ("vp2", vp2), ("vp3", vp3), ("vp4", vp4), ("vp5", vp5), ("vp6", vp6), ("vp7", p7), ("vp8", p8)]:
                     novas_respostas_proms[k_vp] = v_vp
@@ -1405,15 +1408,15 @@ def render():
                 op_ly_aga = ["5 - Sem problemas", "4 - Levemente prejudicado", "2 - Não passa de 90°", "0 - Impossível"]
 
                 with c_ly1:
-                    ly1 = st.selectbox("1. Claudicação (Mancar)", op_ly_mancar, index=_idx_prom(op_ly_mancar, "ly1", 0), key="ly1")
-                    ly2 = st.selectbox("2. Apoio (Muletas/Bengala)", op_ly_apoio, index=_idx_prom(op_ly_apoio, "ly2", 0), key="ly2")
-                    ly3 = st.selectbox("3. Bloqueio / Travamento", op_ly_trav, index=_idx_prom(op_ly_trav, "ly3", 0), key="ly3")
-                    ly4 = st.selectbox("4. Instabilidade (Falseio)", op_ly_inst, index=_idx_prom(op_ly_inst, "ly4", 0), key="ly4")
+                    ly1 = st.selectbox("1. Claudicação (Mancar)", op_ly_mancar, index=_idx_prom(op_ly_mancar, "ly1", 0), key=chave_widget(st.session_state, "ly1"))
+                    ly2 = st.selectbox("2. Apoio (Muletas/Bengala)", op_ly_apoio, index=_idx_prom(op_ly_apoio, "ly2", 0), key=chave_widget(st.session_state, "ly2"))
+                    ly3 = st.selectbox("3. Bloqueio / Travamento", op_ly_trav, index=_idx_prom(op_ly_trav, "ly3", 0), key=chave_widget(st.session_state, "ly3"))
+                    ly4 = st.selectbox("4. Instabilidade (Falseio)", op_ly_inst, index=_idx_prom(op_ly_inst, "ly4", 0), key=chave_widget(st.session_state, "ly4"))
                 with c_ly2:
-                    ly5 = st.selectbox("5. Dor", op_ly_dor, index=_idx_prom(op_ly_dor, "ly5", 0), key="ly5")
-                    ly6 = st.selectbox("6. Edema / Inchaço", op_ly_inc, index=_idx_prom(op_ly_inc, "ly6", 0), key="ly6")
-                    ly7 = st.selectbox("7. Subir Escadas", op_ly_esc, index=_idx_prom(op_ly_esc, "ly7", 0), key="ly7")
-                    ly8 = st.selectbox("8. Agachamento", op_ly_aga, index=_idx_prom(op_ly_aga, "ly8", 0), key="ly8")
+                    ly5 = st.selectbox("5. Dor", op_ly_dor, index=_idx_prom(op_ly_dor, "ly5", 0), key=chave_widget(st.session_state, "ly5"))
+                    ly6 = st.selectbox("6. Edema / Inchaço", op_ly_inc, index=_idx_prom(op_ly_inc, "ly6", 0), key=chave_widget(st.session_state, "ly6"))
+                    ly7 = st.selectbox("7. Subir Escadas", op_ly_esc, index=_idx_prom(op_ly_esc, "ly7", 0), key=chave_widget(st.session_state, "ly7"))
+                    ly8 = st.selectbox("8. Agachamento", op_ly_aga, index=_idx_prom(op_ly_aga, "ly8", 0), key=chave_widget(st.session_state, "ly8"))
 
                 lista_ly = [("ly1", ly1), ("ly2", ly2), ("ly3", ly3), ("ly4", ly4), ("ly5", ly5), ("ly6", ly6), ("ly7", ly7), ("ly8", ly8)]
                 score_lysholm_calc = 0
@@ -1433,19 +1436,19 @@ def render():
                 with c_w1:
                     st.markdown("**Dor (5 itens)**")
                     for p in ["Andar no plano", "Subir/descer escadas", "À noite na cama", "Sentar ou deitar", "Ficar em pé"]:
-                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wd_{p}", 0), key=f"wd_{p}")
+                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wd_{p}", 0), key=chave_widget(st.session_state, f"wd_{p}"))
                         novas_respostas_proms[f"wd_{p}"] = esc_w
                         score_womac_bruto += w_op[esc_w]
                 with c_w2:
                     st.markdown("**Rigidez (2 itens)**")
                     for p in ["Rigidez matinal", "Rigidez ao final do dia"]:
-                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wr_{p}", 0), key=f"wr_{p}")
+                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wr_{p}", 0), key=chave_widget(st.session_state, f"wr_{p}"))
                         novas_respostas_proms[f"wr_{p}"] = esc_w
                         score_womac_bruto += w_op[esc_w]
                 with c_w3:
                     st.markdown("**Função - AVDs (8 itens)**")
                     for p in ["Descer escadas", "Levantar da cadeira", "Ficar em pé", "Entrar/Sair do carro", "Calçar meias", "Sair da cama", "Entrar/sair do banho", "Tarefas domésticas"]:
-                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wf_{p}", 0), key=f"wf_{p}")
+                        esc_w = st.selectbox(p, lista_w_keys, index=_idx_prom(lista_w_keys, f"wf_{p}", 0), key=chave_widget(st.session_state, f"wf_{p}"))
                         novas_respostas_proms[f"wf_{p}"] = esc_w
                         score_womac_bruto += w_op[esc_w]
 
@@ -1656,6 +1659,8 @@ def render():
                         invalidar_cache("Avaliacao_Inicial")
                         st.session_state["_horario_ultimo_autosave"] = datetime.now().strftime("%H:%M:%S")
                         toast("Avaliação Inicial sincronizada com sucesso!", "success")
+                        st.session_state["_selecionar_avaliacao_salvo"] = st.session_state["doc_id_avaliacao"]
+                        st.rerun()
                     except Exception as e:
                         toast(f"Erro ao comunicar com a base de dados: {e}", "error")
 
